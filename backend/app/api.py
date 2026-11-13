@@ -4,7 +4,10 @@ import psycopg
 from fastapi import FastAPI, Response
 from pydantic import BaseModel
 
+from app.site_api import router
+
 app = FastAPI(title="SiteMind API")
+app.include_router(router)
 
 
 class Health(BaseModel):

@@ -1,0 +1,36 @@
+{
+  "crew_leads": [
+    {
+      "id": "lead-plumbing",
+      "name": "Alex Example"
+    },
+    {
+      "id": "lead-insulation",
+      "name": "Robin Example"
+    },
+    {
+      "id": "lead-drywall",
+      "name": "Sam Example"
+    }
+  ],
+  "crews": [
+    {
+      "id": "plumbing",
+      "name": "Plumbing crew",
+      "trade": "plumbing",
+      "lead_id": "lead-plumbing"
+    },
+    {
+      "id": "insulation",
+      "name": "Insulation crew",
+      "trade": "insulation",
+      "lead_id": "lead-insulation"
+    },
+    {
+      "id": "drywall",
+      "name": "Drywall crew",
+      "trade": "drywall",
+      "lead_id": "lead-drywall"
+    }
+  ]
+}

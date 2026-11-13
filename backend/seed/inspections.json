@@ -1,0 +1,58 @@
+[
+  {
+    "id": "rough-in-F1",
+    "zone_id": "F1",
+    "kind": "rough_in",
+    "status": "pending",
+    "scheduled_at": "2026-11-14T15:00:00Z"
+  },
+  {
+    "id": "insulation-F1",
+    "zone_id": "F1",
+    "kind": "insulation",
+    "status": "pending",
+    "scheduled_at": "2026-11-14T19:00:00Z"
+  },
+  {
+    "id": "rough-in-F2",
+    "zone_id": "F2",
+    "kind": "rough_in",
+    "status": "pending",
+    "scheduled_at": "2026-11-14T15:00:00Z"
+  },
+  {
+    "id": "insulation-F2",
+    "zone_id": "F2",
+    "kind": "insulation",
+    "status": "pending",
+    "scheduled_at": "2026-11-14T19:00:00Z"
+  },
+  {
+    "id": "rough-in-F3",
+    "zone_id": "F3",
+    "kind": "rough_in",
+    "status": "pending",
+    "scheduled_at": "2026-11-14T15:00:00Z"
+  },
+  {
+    "id": "insulation-F3",
+    "zone_id": "F3",
+    "kind": "insulation",
+    "status": "pending",
+    "scheduled_at": "2026-11-14T19:00:00Z"
+  },
+  {
+    "id": "rough-in-F4",
+    "zone_id": "F4",
+    "kind": "rough_in",
+    "status": "pending",
+    "scheduled_at": "2026-11-14T15:00:00Z"
+  },
+  {
+    "id": "insulation-F4",
+    "zone_id": "F4",
+    "kind": "insulation",
+    "status": "pending",
+    "scheduled_at": "2026-11-14T19:00:00Z"
+  }
+]
