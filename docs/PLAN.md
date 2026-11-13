@@ -96,6 +96,21 @@ Ein neuer Konflikttyp ist damit nur eine neue Precondition, keine neue Architekt
 ### 3.5 Baupläne (DWG) als räumliche Grundlage
 - **Pläne liegen als DWG vor**, ein Plan pro Etage. Neue Revisionen kommen als DWG-Anhang per Mail (oder als Seed). DWG ist das, was Architekten im kleinen und mittleren Wohnbau tatsächlich liefern. BIM/IFC ist dort selten.
 - **Aus einem Plan entstehen strukturierte Daten:** Räume/Wohnungen (geschlossene Polylinien plus Raumstempel-Text), Wände, Türen, Sanitär- und Elektro-Elemente. Welcher Layer was bedeutet, regelt eine **Layer-Konvention** (orientiert an AIA/US National CAD Standard bzw. ISO 13567, z. B. `A-WALL`, `A-DOOR`, `P-PLUM`). Die synthetischen Pläne halten sich daran.
+- **Layer-Konvention (festgelegt, Details und Generator in [`cad/README.md`](../cad/README.md)):**
+
+  | Layer | Element | Darstellung |
+  |---|---|---|
+  | `A-WALL-EXTR` | Außenwand | Polylinie auf der Wandachse, Breite = Wandstärke |
+  | `A-WALL` | Innen-, Trenn- und Flurwand | Polylinie auf der Wandachse, Breite = Wandstärke; Türöffnungen sind Lücken |
+  | `A-DOOR` | Tür | Block `DOOR` am Anschlag, Skalierung = Türbreite |
+  | `A-AREA-UNIT` / `A-AREA-UNIT-IDEN` | Wohnung | Geschlossene Polylinie / Text = Zonen-ID (z. B. `3B`) |
+  | `A-AREA` / `A-AREA-IDEN` | Raum, Flur | Geschlossene Polylinie / Raumstempel-Text = Zonen-ID (z. B. `3B-BATH`, `F3-CORE`) |
+  | `P-FIXT` | Sanitärobjekt | Block `WC`, `SINK`, `SHOWER` |
+  | `P-SANR` | Abwasser | Polylinie = Leitung, Block `STACK` = Fallstrang |
+  | `A-ANNO-TTLB` | Plankopf (Blatt, Etage, Revision) | Text; wird beim Parsen und im Plan-Diff ignoriert |
+
+  Zonen-IDs: `BLDG` → `F1`–`F4` → Wohnungen `1A`–`4D` und Flur `F<n>-CORE` → Räume `<Wohnung>-<LIV|BED|KIT|HALL|BATH|STOR>`. Plan `A-10<n>` gehört zu Etage `F<n>`. Jedes Element trägt eine über Revisionen stabile ID als XDATA (`SITEMIND`, z. B. `3B-WALL-09`).
+- **Synthetische Pläne liegen vorerst als DXF vor** (`cad/plans/`, Rev C für alle Etagen, Rev D für A-103). Der DWG-Export ist ein Folgeschritt; bis dahin hängt die Hero-Mail `A-103_RevD.dxf` an, und die Pipeline nutzt den direkten DXF-Weg.
 - **Nicht im DWG und deshalb in Gebäude-Metadaten:** Etagenhöhen, Zuordnung Plan → Etage, Zonen-IDs. Die Zonenhierarchie ist also unabhängig vom CAD-Parsing sofort verfügbar. Das Parsing füllt die Geometrie nach und verknüpft sie über den Raumstempel mit den Zonen-IDs.
 - **Gemeinsame Zonen-IDs für #3/#5:** Gebäude `B1`, Etagen `F1`–`F4`, Wohnungen `1A`–`4D`, Hero-Bad `3B-BATH`, Badwand `3B-BATH-WALL`. CAD-Stempel verwenden exakt die IDs. Hierarchie, Plan-Zuordnung und Seed-Vertrag stehen in [SITE_RECORD.md](SITE_RECORD.md).
 - **Eine Quelle für alle:** Die extrahierte Geometrie wird über die API bereitgestellt. Die 3D-Ansicht (Wände auf Etagenhöhe extrudiert) und der Agent nutzen **dieselben** Daten. Der Agent bekommt nie rohe CAD-Dateien, sondern Abfragen wie „Was ist in Zone X?“ oder „Was hat sich zwischen Rev C und Rev D in Zone X geändert?“.
@@ -292,5 +307,5 @@ Schlaf in Schichten, sodass nachts immer jemand reviewen und mergen kann.
 - [ ] Klären, ob das private Repo in eine Talona- bzw. proximata-Org übertragen werden muss
 - [ ] Eskalationsfrist und Löschfrist für die Demo festlegen
 - [x] DWG-Konverter gewählt: LibreDWG als separater Prozess; Details in docs/CAD-CONVERTER.md. Lizenz und Plattformen dokumentiert.
-- [ ] Layer-Konvention für die synthetischen Pläne festlegen und in §3.5 eintragen
+- [x] Layer-Konvention für die synthetischen Pläne festgelegt und in §3.5 eingetragen (Details: `cad/README.md`)
 - [ ] Mentor fragen: Wie liegen Pläne bei Talonas Kunden typischerweise vor (DWG, PDF, beides)?
