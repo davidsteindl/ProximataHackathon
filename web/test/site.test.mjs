@@ -15,6 +15,7 @@ test("schedule filtering reaches REST and other overview data remains unfiltered
   });
   assert.equal(result.error, null);
   assert.equal(result.data.site.id, "SITE-DEMO");
+  assert.ok(urls.some((url) => url.pathname === "/evidence"));
   const tasks = urls.find((url) => url.pathname === "/tasks");
   assert.equal(tasks.searchParams.get("zone_id"), "F3");
   assert.equal(tasks.searchParams.get("from_time"), "2026-11-15T00:00:00Z");

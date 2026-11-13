@@ -3,7 +3,9 @@
 import argparse
 import csv
 import json
+from datetime import UTC, datetime
 from pathlib import Path
+from uuid import uuid4
 
 from sqlalchemy import delete
 from sqlalchemy.orm import Session
@@ -26,6 +28,7 @@ def load_seed(directory: Path) -> schemas.Seed:
         **read("revisions.json"),
         "inspections": read("inspections.json"),
         "tasks": tasks,
+        "evidence": read("evidence.json"),
     })
 
 
@@ -34,6 +37,7 @@ def import_seed(session: Session, seed: schemas.Seed) -> schemas.ImportResult:
     # the old or the new snapshot, never a partly imported hierarchy.
     with session.begin():
         for table in (
+            models.EvidenceReview.__table__, models.Evidence.__table__,
             models.task_dependencies, models.RevisionAcknowledgment.__table__,
             models.revision_zones, models.Inspection.__table__, models.Task.__table__,
             models.Revision.__table__, models.Plan.__table__, models.Crew.__table__,
@@ -78,11 +82,25 @@ def import_seed(session: Session, seed: schemas.Seed) -> schemas.ImportResult:
             models.Inspection(**inspection.model_dump())
             for inspection in seed.inspections
         ])
+        session.flush()
+        import_ref, imported_at = uuid4().hex, datetime.now(UTC)
+        for evidence in seed.evidence:
+            record = models.Evidence(
+                **evidence.model_dump(exclude={"scope", "review_status"}),
+                **evidence.scope.model_dump(),
+                import_ref=import_ref, imported_at=imported_at,
+            )
+            record.history = [models.EvidenceReview(
+                sequence=1, status=evidence.review_status, actor_type="seed_import",
+                reviewer_id=None, reviewer_role=None, decided_at=None,
+                recorded_at=imported_at,
+            )]
+            session.add(record)
 
     return schemas.ImportResult(
         site_id=seed.site.id,
         **{key: len(getattr(seed, key)) for key in (
-            "zones", "tasks", "crews", "plans", "revisions", "acknowledgments", "inspections",
+            "zones", "tasks", "crews", "plans", "revisions", "acknowledgments", "inspections", "evidence",
         )},
     )
 

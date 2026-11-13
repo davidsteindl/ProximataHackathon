@@ -110,3 +110,28 @@ def replace_seed(seed: schemas.Seed, session: Database):
         return import_seed(session, seed)
     except IntegrityError as error:
         raise HTTPException(409, "Seed import conflicted with stored records") from error
+
+
+@router.get("/evidence", response_model=list[schemas.EvidenceView], tags=["Evidence"])
+def get_evidence(
+    session: Database,
+    zone_id: str | None = None,
+    include_descendants: bool = True,
+    inspection_id: str | None = None,
+    task_id: str | None = None,
+    crew_id: str | None = None,
+    revision_id: str | None = None,
+    review_status: schemas.ReviewStatus | None = None,
+):
+    """Source-backed evidence with exact scope and ordered review history; not a Precondition evaluation."""
+    statement = select(models.Evidence).order_by(models.Evidence.id)
+    if zone_id is not None:
+        statement = statement.where(models.Evidence.zone_id.in_(zone_scope(session, zone_id, include_descendants)))
+    for key, value in (
+        ("inspection_id", inspection_id), ("task_id", task_id),
+        ("crew_id", crew_id), ("revision_id", revision_id),
+    ):
+        if value is not None:
+            statement = statement.where(getattr(models.Evidence, key) == value)
+    records = session.scalars(statement).all()
+    return [record for record in records if review_status is None or record.review_status == review_status]

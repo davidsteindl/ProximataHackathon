@@ -2,7 +2,7 @@ from datetime import date, datetime
 
 from sqlalchemy import (
     CheckConstraint, Column, DateTime, Float, ForeignKey, Integer, String, Table,
-    UniqueConstraint,
+    UniqueConstraint, event, inspect,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
@@ -130,3 +130,83 @@ class Inspection(Base):
     kind: Mapped[str] = mapped_column(String(64))
     status: Mapped[str] = mapped_column(String(20))
     scheduled_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class Evidence(Base):
+    __tablename__ = "evidence"
+    __table_args__ = (
+        CheckConstraint("kind IN ('inspection','task_completion','revision_acknowledgment')", name="evidence_kind"),
+        CheckConstraint("origin IN ('seed_baseline','seed_statement','llm_statement')", name="evidence_origin"),
+        CheckConstraint(
+            "(kind = 'inspection' AND task_id IS NULL AND crew_id IS NULL AND revision_id IS NULL AND claim IN ('pending','passed','failed')) OR "
+            "(kind = 'task_completion' AND inspection_id IS NULL AND crew_id IS NULL AND revision_id IS NULL AND claim IN ('completed','not_completed')) OR "
+            "(kind = 'revision_acknowledgment' AND inspection_id IS NULL AND task_id IS NULL AND claim IN ('acknowledged','not_acknowledged'))",
+            name="evidence_subject",
+        ),
+    )
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    origin: Mapped[str] = mapped_column(String(30))
+    statement_ref: Mapped[str | None] = mapped_column(String(200))
+    source_ref: Mapped[str] = mapped_column(String(200))
+    quote: Mapped[str] = mapped_column(String(2000))
+    kind: Mapped[str] = mapped_column(String(30))
+    claim: Mapped[str] = mapped_column(String(30))
+    zone_id: Mapped[str | None] = mapped_column(ForeignKey("zones.id"), index=True)
+    inspection_id: Mapped[str | None] = mapped_column(ForeignKey("inspections.id"), index=True)
+    task_id: Mapped[str | None] = mapped_column(ForeignKey("tasks.id"), index=True)
+    crew_id: Mapped[str | None] = mapped_column(ForeignKey("crews.id"))
+    revision_id: Mapped[str | None] = mapped_column(ForeignKey("revisions.id"))
+    import_ref: Mapped[str | None] = mapped_column(String(64))
+    imported_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    history: Mapped[list["EvidenceReview"]] = relationship(
+        lazy="selectin", order_by="EvidenceReview.sequence",
+    )
+
+    @property
+    def review_status(self):
+        return self.history[-1].status if self.history else "unconfirmed"
+
+    @property
+    def scope(self):
+        return {key: getattr(self, key) for key in (
+            "kind", "zone_id", "inspection_id", "task_id", "crew_id", "revision_id",
+        )}
+
+
+class EvidenceReview(Base):
+    __tablename__ = "evidence_reviews"
+    __table_args__ = (
+        UniqueConstraint("evidence_id", "sequence", name="evidence_review_sequence"),
+        CheckConstraint("sequence > 0", name="evidence_review_positive_sequence"),
+        CheckConstraint("status IN ('unconfirmed','confirmed','rejected')", name="evidence_review_status"),
+        CheckConstraint(
+            "(actor_type = 'human' AND status IN ('confirmed','rejected') AND "
+            "reviewer_id IS NOT NULL AND length(reviewer_id) > 0 AND "
+            "reviewer_role IS NOT NULL AND reviewer_role IN ('superintendent','crew_lead') AND decided_at IS NOT NULL) OR "
+            "(actor_type IN ('seed_import','statement_ingestion') AND reviewer_id IS NULL AND "
+            "reviewer_role IS NULL AND decided_at IS NULL AND "
+            "(status = 'unconfirmed' OR (actor_type = 'seed_import' AND status = 'confirmed')))",
+            name="evidence_review_actor",
+        ),
+    )
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    evidence_id: Mapped[str] = mapped_column(ForeignKey("evidence.id"), index=True)
+    sequence: Mapped[int] = mapped_column(Integer)
+    status: Mapped[str] = mapped_column(String(20))
+    actor_type: Mapped[str] = mapped_column(String(30))
+    reviewer_id: Mapped[str | None] = mapped_column(String(64))
+    reviewer_role: Mapped[str | None] = mapped_column(String(30))
+    decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    recorded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+@event.listens_for(EvidenceReview, "before_update")
+@event.listens_for(EvidenceReview, "before_delete")
+def preserve_evidence_review_history(_mapper, _connection, _record):
+    raise ValueError("Evidence review history is append-only; use explicit seed reset to clear demo data")
+
+
+@event.listens_for(Evidence, "before_update")
+def preserve_evidence_source_and_scope(_mapper, _connection, record):
+    if any(inspect(record).attrs[column.key].history.has_changes() for column in Evidence.__table__.columns):
+        raise ValueError("Evidence content is immutable; store a new statement or clarification separately")

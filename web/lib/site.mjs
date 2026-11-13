@@ -10,6 +10,7 @@ export async function getSiteOverview(baseUrl, { zoneId, fromDate, toDate } = {}
     crews: "/crews",
     plans: "/plans",
     inspections: "/inspections",
+    evidence: "/evidence",
     tasks: `/tasks?${query}`,
   };
   try {

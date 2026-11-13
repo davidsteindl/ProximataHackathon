@@ -1,0 +1,125 @@
+[
+  {
+    "id": "baseline-ack-F1",
+    "origin": "seed_baseline",
+    "source_ref": "seed:revisions.json#A-101-C/plumbing",
+    "quote": "Explicit synthetic baseline: plumbing acknowledged A-101 Rev C.",
+    "claim": "acknowledged",
+    "review_status": "confirmed",
+    "scope": {
+      "kind": "revision_acknowledgment",
+      "zone_id": "F1",
+      "crew_id": "plumbing",
+      "revision_id": "A-101-C"
+    }
+  },
+  {
+    "id": "baseline-ack-F2",
+    "origin": "seed_baseline",
+    "source_ref": "seed:revisions.json#A-102-C/plumbing",
+    "quote": "Explicit synthetic baseline: plumbing acknowledged A-102 Rev C.",
+    "claim": "acknowledged",
+    "review_status": "confirmed",
+    "scope": {
+      "kind": "revision_acknowledgment",
+      "zone_id": "F2",
+      "crew_id": "plumbing",
+      "revision_id": "A-102-C"
+    }
+  },
+  {
+    "id": "baseline-ack-F3",
+    "origin": "seed_baseline",
+    "source_ref": "seed:revisions.json#A-103-C/plumbing",
+    "quote": "Explicit synthetic baseline: plumbing acknowledged A-103 Rev C.",
+    "claim": "acknowledged",
+    "review_status": "confirmed",
+    "scope": {
+      "kind": "revision_acknowledgment",
+      "zone_id": "F3",
+      "crew_id": "plumbing",
+      "revision_id": "A-103-C"
+    }
+  },
+  {
+    "id": "baseline-ack-F4",
+    "origin": "seed_baseline",
+    "source_ref": "seed:revisions.json#A-104-C/plumbing",
+    "quote": "Explicit synthetic baseline: plumbing acknowledged A-104 Rev C.",
+    "claim": "acknowledged",
+    "review_status": "confirmed",
+    "scope": {
+      "kind": "revision_acknowledgment",
+      "zone_id": "F4",
+      "crew_id": "plumbing",
+      "revision_id": "A-104-C"
+    }
+  },
+  {
+    "id": "baseline-rough-in-F3",
+    "origin": "seed_baseline",
+    "source_ref": "seed:inspections.json#rough-in-F3",
+    "quote": "Explicit synthetic baseline: floor 3 rough-in inspection is still pending.",
+    "claim": "pending",
+    "review_status": "confirmed",
+    "scope": {
+      "kind": "inspection",
+      "zone_id": "F3",
+      "inspection_id": "rough-in-F3"
+    }
+  },
+  {
+    "id": "example-missing-scope",
+    "origin": "seed_statement",
+    "statement_ref": "example-statement-missing-scope",
+    "source_ref": "seed:evidence.json#example-missing-scope",
+    "quote": "The inspection has passed; the zone and inspection are unspecified.",
+    "claim": "passed",
+    "review_status": "unconfirmed",
+    "scope": {
+      "kind": "inspection"
+    }
+  },
+  {
+    "id": "example-ambiguous",
+    "origin": "seed_statement",
+    "statement_ref": "example-statement-ambiguous",
+    "source_ref": "seed:evidence.json#example-ambiguous",
+    "quote": "Abnahme duerfte passen.",
+    "claim": "passed",
+    "review_status": "unconfirmed",
+    "scope": {
+      "kind": "inspection",
+      "zone_id": "F3",
+      "inspection_id": "rough-in-F3"
+    }
+  },
+  {
+    "id": "example-contradictory-positive",
+    "origin": "seed_statement",
+    "statement_ref": "example-statement-contradictory-positive",
+    "source_ref": "seed:evidence.json#example-contradictory-positive",
+    "quote": "The floor 3 rough-in inspection passed.",
+    "claim": "passed",
+    "review_status": "unconfirmed",
+    "scope": {
+      "kind": "inspection",
+      "zone_id": "F3",
+      "inspection_id": "rough-in-F3"
+    }
+  },
+  {
+    "id": "example-contradictory-negative",
+    "origin": "seed_statement",
+    "statement_ref": "example-statement-contradictory-negative",
+    "source_ref": "seed:evidence.json#example-contradictory-negative",
+    "quote": "The floor 3 rough-in inspection failed.",
+    "claim": "failed",
+    "review_status": "unconfirmed",
+    "scope": {
+      "kind": "inspection",
+      "zone_id": "F3",
+      "inspection_id": "rough-in-F3"
+    }
+  }
+]

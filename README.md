@@ -19,6 +19,12 @@ In PowerShell statt `cp`: `Copy-Item .env.example .env`. Beim ersten Start baut 
 - Statischer Site Record (Issue #5): Nach dem Start in einem zweiten Terminal
   `docker compose exec api python -m app.seed` ausführen. Das Dashboard zeigt dann
   Zonen, Terminplan, Crews, Revisionen/Bestätigungen und Inspections.
+  Evidence mit Quelle, genauem Geltungsbereich und Prüf-Historie steht unter
+  `/evidence` sowie lesend im Dashboard. Synthetische Ausgangsnachweise sind
+  von unbestätigten Aussage-Beispielen getrennt; Seed-Herkunft ersetzt keine
+  erfundene menschliche Freigabe. Der explizite Demo-Reset setzt auch diese
+  Nachweise samt Historie zurück. Extraktion (#6) und menschliche Prüf-Aktion
+  (#9) verwenden den Vertrag in [SITE_RECORD.md](docs/SITE_RECORD.md).
   Derselbe Befehl setzt die statischen Daten auf den Seed-Ausgangszustand zurück.
   Format, Zonen-IDs für #3, REST-Vertrag und Migrationen: [docs/SITE_RECORD.md](docs/SITE_RECORD.md).
 - API-Health: http://localhost:8000/health – `200` mit

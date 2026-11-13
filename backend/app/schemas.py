@@ -124,6 +124,82 @@ class Inspection(Record):
     scheduled_at: Timestamp
 
 
+ReviewStatus = Literal["unconfirmed", "confirmed", "rejected"]
+
+
+class EvidenceScope(Record):
+    kind: Literal["inspection", "task_completion", "revision_acknowledgment"]
+    zone_id: Identifier | None = None
+    inspection_id: Identifier | None = None
+    task_id: Identifier | None = None
+    crew_id: Identifier | None = None
+    revision_id: Identifier | None = None
+
+    @model_validator(mode="after")
+    def subject_fields(self):
+        fields = {
+            "inspection": {"inspection_id"},
+            "task_completion": {"task_id"},
+            "revision_acknowledgment": {"crew_id", "revision_id"},
+        }
+        allowed = fields[self.kind]
+        if any(getattr(self, key) is not None for key in {"inspection_id", "task_id", "crew_id", "revision_id"} - allowed):
+            raise ValueError("Evidence scope mixes different subjects")
+        return self
+
+
+class EvidenceReview(Record):
+    sequence: int
+    status: ReviewStatus
+    actor_type: Literal["seed_import", "statement_ingestion", "human"]
+    reviewer_id: Identifier | None
+    reviewer_role: Literal["superintendent", "crew_lead"] | None
+    decided_at: Timestamp | None
+    recorded_at: Timestamp
+
+
+class EvidenceView(Record):
+    id: Identifier
+    origin: Literal["seed_baseline", "seed_statement", "llm_statement"]
+    statement_ref: Name | None
+    source_ref: Name
+    quote: str
+    claim: str
+    scope: EvidenceScope
+    review_status: ReviewStatus
+    import_ref: str | None
+    imported_at: Timestamp | None
+    history: list[EvidenceReview]
+
+
+class SeedEvidence(Record):
+    id: Identifier
+    origin: Literal["seed_baseline", "seed_statement"]
+    statement_ref: Name | None = None
+    source_ref: Name
+    quote: Annotated[str, Field(min_length=1, max_length=2000)]
+    claim: str
+    scope: EvidenceScope
+    review_status: Literal["unconfirmed", "confirmed"] = "unconfirmed"
+
+    @model_validator(mode="after")
+    def seed_trust_boundary(self):
+        claims = {
+            "inspection": {"pending", "passed", "failed"},
+            "task_completion": {"completed", "not_completed"},
+            "revision_acknowledgment": {"acknowledged", "not_acknowledged"},
+        }
+        if self.claim not in claims[self.scope.kind]:
+            raise ValueError("Claim does not match evidence kind")
+        if not self.source_ref.startswith("seed:"):
+            raise ValueError("Seed evidence must have explicit seed source provenance")
+        if self.origin == "seed_statement" and (self.review_status != "unconfirmed" or self.statement_ref is None):
+            raise ValueError("Seed statement examples require a statement_ref and must remain unconfirmed")
+        if self.origin == "seed_baseline" and self.statement_ref is not None:
+            raise ValueError("Baseline facts are explicit seed evidence, not extracted statements")
+        return self
+
+
 class Seed(Record):
     site: Site
     zones: list[Zone] = Field(min_length=1)
@@ -134,6 +210,7 @@ class Seed(Record):
     revisions: list[Revision]
     acknowledgments: list[RevisionAcknowledgment]
     inspections: list[Inspection]
+    evidence: list[SeedEvidence]
 
     @model_validator(mode="after")
     def valid_references(self):
@@ -150,7 +227,8 @@ class Seed(Record):
         zones, plans = index(self.zones), index(self.plans)
         leads, crews = index(self.crew_leads), index(self.crews)
         tasks, revisions = index(self.tasks), index(self.revisions)
-        index(self.inspections)
+        inspections = index(self.inspections)
+        index(self.evidence)
         index(self.acknowledgments, lambda item: (item.crew_id, item.revision_id))
         index(self.revisions, lambda item: (item.plan_id, item.sequence))
         index(self.revisions, lambda item: (item.plan_id, item.label))
@@ -199,6 +277,28 @@ class Seed(Record):
             require(acknowledgment.acknowledged_at >= revisions[acknowledgment.revision_id].issued_at, "Acknowledgment precedes revision")
         for inspection in self.inspections:
             require(inspection.zone_id in zones, f"Unknown zone for inspection {inspection.id}")
+        for evidence in self.evidence:
+            scope = evidence.scope
+            for key, collection in (
+                ("zone_id", zones), ("inspection_id", inspections), ("task_id", tasks),
+                ("crew_id", crews), ("revision_id", revisions),
+            ):
+                reference = getattr(scope, key)
+                require(reference is None or reference in collection, f"Unknown {key} for evidence {evidence.id}")
+            if evidence.review_status != "confirmed":
+                continue  # Missing/unclear scopes remain reviewable, never confirmed.
+            require(scope.zone_id is not None, "Confirmed baseline evidence requires a zone")
+            if scope.kind == "inspection":
+                require(scope.inspection_id is not None and inspections[scope.inspection_id].zone_id == scope.zone_id, "Confirmed inspection scope must match the inspection zone")
+                require(inspections[scope.inspection_id].status == evidence.claim, "Baseline inspection evidence must match the baseline outcome")
+            elif scope.kind == "task_completion":
+                require(scope.task_id is not None and tasks[scope.task_id].zone_id == scope.zone_id, "Confirmed task scope must match the task zone")
+            else:
+                require(scope.crew_id is not None and scope.revision_id is not None, "Confirmed acknowledgment needs a crew and exact revision")
+                revision = revisions[scope.revision_id]
+                require(scope.zone_id in revision.zone_ids or scope.zone_id == plans[revision.plan_id].floor_id, "Confirmed acknowledgment zone must belong to the exact revision")
+                if evidence.claim == "acknowledged":
+                    require(any(ack.crew_id == scope.crew_id and ack.revision_id == scope.revision_id for ack in self.acknowledgments), "Confirmed baseline acknowledgment must match a baseline record")
         return self
 
 
@@ -211,3 +311,4 @@ class ImportResult(Record):
     revisions: int
     acknowledgments: int
     inspections: int
+    evidence: int

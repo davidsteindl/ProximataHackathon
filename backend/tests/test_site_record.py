@@ -161,10 +161,10 @@ def test_plan_current_revision_uses_sequence_and_preserves_ack_history(engine, s
 
 def test_empty_record_and_openapi_contract(client):
     assert client.get("/site").json() is None
-    for path in ("/zones", "/tasks", "/crews", "/plans", "/inspections"):
+    for path in ("/zones", "/tasks", "/crews", "/plans", "/inspections", "/evidence"):
         assert client.get(path).json() == []
     spec = client.get("/openapi.json").json()
-    assert {"/site", "/zones", "/tasks", "/crews", "/plans", "/inspections", "/seed/import"} <= spec["paths"].keys()
+    assert {"/site", "/zones", "/tasks", "/crews", "/plans", "/inspections", "/seed/import", "/evidence"} <= spec["paths"].keys()
     assert "Seed" in spec["components"]["schemas"]
 
 
@@ -178,3 +178,4 @@ def test_migration_matches_models_and_round_trips(engine):
         assert inspect(connection).get_table_names() == ["alembic_version"]
         command.upgrade(config, "head")
         assert "revision_acknowledgments" in inspect(connection).get_table_names()
+        assert "evidence_reviews" in inspect(connection).get_table_names()

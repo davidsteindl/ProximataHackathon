@@ -47,6 +47,9 @@ The command validates all files and relationships before changing data, then
 replaces the entire static snapshot in one transaction. Repeating it is the reset
 operation: modified records revert, extra static records disappear and no duplicates
 accumulate. A failed import rolls back. The schema and migration history remain.
+Explicit demo reset also replaces Evidence and its review history; normal review
+history is append-only between resets. A fresh import batch reference and actual
+UTC import timestamp distinguish each reset from a human review decision.
 There is no automatic seed import on API startup, so restarts preserve state.
 
 For a different complete seed directory:
@@ -82,10 +85,11 @@ cyclic task predecessors and invalid time ranges are rejected.
 | `crews.json` | Object with `crew_leads`, `crews` |
 | `revisions.json` | Object with `revisions`, `acknowledgments` |
 | `inspections.json` | Array of Inspections |
+| `evidence.json` | Array of Evidence seed records; explicit synthetic baseline facts and unconfirmed statement examples |
 | `schedule.csv` | Header `id,name,zone_id,crew_id,starts_at,ends_at,predecessor_ids`; predecessor IDs separated by `\|`, empty for none |
 
 The combined REST `Seed` object has the keys `site`, `zones`, `plans`,
-`crew_leads`, `crews`, `tasks`, `revisions`, `acknowledgments`, `inspections`.
+`crew_leads`, `crews`, `tasks`, `revisions`, `acknowledgments`, `inspections`, `evidence`.
 All collections are required, even if empty; at least the building Zone is required.
 
 | Entity | Fields |
@@ -141,12 +145,101 @@ Current Revision is the greatest `sequence` per Plan, not lexical label order.
 Labels and sequences are unique per Plan. Historical acknowledgments stay attached
 to the acknowledged Revision; they never become acknowledgment of a newer one.
 
+## Evidence confirmation contract (alignment #30)
+
+`Evidence` is a separate source-backed record, not an Event, a domain outcome or
+a Precondition evaluation. The immutable `claim` records what is asserted;
+`review_status` records its review state. Inspection status, Task schedule and
+Crew RevisionAcknowledgment records are not automatically changed by storing
+Evidence or a review. Neither an acknowledgment record nor `Inspection.status`
+alone is proof that a Precondition is satisfied. Rules in #7/#8 must consider
+valid, current, correctly scoped reviewed Evidence and relevant counterclaims.
+
+`GET /evidence` exposes these fields:
+
+| Field | Meaning |
+|---|---|
+| `id` | Evidence identity, separate from an extracted statement |
+| `origin` | `seed_baseline`, `seed_statement` (synthetic example), or `llm_statement` (#6) |
+| `statement_ref` | Opaque reference to the extracted statement stored by #6; null for explicit baseline facts. Example refs are visibly synthetic, not fabricated Events |
+| `source_ref`, `quote` | Source identity and the relevant original quote, preserved with the Evidence |
+| `claim` | Inspection `pending`/`passed`/`failed`, Task `completed`/`not_completed`, or Revision `acknowledged`/`not_acknowledged` |
+| `scope` | `kind` (`inspection`, `task_completion`, `revision_acknowledgment`), `zone_id`, and the matching `inspection_id`/`task_id` or `crew_id` + exact `revision_id` |
+| `review_status` | `unconfirmed`, `confirmed`, `rejected`, derived from the last review sequence; missing history defaults to unconfirmed |
+| `import_ref`, `imported_at` | Server-generated batch ID and actual UTC import time for seed provenance; nullable for future non-seed ingestion |
+| `history` | Ordered, append-only review records with `sequence`, `status`, `actor_type`, `reviewer_id`, `reviewer_role`, `decided_at`, `recorded_at` |
+
+Filters are `zone_id`/`include_descendants`, `inspection_id`, `task_id`,
+`crew_id`, `revision_id`, `review_status`; supplied filters combine with AND.
+For example, `/evidence?crew_id=plumbing&revision_id=A-103-C` is scoped to that
+exact Revision, not automatically the latest Plan Revision. Missing evidence
+returns `[]`; unresolved scope fields are null, never interpreted as global scope.
+
+### Seed and reset
+
+`evidence.json` contains the `id`, `origin`, `statement_ref` (optional for baseline),
+`source_ref`, `quote`, `claim`, `scope`, `review_status` fields from the table.
+Every source must explicitly use `seed:` provenance. Only `seed_baseline` may
+start confirmed; its complete, matching scope and baseline outcome are validated.
+Baseline Revision acknowledgment evidence includes the Plan's floor or one of
+its Revision zones, the Crew and exact Revision ID. Baseline Inspection/Task
+evidence must match the subject's Zone. A missing or mismatched scope cannot
+be imported as confirmed.
+
+The sample provides five confirmed baseline facts: plumbing acknowledgment of
+Rev C on each floor and the still-pending F3 rough-in Inspection. They have
+`actor_type=seed_import`, actual import provenance, **no human reviewer and no
+human decision timestamp**. Import time is not misrepresented as human approval.
+
+Four separately identified `seed_statement` examples remain unconfirmed:
+missing Zone/Inspection scope, ambiguous wording, and a pair asserting opposing
+results for the exact same F3 Inspection. `insulation-F3` also deliberately has
+no Evidence (a missing-evidence read returns `[]`). These examples do not overwrite
+the baseline's pending status, resolve contradictions or make work safe to start.
+Seed payloads cannot supply review history or invent a reviewer; statement examples
+cannot be promoted to confirmed through import. Reset restores these same trust
+boundaries, removes later demo decisions, and gives the new import fresh provenance.
+
+Migration `0002` only adds storage; it does not retroactively confirm existing
+domain records. Existing demos can explicitly rerun the seed command to create
+the labelled baseline and examples. The seed endpoint is a destructive demo
+bootstrap/reset operation, not an Evidence confirmation action for agents.
+
+### Handoff to #6 and #9
+
+- #6 stores extracted statements/Events separately and links Evidence using
+  `statement_ref`, `source_ref` and `quote`. Use `origin=llm_statement`, initially
+  unconfirmed, regardless of confidence. The initial review has
+  `actor_type=statement_ingestion`, no reviewer/decision timestamp and a real
+  `recorded_at`. The storage constraint rejects confirmed ingestion reviews.
+  Do not call the seed endpoint to ingest live/cached/offline extracted statements.
+- #9 implements the separate human review API/dashboard action and its caller
+  restrictions and re-evaluation. Append a new `EvidenceReview` with increasing
+  `sequence`; do not update/delete earlier reviews. Human decisions require a
+  reviewer ID, role (`superintendent`/`crew_lead`), and decision timestamp. Validate
+  source, complete matching scope and the responsible human before accepting a
+  decision; confirmation/rejection must work without a Flag. Uniqueness on
+  `(evidence_id, sequence)` detects concurrent sequence conflicts; the action must
+  handle/retry a conflict without overwriting history.
+- Evidence source, quote, claim and scope remain immutable, retaining the exact
+  material reviewed by every decision. Clarification is a new Evidence record
+  linked to the statement rather than silently editing a prior reviewed scope.
+  ORM guards reject ordinary updates/deletes of review history and changes to
+  Evidence content; direct SQL is not an authorization boundary. Only the explicit
+  seed reset clears this demo history using the transaction described above.
+- The current dashboard displays scope, source/quote, origin, review status and
+  history read-only. It contains no confirm/reject action. This issue does not
+  implement #6 extraction, #9 review actions, caller authorization, rule evaluation,
+  Flag transitions or the four Precondition evaluations.
+
 ## Schema and migrations
 
 SQLAlchemy models are in `backend/app/models.py`. Alembic revision `0001`
 creates `sites`, `zones`, `crew_leads`, `crews`, `plans`, `revisions`,
 `revision_zones`, `revision_acknowledgments`, `tasks`, `task_dependencies`,
 `inspections`, with foreign keys, uniqueness and range/status constraints.
+Revision `0002` adds `evidence` and `evidence_reviews`, retaining one migration
+head and leaving `0001` intact for already-running demos.
 The API applies `alembic upgrade head` before starting in Compose; no other
 service performs migrations. Application startup does not use `create_all`.
 

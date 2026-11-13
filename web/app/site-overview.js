@@ -18,7 +18,7 @@ function ZoneTree({ zones }) {
 }
 
 export default function SiteOverview({ data, filters }) {
-  const { site, zones, tasks, crews, plans, inspections } = data;
+  const { site, zones, tasks, crews, plans, inspections, evidence } = data;
   if (!site) return <p>No site data has been loaded yet.</p>;
 
   const crewNames = Object.fromEntries(crews.map((crew) => [crew.id, crew.name]));
@@ -96,9 +96,10 @@ export default function SiteOverview({ data, filters }) {
 
       <section aria-labelledby="inspections-title">
         <h2 id="inspections-title">Inspections</h2>
+        <p>A recorded result is separate from the evidence review status shown below.</p>
         <div className="table-scroll">
           <table>
-            <thead><tr><th>Zone</th><th>Inspection</th><th>Status</th><th>Scheduled</th></tr></thead>
+            <thead><tr><th>Zone</th><th>Inspection</th><th>Recorded status</th><th>Scheduled</th></tr></thead>
             <tbody>{inspections.map((inspection) => (
               <tr key={inspection.id}>
                 <td>{inspection.zone_id}</td><td>{inspection.kind.replaceAll("_", " ")}</td>
@@ -107,6 +108,52 @@ export default function SiteOverview({ data, filters }) {
             ))}</tbody>
           </table>
         </div>
+      </section>
+
+      <section aria-labelledby="evidence-title">
+        <h2 id="evidence-title">Evidence and review status</h2>
+        <p>Review status is separate from the claimed result and from whether work may proceed.
+          Unconfirmed, incomplete or unresolved contradictory statements do not establish approval.</p>
+        {evidence.length === 0 ? <p>No evidence has been recorded.</p> : (
+          <div className="table-scroll">
+            <table>
+              <thead><tr><th>Claim and scope</th><th>Source</th><th>Review</th></tr></thead>
+              <tbody>{evidence.map((record) => (
+                <tr key={record.id}>
+                  <td>
+                    <strong>{record.claim.replaceAll("_", " ")}</strong>
+                    <small className="record-id">{record.id}</small>
+                    <p>Zone: {record.scope.zone_id || "Unresolved"}</p>
+                    {record.scope.kind === "inspection" && <p>Inspection: {record.scope.inspection_id || "Unresolved"}</p>}
+                    {record.scope.kind === "task_completion" && <p>Task: {record.scope.task_id || "Unresolved"}</p>}
+                    {record.scope.kind === "revision_acknowledgment" && (
+                      <p>Crew: {record.scope.crew_id || "Unresolved"} · Exact revision: {record.scope.revision_id || "Unresolved"}</p>
+                    )}
+                  </td>
+                  <td>
+                    <blockquote>{record.quote}</blockquote>
+                    <small>{record.source_ref}</small>
+                    <p>{record.origin === "seed_baseline" ? "Synthetic baseline" : record.origin === "seed_statement" ? "Synthetic statement example" : "Extracted statement"}</p>
+                    {record.statement_ref && <small>Statement: {record.statement_ref}</small>}
+                    {record.imported_at && <p>Imported {formatTime(record.imported_at, site.timezone)}</p>}
+                  </td>
+                  <td>
+                    <strong>{record.review_status}</strong>
+                    <details>
+                      <summary>Review history</summary>
+                      <ol>{record.history.map((review) => (
+                        <li key={review.sequence}>
+                          {review.status} · {review.actor_type === "human" ? `${review.reviewer_id} (${review.reviewer_role})` : review.actor_type.replaceAll("_", " ")}
+                          <p>{formatTime(review.decided_at || review.recorded_at, site.timezone)}</p>
+                        </li>
+                      ))}</ol>
+                    </details>
+                  </td>
+                </tr>
+              ))}</tbody>
+            </table>
+          </div>
+        )}
       </section>
     </>
   );

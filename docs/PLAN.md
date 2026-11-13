@@ -150,6 +150,7 @@ Grundsätze:
 - **Alles startet per `docker compose up`.** Die Jury muss es nach README nachvollziehen können.
 - **Der API-Vertrag ist die OpenAPI-Spezifikation von FastAPI.** Das Frontend arbeitet gegen diesen Vertrag.
 - **Statischer Site Record (#5):** SQLAlchemy + Alembic (ein Migrations-Head); API-Start migriert, Seed-Import erfolgt explizit und ersetzt den statischen Ausgangszustand atomar. Schema- und REST-Vertrag einschließlich Zonen-IDs: [SITE_RECORD.md](SITE_RECORD.md). Noch keine Events, Flags oder CAD-Geometrie.
+- **Evidence-Vertrag (#5, Alignment #30):** Nachweis, extrahierte Aussage und Domänen-Ergebnis bleiben getrennt. Quellen/Zitate, genauer Geltungsbereich und append-only Prüf-Historie sind über `/evidence` lesbar. Nur explizite synthetische Seed-Ausgangsnachweise starten bestätigt, mit Import-Herkunft ohne menschlichen Prüfer. Gegenbeispiele starten unbestätigt; keine automatische Übernahme in Inspection-/Task-/Crew-Ergebnisse. Speicherung und Übergabe an Extraktion (#6) sowie menschliche Prüf-Aktion (#9): [SITE_RECORD.md](SITE_RECORD.md#evidence-confirmation-contract-alignment-30).
 - **`api` ist der einzige Dienst mit Zugriff auf die DB.** `worker`, `mcp` und `web` sprechen ausschließlich über die REST-API.
 - **Alle Quellen laufen über denselben Ingestion-Eingang.** Ein neuer Kanal ist nur ein neuer Adapter.
 - **Ausgehende Nachrichten laufen über eine Outbox:** `api` legt jede Nachricht an, `worker` versendet sie und meldet den Status zurück. Keine Benachrichtigung geht verloren, jede steht im Audit-Trail.
