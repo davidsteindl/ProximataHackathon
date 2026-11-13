@@ -1,0 +1,57 @@
+[
+  {
+    "file": "plans/A-101_RevC.dxf",
+    "metadata": {
+      "plan_id": "A-101",
+      "floor_id": "F1",
+      "revision_id": "A-101-C",
+      "label": "C",
+      "sequence": 3,
+      "issued_at": "2026-11-12T12:00:00Z"
+    }
+  },
+  {
+    "file": "plans/A-102_RevC.dxf",
+    "metadata": {
+      "plan_id": "A-102",
+      "floor_id": "F2",
+      "revision_id": "A-102-C",
+      "label": "C",
+      "sequence": 3,
+      "issued_at": "2026-11-12T12:00:00Z"
+    }
+  },
+  {
+    "file": "plans/A-103_RevC.dxf",
+    "metadata": {
+      "plan_id": "A-103",
+      "floor_id": "F3",
+      "revision_id": "A-103-C",
+      "label": "C",
+      "sequence": 3,
+      "issued_at": "2026-11-12T12:00:00Z"
+    }
+  },
+  {
+    "file": "plans/A-103_RevD.dxf",
+    "metadata": {
+      "plan_id": "A-103",
+      "floor_id": "F3",
+      "revision_id": "A-103-D",
+      "label": "D",
+      "sequence": 4,
+      "issued_at": "2026-11-13T09:15:00Z"
+    }
+  },
+  {
+    "file": "plans/A-104_RevC.dxf",
+    "metadata": {
+      "plan_id": "A-104",
+      "floor_id": "F4",
+      "revision_id": "A-104-C",
+      "label": "C",
+      "sequence": 3,
+      "issued_at": "2026-11-12T12:00:00Z"
+    }
+  }
+]

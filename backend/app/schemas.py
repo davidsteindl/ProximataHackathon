@@ -92,6 +92,8 @@ class RevisionAcknowledgment(Record):
 
 
 class RevisionView(Revision):
+    # A newly registered CAD revision has no affected-zone result until #17.
+    zone_ids: list[Identifier]
     acknowledgments: list[RevisionAcknowledgment]
 
 
