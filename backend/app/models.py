@@ -2,7 +2,7 @@ from datetime import date, datetime
 
 from sqlalchemy import (
     CheckConstraint, Column, DateTime, Float, ForeignKey, Integer, String, Table,
-    UniqueConstraint, event, inspect,
+    UniqueConstraint, event, inspect, JSON, LargeBinary,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
@@ -210,3 +210,37 @@ def preserve_evidence_review_history(_mapper, _connection, _record):
 def preserve_evidence_source_and_scope(_mapper, _connection, record):
     if any(inspect(record).attrs[column.key].history.has_changes() for column in Evidence.__table__.columns):
         raise ValueError("Evidence content is immutable; store a new statement or clarification separately")
+
+
+class PlanGeometry(Base):
+    __tablename__ = "plan_geometry"
+    revision_id: Mapped[str] = mapped_column(ForeignKey("revisions.id", ondelete="CASCADE"), primary_key=True)
+    original_filename: Mapped[str] = mapped_column(String(200))
+    source: Mapped[bytes] = mapped_column(LargeBinary)
+    source_sha256: Mapped[str] = mapped_column(String(64))
+    floor_height_m: Mapped[float] = mapped_column(Float)
+    floor_elevation_m: Mapped[float] = mapped_column(Float)
+    ignored_layers: Mapped[list] = mapped_column(JSON)
+
+
+geometry_element_zones = Table(
+    "geometry_element_zones", Base.metadata,
+    Column("element_id", ForeignKey("geometry_elements.id", ondelete="CASCADE"), primary_key=True),
+    Column("zone_id", ForeignKey("zones.id", ondelete="CASCADE"), primary_key=True),
+)
+
+
+class GeometryElement(Base):
+    __tablename__ = "geometry_elements"
+    __table_args__ = (UniqueConstraint("revision_id", "element_id", name="geometry_revision_element"),)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    revision_id: Mapped[str] = mapped_column(ForeignKey("plan_geometry.revision_id", ondelete="CASCADE"), index=True)
+    element_id: Mapped[str] = mapped_column(String(200))
+    kind: Mapped[str] = mapped_column(String(30))
+    layer: Mapped[str] = mapped_column(String(200))
+    shape: Mapped[dict] = mapped_column(JSON)
+    zones: Mapped[list[Zone]] = relationship(secondary=geometry_element_zones, lazy="selectin")
+
+    @property
+    def zone_ids(self):
+        return sorted(zone.id for zone in self.zones)

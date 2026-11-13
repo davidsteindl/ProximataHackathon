@@ -147,6 +147,12 @@ there is no inferred ancestor status, Preconditions evaluation or Flag creation.
 Current Revision is the greatest `sequence` per Plan, not lexical label order.
 Labels and sequences are unique per Plan. Historical acknowledgments stay attached
 to the acknowledged Revision; they never become acknowledgment of a newer one.
+CAD import (#15) may register a Revision before changed/affected Zones are known.
+`/plans` then returns `zone_ids: []` for it; #17 supplies the affected-zone result.
+Geometry coverage is separate and available through `/geometry`; see
+[CAD-PIPELINE.md](CAD-PIPELINE.md). Existing seed validation still requires
+explicit nonempty Zone scope for seeded Revisions. Seed reset cascades removal
+of the derived CAD geometry and original DXF sources with their Revisions.
 
 ## Evidence confirmation contract (alignment #30)
 

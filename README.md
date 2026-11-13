@@ -29,6 +29,13 @@ In PowerShell statt `cp`: `Copy-Item .env.example .env`. Beim ersten Start baut 
   Format, Zonen-IDs für #3, REST-Vertrag und Migrationen: [docs/SITE_RECORD.md](docs/SITE_RECORD.md).
 - API-Health: http://localhost:8000/health – `200` mit
   `{"api":"ok","db":"ok"}`, bei DB-Ausfall `503` mit `db: "error"`.
+- CAD-Geometrie (#15): Nach dem Seed-Import
+  `docker compose exec api python -m app.cad_import` ausführen. Importiert alle fünf
+  DXFs aus #3 samt Metadaten; Originaldateien bleiben je Revision gespeichert.
+  Geometrie in Metern unter `/geometry?floor_id=F3` bzw.
+  `/geometry?zone_id=3B&revision_id=A-103-D`. API-/Importvertrag und 3D-Koordinaten:
+  [docs/CAD-PIPELINE.md](docs/CAD-PIPELINE.md). Ein Seed-Reset entfernt auch die
+  daraus abgeleitete Geometrie; danach den CAD-Import erneut ausführen.
 - OpenAPI: http://localhost:8000/openapi.json, interaktive Dokumentation unter `/docs`.
 - MCP: http://localhost:8001/mcp – startbarer Streamable-HTTP-Server ohne Tools.
 - `docker compose logs worker mcp` zeigt den erfolgreichen API-Zugriff beider Dienste.
@@ -44,7 +51,8 @@ Stoppen: `docker compose down`. Die Daten bleiben im Volume `db-data` erhalten.
 `docker compose down --volumes` löscht auch die lokalen Daten.
 
 Enthalten sind Infrastruktur, Health-Prüfungen und der statische Site Record aus
-Issue #5. Events/Flags, CAD-Geometrie, Kanal-Adapter, MCP-Tools, Authentifizierung
+Issue #5 sowie DXF-Extraktion und Geometrie-API aus #15. Events/Flags, 3D-Ansicht,
+Plan-Diff, Kanal-Adapter, MCP-Tools, Authentifizierung
 und Hosting folgen in ihren eigenen Issues.
 
 ### Lokale Checks
