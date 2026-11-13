@@ -143,7 +143,7 @@ Grundsätze:
 - **Der Chat-Agent lebt in `api` als MCP-Client** des eigenen `mcp`-Servers. Er nutzt dieselben Tools wie externe Agents.
 - **Kanal-Zugangsdaten** (Gmail, Telegram) liegen nur im `worker`, der LLM-Key nur in `api`.
 - **Diagramme:** siehe [README → Architektur](../README.md#architektur). Plan und Diagramme werden gemeinsam geändert.
-- **DWG → DXF über einen externen Konverter**, der in einem Container läuft. Kandidaten: LibreDWG (`dwg2dxf`, GPL, läuft auch auf ARM64) oder ODA File Converter (proprietäre Lizenz, nur x64; auf ARM-Rechnern Emulation). Die Wahl muss vor WP15 feststehen (§12). Im Fallback werden DXF-Dateien direkt angenommen.
+- **DWG → DXF über einen externen Konverter**, der in einem Container läuft. Gewählt: LibreDWG (`dwg2dxf`, GPL-3.0-or-later), ausschließlich als separates Programm. Nativer Source-Build für ARM64 und x64; Entscheidung und Testanleitung: [CAD-Konverter](CAD-CONVERTER.md). DXF-Dateien bleiben als direkter Fallback möglich.
 - **Polling statt Webhooks** (keine öffentliche URL nötig, lokales Deployment).
 - **LLM-Provider austauschbar über die Konfiguration.** Voraussetzungen: strukturierte Ausgaben und Tool-Calling; bevorzugt mit EU-Region.
 - **Für die Demo funktioniert alles auch offline:** Replay direkt in den Ingestion-Eingang, LLM-Antworten des Demo-Szenarios gecacht.
@@ -274,6 +274,6 @@ Schlaf in Schichten, sodass nachts immer jemand reviewen und mergen kann.
 - [ ] Studienzahlen aus §1 mit Originalquellen verifizieren
 - [ ] Klären, ob das private Repo in eine Talona- bzw. proximata-Org übertragen werden muss
 - [ ] Eskalationsfrist und Löschfrist für die Demo festlegen
-- [ ] DWG-Konverter wählen (LibreDWG vs. ODA): Lizenz, ARM64-Tauglichkeit, unterstützte DWG-Versionen kurz testen
+- [x] DWG-Konverter gewählt: LibreDWG als separater Prozess; Details in docs/CAD-CONVERTER.md. Lizenz und Plattformen dokumentiert.
 - [ ] Layer-Konvention für die synthetischen Pläne festlegen und in §3.5 eintragen
 - [ ] Mentor fragen: Wie liegen Pläne bei Talonas Kunden typischerweise vor (DWG, PDF, beides)?
