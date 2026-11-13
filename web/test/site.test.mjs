@@ -4,7 +4,7 @@ import { flattenZones, formatTime, getSiteOverview } from "../lib/site.mjs";
 
 afterEach(() => mock.restoreAll());
 
-test("schedule filtering reaches REST and other overview data remains unfiltered", async () => {
+test("schedule and timeline filtering reach REST while other overview data remains unfiltered", async () => {
   const urls = [];
   mock.method(globalThis, "fetch", async (url) => {
     urls.push(url);
@@ -20,7 +20,10 @@ test("schedule filtering reaches REST and other overview data remains unfiltered
   assert.equal(tasks.searchParams.get("zone_id"), "F3");
   assert.equal(tasks.searchParams.get("from_time"), "2026-11-15T00:00:00Z");
   assert.equal(tasks.searchParams.get("to_time"), "2026-11-16T00:00:00Z");
-  assert.ok(urls.filter((url) => url.pathname !== "/tasks").every((url) => url.search === ""));
+  const events = urls.find((url) => url.pathname === "/events");
+  assert.equal(events.search, tasks.search);
+  assert.deepEqual(result.data.events, []);
+  assert.ok(urls.filter((url) => !["/tasks", "/events"].includes(url.pathname)).every((url) => url.search === ""));
 });
 
 test("unavailable or invalid REST responses are shown as errors, not an empty site", async () => {

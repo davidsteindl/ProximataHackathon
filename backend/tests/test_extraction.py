@@ -102,11 +102,19 @@ def test_provider_failure_uses_safe_error_and_configuration_is_explicit(monkeypa
         get_extractor()
 
 
+@pytest.mark.parametrize("base_url", ["not a URL", "ftp://provider.invalid", "https://user:secret@provider.invalid/v1", "https://provider.invalid?key=secret"])
+def test_invalid_provider_address_is_a_safe_configuration_error(base_url):
+    with pytest.raises(ExtractionError, match="provider_not_configured"):
+        OpenAICompatibleExtractor(base_url, "test-model", "synthetic-key")
+
+
 def test_redaction_keeps_dates_and_original_quote_positions_but_removes_contact_identifiers():
     text = "Am 2026-11-14 meldet @crew_test an a@example.test: +43 660 1234567, 06601234567."
     redacted = redact_text(text)
     assert len(text) == len(redacted)
     assert "2026-11-14" in redacted
+    for timestamp in ["2026-11-14 18:05", "2026-11-14T18:05:00+01:00", "14.11.2026"]:
+        assert timestamp in redact_text(f"Abnahme am {timestamp}, Kontakt +43 660 1234567")
     assert all(value not in redacted for value in ["crew_test", "example.test", "660", "06601234567"])
     assert "plain_sender" not in redact_text("plain_sender meldet fertig", "plain_sender")
     batch = ExtractedBatch(events=[ExtractedEvent(intent="observation", quote="invented text", confidence=1)])

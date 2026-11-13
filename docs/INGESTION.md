@@ -12,7 +12,8 @@ and team test accounts are supported for the demo.
   identifies a chat; a Gmail source key identifies the dedicated project mailbox.
 - `source_attachments`: original bytes, filename, media type and SHA-256, linked
   to the source. Input uses base64, at most five attachments of 2 MB each. Filenames
-  cannot contain paths. The API never executes, parses or sends attachments to an LLM.
+  cannot contain paths. This ingestion path never executes, parses or sends
+  attachments to an LLM; the separate CAD API handles geometry imports.
 - `events` and `event_zones`: one extracted statement per source/ordinal, resolved
   zone IDs, unresolved zone labels, intent, actor/crew, activity/trade, confidence,
   relevant original quote and time information. Event IDs are opaque references.
@@ -22,7 +23,8 @@ and team test accounts are supported for the demo.
   `origin=llm_statement` with an unconfirmed `statement_ingestion` review, without
   a human reviewer or decision timestamp. Confidence is never confirmation.
 
-Migration `0004` extends the CAD migration `0003`; existing evidence and review history are unchanged.
+Migration `0004` extends the CAD migration `0003`; existing evidence and review
+history are unchanged.
 The explicit demo seed reset deletes these new referencing tables before replacing
 the baseline, preserving atomic reset and labelled seed provenance. It is not the
 runtime ingestion path. The guided replay workflow remains in #22.
@@ -81,3 +83,70 @@ Zone resolution accepts exact IDs/names and narrowly defined aliases (e.g.
 references are resolved only when the existing subject and exact zone match;
 an unseen revision such as Rev D stays unresolved with its original plan/label
 in Event details. Extraction does not create or change authoritative revisions.
+
+## REST contract
+
+| Endpoint | Behaviour |
+|---|---|
+| `POST /ingestion/messages` | Store original source and attempt extraction synchronously; return `{source, events, duplicate}` |
+| `GET /source-messages/{id}` | Original text, provenance, processing status/error and attachment metadata |
+| `GET /source-messages/{id}/attachments/{attachment_id}` | Original bytes as an attachment download; metadata includes SHA-256 |
+| `GET /events` | Chronological Events with source/quote, resolved/unresolved scope, time interpretation and linked Evidence/history |
+
+The request requires `channel`, `source_key`, `external_id`, timezone-aware
+`sent_at`, `text`, and optionally `sender_id`, `sender_role`, `sender_crew_id`,
+`attachments`. Sender roles are `architect`, `inspector`, `crew_lead`, `crew`,
+`superintendent`, `unknown` (default). A supplied crew must exist. Channel is an
+adapter-defined lowercase identifier, e.g. `gmail`, `telegram`, `seed`, `replay`.
+There must be text or an attachment; text is limited to 50,000 characters.
+An attachment has `file_name`, `media_type`, `content_base64`. Review status,
+Events, seed provenance and human decisions cannot be supplied by a caller.
+
+Load the static Site baseline first. Ingestion does not use `/seed/import`;
+even `channel=seed` creates unconfirmed statements. The separate baseline import
+remains an explicit, destructive demo bootstrap operation with seed provenance.
+
+Example request is `backend/demo/closing-work.json`; send it with:
+
+```sh
+curl http://localhost:8000/ingestion/messages \
+  -H 'Content-Type: application/json' \
+  --data-binary @backend/demo/closing-work.json
+```
+
+Run from the repository root after Compose startup and seed import. The cached
+hero messages and roles are listed verbatim in `backend/demo/extraction-cache.json`.
+The file is only extraction fixtures; guided scenario playback, simulated clock,
+channel adapters and pauses for human decisions remain in #22.
+
+### Idempotency, failure and retry
+
+- New completed source: `201`. Re-delivery of the same normalized request:
+  `200`, `duplicate=true`, same source/Event/Evidence IDs, no second LLM call.
+- The same identity with different content/metadata is `409`; the original is
+  unchanged. Corrections must be new source messages. No baseline is also `409`.
+- Irrelevant text or attachment-only input: `processed`, no Events. Attachment-only
+  messages bypass the LLM. This is different from a failed extraction.
+- Provider/cache/schema/quote failure: `502` with the stored source and a safe
+  `error_code` (`provider_unavailable`, `provider_not_configured`, `cache_miss`,
+  `invalid_cache`, `invalid_extraction`, `invalid_quote`). No partial Events or
+  Evidence are committed. Storage failure is reported as `storage_failed` when
+  the database remains available to record it. Provider bodies/secrets are never
+  returned as error text.
+- Re-deliver the exact request to retry a failed source. Requests already being
+  processed return `202`; they do not launch a second extraction. A crashed
+  processing attempt can be reclaimed by re-delivery after five minutes. Attempt
+  tokens prevent a late old attempt from committing over a newer one.
+- A unique source constraint and unique Event ordinal enforce dedup in storage.
+  Source persistence, processing claim and final result are separate transactions;
+  no transaction/row lock spans the provider call. All Events, Evidence and the
+  final success status are committed together. There is no background retry queue
+  or channel polling in #6.
+
+`GET /events` orders by Source Message `sent_at`, source ID and extraction ordinal.
+Filters: `zone_id`, `include_descendants` (default true), `from_time` inclusive,
+`to_time` exclusive. Time filters apply to the original message timestamp, not
+the claimed future activity time. Unknown zones return `404`; naive timestamps
+or non-increasing ranges return `422`. Unknown source/attachment IDs return `404`.
+The dashboard shows the same chronological timeline with expandable original
+sources and separate evidence review labels; reload it to fetch new records.

@@ -50,10 +50,43 @@ Anwendungsdienste verwenden die REST-API.
 Stoppen: `docker compose down`. Die Daten bleiben im Volume `db-data` erhalten.
 `docker compose down --volumes` löscht auch die lokalen Daten.
 
-Enthalten sind Infrastruktur, Health-Prüfungen und der statische Site Record aus
-Issue #5 sowie DXF-Extraktion und Geometrie-API aus #15. Events/Flags, 3D-Ansicht,
-Plan-Diff, Kanal-Adapter, MCP-Tools, Authentifizierung
+Enthalten sind Infrastruktur, Health-Prüfungen, der statische Site Record aus
+Issue #5, Nachrichten-Ingestion, Event-Extraktion und Timeline aus #6 sowie
+DXF-Extraktion und Geometrie-API aus #15. Flags, 3D-Ansicht, Plan-Diff,
+Kanal-Adapter, MCP-Tools, Authentifizierung
 und Hosting folgen in ihren eigenen Issues.
+
+### Nachricht → Event → Timeline (Issue #6)
+
+Nach `docker compose up --build` und dem Seed-Import kann die synthetische
+Hero-Nachricht ohne LLM-Key oder Internet verarbeitet werden:
+
+```sh
+curl http://localhost:8000/ingestion/messages \
+  -H 'Content-Type: application/json' \
+  --data-binary @backend/demo/closing-work.json
+```
+
+In PowerShell `curl.exe` verwenden und den Befehl in eine Zeile schreiben.
+Bei geändertem `API_PORT` die URL anpassen. Danach das Dashboard neu laden:
+Die Event-Timeline zeigt die Arbeitsankündigung für 3B samt Originalquelle und
+Zeitfenster am Folgetag. Wiederholtes Senden liefert dieselben Event-IDs.
+Irrelevante Nachrichten bleiben als Quellen gespeichert, erzeugen aber keine Events.
+Die Timeline nutzt dieselben Zonen-/Datumsfilter wie der Terminplan; ihre Daten
+beziehen sich auf den Zeitpunkt der ursprünglichen Nachricht.
+
+`LLM_PROVIDER=cached` nutzt ausdrücklich synthetische Extraktionsergebnisse für
+die dokumentierten Hero-Nachrichten. Andere Texte melden `cache_miss`, ohne einen
+Live-Aufruf auszulösen. Für beliebige Texte `LLM_PROVIDER=openai_compatible`,
+`LLM_BASE_URL`, `LLM_MODEL` und `LLM_API_KEY` für einen JSON-Mode-fähigen Provider
+in `.env` setzen und `api` neu erstellen. Nur `api` erhält den LLM-Key.
+
+Abnahme-, Task-Abschluss- und Revisionsbestätigungen aus Nachrichten werden immer
+als **unbestätigte Evidence** mit Quelle/Zitat gespeichert. Sie überschreiben keine
+vorhandene Bestätigung und geben keine Arbeit frei. Die menschliche Prüfung folgt
+in #9, die Regelprüfung in #7/#8. Der Seed-Befehl setzt auch die neuen Nachrichten
+und Events zurück. REST-Vertrag, Cache-Inhalte, Fehler-/Retry-Verhalten und
+Datenschutzgrenzen: [docs/INGESTION.md](docs/INGESTION.md).
 
 ### Lokale Checks
 
@@ -153,6 +186,10 @@ flowchart LR
 ```
 
 ### 2. Vom Eingang zum Flag (in `api`)
+
+Der gemeinsame REST-Eingang ist `POST /ingestion/messages`; `GET /events` liefert
+die quellengebundene Timeline. Quellen und Originalanhänge werden vor der
+Extraktion gespeichert. Details zum Vertrag: [INGESTION.md](docs/INGESTION.md).
 
 Durchgezogene Pfeile sind der Hauptfluss, gestrichelte die Rückkopplung aus dem Learning Loop. LLM-Events sind Aussagen mit Prüfstatus. Sie dürfen sofort Prüfungen auslösen; als Nachweis zur Erfüllung einer Precondition zählen sie erst nach einer expliziten menschlichen Bestätigung im Dashboard. Bestätigungsstatus und Precondition-Bewertung sind getrennt (PLAN §3.2).
 

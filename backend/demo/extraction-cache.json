@@ -168,6 +168,21 @@
       }
     },
     {
+      "text": "wie ist der Stand im Bad 3B?",
+      "sender_role": "superintendent",
+      "result": {
+        "events": [
+          {
+            "quote": "wie ist der Stand im Bad 3B?",
+            "confidence": 0.95,
+            "intent": "question",
+            "zones": ["Bad 3B"],
+            "activity": "zone_status_question"
+          }
+        ]
+      }
+    },
+    {
       "text": "Danke, bis später!",
       "sender_role": "crew_lead",
       "result": {

@@ -7,6 +7,7 @@ import re
 from datetime import UTC, date, datetime, time, timedelta
 from pathlib import Path
 from typing import Annotated, Literal
+from urllib.parse import urlsplit
 from zoneinfo import ZoneInfo
 
 import httpx
@@ -74,8 +75,9 @@ class ExtractedBatch(ExtractionRecord):
     events: list[ExtractedEvent] = Field(max_length=30)
 
 
+_TEMPORAL = r"\b(?:\d{4}-\d{2}-\d{2}(?:[ T]\d{2}:\d{2}(?::\d{2})?(?:Z|[+-]\d{2}:\d{2})?)?|\d{2}[./]\d{2}[./]\d{4})\b"
 _IDENTIFIERS = re.compile(
-    r"[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}|(?<![\w@])@[A-Z0-9_]+|"
+    _TEMPORAL + r"|[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}|(?<![\w@])@[A-Z0-9_]+|"
     r"(?<!\w)(?:\+|00)?\d[\d ()/.-]{5,}\d(?!\w)", re.IGNORECASE,
 )
 
@@ -85,7 +87,7 @@ def redact_text(text, sender_id=None):
     def mask(match):
         value = match.group()
         # Dates are temporal facts rather than telephone numbers.
-        if re.fullmatch(r"\d{4}-\d{2}-\d{2}|\d{2}[./]\d{2}[./]\d{4}", value):
+        if re.fullmatch(_TEMPORAL, value, re.IGNORECASE):
             return value
         return "#" * len(value)
 
@@ -141,7 +143,13 @@ JSON schema:
 
 class OpenAICompatibleExtractor:
     def __init__(self, base_url, model, api_key, timeout=30):
-        if not base_url or not model or not api_key or len(model) > 160 or not 0 < timeout <= 120:
+        try:
+            url = urlsplit(base_url)
+            url.port  # Validate an explicitly configured port as well.
+            valid_url = url.scheme in {"http", "https"} and url.hostname and not url.username and not url.password and not url.query and not url.fragment
+        except ValueError:
+            valid_url = False
+        if not valid_url or not model.strip() or not api_key or len(model) > 160 or not 0 < timeout <= 120:
             raise ExtractionError("provider_not_configured")
         self.base_url, self.model, self.api_key, self.timeout = base_url, model, api_key, timeout
         self.name = f"openai_compatible:{model}"
@@ -168,7 +176,7 @@ class OpenAICompatibleExtractor:
                 if choice.get("finish_reason") != "stop" or choice["message"].get("refusal"):
                     raise ExtractionError("invalid_extraction")
                 return ExtractedBatch.model_validate_json(choice["message"]["content"])
-        except httpx.HTTPError as error:
+        except (httpx.HTTPError, httpx.InvalidURL) as error:
             raise ExtractionError("provider_unavailable") from error
         except (ValueError, KeyError, IndexError, TypeError) as error:
             raise ExtractionError("invalid_extraction") from error
