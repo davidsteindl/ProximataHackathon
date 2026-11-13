@@ -127,6 +127,7 @@ flowchart LR
   ARCH -->|"Mails, DXF-Revisionen"| GMAIL
   CREW <-->|"Chat"| TG
   GMAIL -.->|"Warnungen, Freigabe-Anfragen"| SUP
+  SUP <-->|"Raumstatus-Fragen, Links ins Dashboard"| TG
   SUP -->|"Browser"| WEB
   GMAIL <-->|"Gmail API: Polling / Senden"| WORKER
   TG <-->|"Bot API: Polling / Senden"| WORKER

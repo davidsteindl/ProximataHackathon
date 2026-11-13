@@ -64,8 +64,8 @@ Ein neuer Konflikttyp ist damit nur eine neue Precondition, keine neue Architekt
 ### 3.2 Wer entscheidet was (Autonomie-Grenze)
 - **LLM:** Extraktion (Source Message → Event), Erklärung von Flags, Proposals, Beantwortung von Fragen. **Rein beratend. Das LLM trifft keine Entscheidungen und löst keine Aktionen aus, die über Information hinausgehen.**
 - **Regeln (deterministisch):** Prüfen Preconditions anhand gültiger Nachweise und erzeugen Flags. Dadurch reproduzierbar und erklärbar. Ein LLM-Event allein kann keine Precondition erfüllen.
-- **Automatisch (ohne Mensch):** Prüfung bei jedem neuen Event, täglicher Morgen-Scan („Was ist morgen gefährdet?“), **faktische Benachrichtigung** der verantwortlichen Person mit Quelle, Eskalation bei ausbleibender Reaktion.
-- **Nur mit menschlicher Freigabe:** Jede Handlung (Task verschieben, Crew umplanen, Arbeit stoppen), die Bestätigung extrahierter Nachweise und jeder Abschluss eines Flags.
+- **Automatisch (ohne Mensch):** Prüfung bei jedem neuen Event, täglicher Morgen-Scan („Was ist morgen gefährdet?“), **faktische Benachrichtigung** der verantwortlichen Person mit Quelle, Eskalation bei ausbleibender Reaktion. *(Stretch)* Faktischer Hinweis an Crew Lead und Crew-Gruppe der **blockierten Tasks** (Tasks der Zone und ihre Nachfolger laut Terminplan): welche Precondition fehlt, Quelle, „vor Beginn mit dem Superintendent abstimmen“. Das ist eine Information, keine Arbeitsanweisung.
+- **Nur mit menschlicher Freigabe:** Jede Handlung (Task verschieben, Crew umplanen, Arbeit stoppen), die Bestätigung extrahierter Nachweise und jeder Abschluss eines Flags. Die ausdrückliche Anweisung „Tasks pausiert, nicht ohne Rücksprache mit dem Superintendent fortsetzen“ geht erst nach Freigabe des entsprechenden Proposals raus.
 
 **Nachweisbestätigung (verbindlich für alle Precondition-Typen):**
 
@@ -117,6 +117,12 @@ Ein neuer Konflikttyp ist damit nur eine neue Precondition, keine neue Architekt
 - **Plan-Diff statt Vision:** Eine neue Revision wird geometrisch mit der vorherigen verglichen. Das Ergebnis sind die betroffenen Zonen, und das ist der deterministische Auslöser für Konflikttyp B. Die Revisionsnotiz in der Mail dient dem LLM nur zur Erklärung. **Fallback**, falls der Diff nicht rechtzeitig steht: Die betroffenen Zonen kommen aus der Revisionsnotiz (LLM-Extraktion). Diese Angaben bleiben als unbestätigt gekennzeichnet und dürfen Warnungen auslösen, aber keine Crew-Bestätigung oder andere Precondition erfüllen.
 - **Erweiterung für DWG:** Ein separater Konverter kann DWG vor derselben DXF-Extraktion umwandeln. Dabei müssen Layer, Beschriftungen, Einheiten und relevante Geometrie erhalten bleiben; das Original-DWG bleibt als Quelle gespeichert. Der bestehende LibreDWG-Prototyp aus #4 ist vorbereitet, seine automatische Anbindung ist außerhalb des MVP. Auch bei direktem DXF-Import bleibt die Originaldatei mit ihrer Revision als Quelle erhalten.
 
+
+### 3.6 Raumansicht, Raumstatus und Neuigkeiten
+- **Raumansicht im Dashboard:** Jeder Raum bzw. jede Zone ist per URL `/zones/<zoneId>` aufrufbar (z. B. `/zones/3B-BATH`). Links: 3D-Ansicht (#16), Etage isoliert und in der Draufsicht, ausgewählter Raum hervorgehoben. Rechts: Seitenleiste mit Widgets, oben breit **Zustand** (Precondition-Bewertungen, offene Flags), unten **anstehende Tasks** und **Plan & Abnahmen** (aktuelle Revision, Kenntnisnahmen, Inspections mit Nachweisstatus). Die genaue Gestaltung legt das Mockup (#35) fest.
+- **Raumstatus per Telegram:** Fragt der Superintendent per Telegram nach einem Raum, bekommt er eine strukturierte Antwort mit denselben Inhalten wie die Widgets, jeweils mit Quelle, plus Link auf die Raumansicht. Die Inhalte stammen nur aus dem Record (MCP-Tools, §5); unbestätigte Aussagen und Widersprüche werden als solche gekennzeichnet.
+- **Neuigkeiten-Feed:** Startseite für den Superintendent: chronologisch neue Events, Revisionen, Nachweisentscheidungen, Flag-Änderungen und abgeschlossene Tasks, filterbar nach Zone, jeweils mit Link zur Raumansicht bzw. zum Flag. Ein Task gilt nur mit bestätigtem Nachweis als abgeschlossen; unbestätigte Abschlussmeldungen erscheinen als solche gekennzeichnet. Keine Auswertungen pro Person (§6).
+
 ---
 
 ## 4. Scope
@@ -128,10 +134,10 @@ Ein neuer Konflikttyp ist damit nur eine neue Precondition, keine neue Architekt
 4. Regel-Engine mit Konflikttypen A und B, Nachweisprüfung gemäß §3.2, Prüfung bei jedem Event, jeder Nachweisentscheidung und Morgen-Scan
 5. Flag-Lebenszyklus mit Audit-Trail, Eskalation, Deduplizierung
 6. **Gmail** ein und aus (Revisionen als DXF und Inspektionsergebnisse rein; Warnungen und Freigabe-Anfragen raus)
-7. **Telegram** ein und aus (Gruppenchat mitlesen, Warnungen und Antworten an Crew Leads), inkl. Compliance (§6)
+7. **Telegram** ein und aus (Gruppenchat mitlesen, Warnungen und Antworten an Crew Leads), inkl. Compliance (§6). Der Superintendent kann per Telegram den **Zustand eines Raums** abfragen und bekommt eine strukturierte Antwort aus dem Record plus Link auf die Raumansicht im Dashboard (§3.6)
 8. Terminplan als Seed-Datei (CSV oder Export im MS-Project-Stil)
-9. Dashboard: Übersicht, Flag-Inbox mit Detail, Quellen und Feedback, separate Prüfung/Bestätigung/Ablehnung von Nachweisen (auch ohne Flag), Freigabe von Proposals, Timeline der Änderungen und Entscheidungen
-10. 3D-Ansicht, **erzeugt aus der Geometrie der DXF-Pläne** (einzige räumliche Ansicht)
+9. Dashboard: Übersicht, Flag-Inbox mit Detail, Quellen und Feedback, separate Prüfung/Bestätigung/Ablehnung von Nachweisen (auch ohne Flag), Freigabe von Proposals, Timeline der Änderungen und Entscheidungen. Startseite für den Superintendent mit **Neuigkeiten-Feed** (§3.6)
+10. 3D-Ansicht, **erzeugt aus der Geometrie der DXF-Pläne** (einzige räumliche Ansicht). **Raumansicht:** ausgewählter Raum hervorgehoben (Etage isoliert, Draufsicht), daneben eine Seitenleiste mit Widgets; per URL direkt aufrufbar (§3.6)
 11. REST-API und **MCP-Server** (inkl. Abfragen zu Plänen und Plan-Diffs)
 12. Learning Loop (§3.4)
 13. Replay-Skript mit Reset
@@ -140,6 +146,7 @@ Ein neuer Konflikttyp ist damit nur eine neue Precondition, keine neue Architekt
 ### Stretch (nur wenn das MVP zuverlässig läuft)
 - Konflikttyp C (falsche Reihenfolge)
 - Fotos aus Telegram per Vision-LLM als Beleg („Wand ist zu“)
+- Blockierte Tasks bei einem Konflikt ermitteln und deren Crews faktisch benachrichtigen; „pausiert“-Hinweis nach Proposal-Freigabe (§3.2)
 
 ### Bewusst out of scope
 - Automatischer DWG-Import und DWG-Export. Der MVP nimmt DXF nach Layer-Konvention an; der LibreDWG-Prototyp bleibt als Grundlage für die spätere Konverter-Anbindung erhalten.
@@ -217,6 +224,7 @@ Fiktives Projekt: Wohnbau, 1 Gebäude, 4 Etagen, je 4 Wohnungen (A–D). Pro Eta
 | Tag 2, 17:00 | Telegram | „Abnahme dürfte passen“ | Unklare Aussage bleibt unbestätigt; ersetzt den fehlenden Abnahmenachweis nicht |
 | Tag 2, 18:05 | Telegram (Trockenbau-Gruppe) | „morgen früh machen wir 3B zu, platten sind da“ | **Flag A (kritisch)**: Abnahme nicht nachgewiesen und Kenntnisnahme von Rev D nicht bestätigt → 3D: Wand 3B rot → Superintendent bekommt Proposal „Trockenbau 3B verschieben, Crew auf 3A/3C umplanen“ → Freigabe → Crew Lead informiert |
 | Tag 2, 18:30 | Telegram | Crew fragt: „welcher plan gilt für 3B?“ | Antwort aus dem Record mit Quelle (Rev D, Mail vom Tag 1) |
+| Tag 2, 18:45 | Telegram (Superintendent) | „wie ist der Stand im Bad 3B?“ | Strukturierte Antwort: Revision und Kenntnisnahmen, Inspection mit Nachweisstatus, offener Flag A, anstehende Tasks, letzte Änderungen, jeweils mit Quelle; Link auf `/zones/3B-BATH` im Dashboard, dort ist das Bad in der Draufsicht hervorgehoben |
 | Tag 3 | Dashboard | Superintendent schließt Flag A als *erledigt* mit Begründung „Trockenbau verschoben“ | Audit-Trail vollständig; Abschluss bestätigt keine Inspection und erfüllt keine andere Precondition |
 | Nach Abnahme an Tag 4 | Gmail + Dashboard | Eindeutiges positives Abnahmeergebnis trifft ein; zuständiger Mensch prüft Quelle und bestätigt den Nachweis für die konkrete Inspection in 3B | Erst danach ist Precondition A erfüllt; ein ggf. noch offener Flag bleibt bis zum separaten menschlichen Abschluss offen |
 | Learning-Loop-Moment | Telegram + Dashboard | Eine als Arbeitsankündigung fehlinterpretierte Frage erzeugt einen Fehlalarm; menschliches Feedback korrigiert die Extraktion; Replay neu | Derselbe Fall wird mit sichtbarem Quellen-/Feedback-Bezug richtig interpretiert; echte Arbeitsankündigungen ohne bestätigten Nachweis erzeugen weiterhin Flags |
@@ -251,6 +259,8 @@ Keine feste Rollenverteilung, jeder nimmt sich Issues selbst. Die Abhängigkeite
 | WP14 | Research, Mentor-Interview, Pitch, 3-Min-Video, `COMPLIANCE.md`, finale README, Abgabe | läuft parallel | M4 |
 | S1 | Stretch: Konflikttyp C mit gültigen Abschlussnachweisen gemäß §3.2 | WP4 | M3 |
 | S2 | Stretch: Fotos als Beleg (Vision); LLM-Befunde bleiben unbestätigte Aussagen gemäß §3.2 | WP7 | M3 |
+| WP18 | Neuigkeiten-Feed: chronologische Übersicht für den Superintendent über Events, Revisionen, Nachweisentscheidungen, Flag-Änderungen und abgeschlossene Tasks; API + Dashboard-Startseite (§3.6) | WP3, WP5 | M3 |
+| S3 | Stretch: blockierte Tasks bei Konflikten + faktische Hinweise an deren Crews; „pausiert“-Hinweis nach Proposal-Freigabe (§3.2) | WP4, WP5, WP6 | M3 |
 
 **Sofort parallel zu WP0/WP1 (keine Code-Abhängigkeit):** WP15 (synthetische DXF-Pläne), Google-Cloud-Projekt und Gmail-OAuth einrichten (OAuth-Testmodus: Test-User eintragen; Refresh-Tokens laufen nach 7 Tagen ab), Telegram-Bot anlegen (Privacy Mode aus), LLM-Key besorgen, Seed-Inhalte schreiben, 3D-Prototyp, Research und Mentor-Interview.
 
