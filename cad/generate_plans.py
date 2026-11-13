@@ -5,8 +5,8 @@ the bathroom wall of unit 3B by 300 mm and reroutes the shower drain. Every
 element follows the layer convention in ``cad/README.md`` (PLAN §3.5) and carries
 a stable element ID as XDATA (application ``SITEMIND``).
 
-The plans are delivered as DXF (the internal format, PLAN §3.5). A DWG export is
-a follow-up; the CAD pipeline accepts DXF directly.
+The MVP accepts DXF with the documented layer convention (PLAN §3.5).
+DWG import and export are outside the MVP.
 
 Usage::
 

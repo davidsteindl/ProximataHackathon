@@ -30,7 +30,7 @@ Auf Baustellen gehen Entscheidungen in Chats, Mails und Tabellen verloren. Eine 
 |---|---|
 | **Site** | Die Baustelle (1 Projekt im MVP) |
 | **Zone** | Räumliche Einheit, hierarchisch: Gebäude → Etage → Wohnung → Raum/Bauteil (z. B. „Wand Bad 3B“) |
-| **Plan** | CAD-Zeichnung (DWG) eines Planblatts, z. B. Grundriss 3. OG. Räumliche Quelle für Zonen, Bauteile und das 3D-Modell |
+| **Plan** | CAD-Zeichnung eines Planblatts (im MVP DXF), z. B. Grundriss 3. OG. Räumliche Quelle für Zonen, Bauteile und das 3D-Modell |
 | **Layer** | CAD-Ebene, die den Typ eines Elements festlegt (Wand, Tür, Sanitär, Raumstempel …) |
 | **Plan-Diff** | Strukturierter Unterschied zwischen zwei Revisionen eines Plans: welche Elemente in welchen Zonen hinzugekommen, entfernt oder verschoben sind |
 | **Task** | Geplanter Arbeitsschritt aus dem Terminplan (Gewerk, Zone, Zeitraum, Vorgänger) |
@@ -93,8 +93,8 @@ Ein neuer Konflikttyp ist damit nur eine neue Precondition, keine neue Architekt
 - **Ziel:** Gleiche Fehler bzw. Fehlalarme treten nicht wieder auf. Im Dashboard sichtbar als Kennzahl (Anteil bestätigter Flags über die Zeit).
 - **Vision (nur im Pitch):** Lernen über Projekte hinweg, Fotos gegen Pläne prüfen, Kontext für Roboter.
 
-### 3.5 Baupläne (DWG) als räumliche Grundlage
-- **Pläne liegen als DWG vor**, ein Plan pro Etage. Neue Revisionen kommen als DWG-Anhang per Mail (oder als Seed). DWG ist das, was Architekten im kleinen und mittleren Wohnbau tatsächlich liefern. BIM/IFC ist dort selten.
+### 3.5 Baupläne (DXF im MVP) als räumliche Grundlage
+- **Der MVP setzt DXF-Dateien mit der dokumentierten Layer-Konvention voraus**, ein Plan pro Etage. Neue Revisionen kommen als DXF-Anhang per Mail oder als Seed. DWG-Import und DWG-Export gehören zu einer späteren Erweiterung.
 - **Aus einem Plan entstehen strukturierte Daten:** Räume/Wohnungen (geschlossene Polylinien plus Raumstempel-Text), Wände, Türen, Sanitär- und Elektro-Elemente. Welcher Layer was bedeutet, regelt eine **Layer-Konvention** (orientiert an AIA/US National CAD Standard bzw. ISO 13567, z. B. `A-WALL`, `A-DOOR`, `P-PLUM`). Die synthetischen Pläne halten sich daran.
 - **Layer-Konvention (festgelegt, Details und Generator in [`cad/README.md`](../cad/README.md)):**
 
@@ -110,28 +110,28 @@ Ein neuer Konflikttyp ist damit nur eine neue Precondition, keine neue Architekt
   | `A-ANNO-TTLB` | Plankopf (Blatt, Etage, Revision) | Text; wird beim Parsen und im Plan-Diff ignoriert |
 
   Zonen-IDs aus dem Seed (#5): `B1` → `F1`–`F4` → Wohnungen `1A`–`4D` → Räume `<Wohnung>-<LIV|BED|KIT|HALL|BATH|STOR>`; Flure sind gezeichnet, aber ohne Zone. Plan `A-10<n>` gehört zu Etage `F<n>`. Jedes Element trägt eine über Revisionen stabile ID als XDATA (`SITEMIND`); die in Rev D verschobene Badwand trägt die Element-Zone `3B-BATH-WALL`.
-- **Synthetische Pläne liegen vorerst als DXF vor** (`cad/plans/`, Rev C für alle Etagen, Rev D für A-103). Der DWG-Export ist ein Folgeschritt; bis dahin verweisen die Seed-Revisionen auf die `.dxf`-Dateien, die Hero-Mail hängt `A-103_RevD.dxf` an, und die Pipeline nutzt den direkten DXF-Weg.
-- **Nicht im DWG und deshalb in Gebäude-Metadaten:** Etagenhöhen, Zuordnung Plan → Etage, Zonen-IDs. Die Zonenhierarchie ist also unabhängig vom CAD-Parsing sofort verfügbar. Das Parsing füllt die Geometrie nach und verknüpft sie über den Raumstempel mit den Zonen-IDs.
+- **Synthetische DXF-Pläne:** `cad/plans/` enthält Rev C für alle Etagen und Rev D für A-103. Seed-Revisionen verweisen auf `.dxf`; die Hero-Mail hängt `A-103_RevD.dxf` an.
+- **Separat in Gebäude-Metadaten:** Etagenhöhen, Zuordnung Plan → Etage, Zonen-IDs. Die Zonenhierarchie ist also unabhängig vom CAD-Parsing sofort verfügbar. Das Parsing füllt die Geometrie nach und verknüpft sie über den Raumstempel mit den Zonen-IDs.
 - **Gemeinsame Zonen-IDs für #3/#5:** Gebäude `B1`, Etagen `F1`–`F4`, Wohnungen `1A`–`4D`, je Wohnung die Räume `LIV`, `BED`, `KIT`, `HALL`, `BATH`, `STOR` (z. B. Hero-Bad `3B-BATH`), Badwand `3B-BATH-WALL`. CAD-Stempel verwenden exakt die IDs. Hierarchie, Plan-Zuordnung und Seed-Vertrag stehen in [SITE_RECORD.md](SITE_RECORD.md).
 - **Eine Quelle für alle:** Die extrahierte Geometrie wird über die API bereitgestellt. Die 3D-Ansicht (Wände auf Etagenhöhe extrudiert) und der Agent nutzen **dieselben** Daten. Der Agent bekommt nie rohe CAD-Dateien, sondern Abfragen wie „Was ist in Zone X?“ oder „Was hat sich zwischen Rev C und Rev D in Zone X geändert?“.
 - **Plan-Diff statt Vision:** Eine neue Revision wird geometrisch mit der vorherigen verglichen. Das Ergebnis sind die betroffenen Zonen, und das ist der deterministische Auslöser für Konflikttyp B. Die Revisionsnotiz in der Mail dient dem LLM nur zur Erklärung. **Fallback**, falls der Diff nicht rechtzeitig steht: Die betroffenen Zonen kommen aus der Revisionsnotiz (LLM-Extraktion). Diese Angaben bleiben als unbestätigt gekennzeichnet und dürfen Warnungen auslösen, aber keine Crew-Bestätigung oder andere Precondition erfüllen.
-- **DWG ist proprietär:** Intern wird mit **DXF** gearbeitet (offenes Format). DWG wird beim Eingang per Konverter umgewandelt, das Original-DWG bleibt als Quelle gespeichert. Konverter-Wahl siehe §5 und §12.
+- **Erweiterung für DWG:** Ein separater Konverter kann DWG vor derselben DXF-Extraktion umwandeln. Dabei müssen Layer, Beschriftungen, Einheiten und relevante Geometrie erhalten bleiben; das Original-DWG bleibt als Quelle gespeichert. Der bestehende LibreDWG-Prototyp aus #4 ist vorbereitet, seine automatische Anbindung ist außerhalb des MVP. Auch bei direktem DXF-Import bleibt die Originaldatei mit ihrer Revision als Quelle erhalten.
 
 ---
 
 ## 4. Scope
 
 ### MVP (muss stehen)
-1. Gebäude-Metadaten und Seed-Daten (Zonen, Terminplan, Crews, Revisionen, Inspections, Hero-Szenario), dazu **synthetische DWG-Pläne** pro Etage inkl. Rev C und Rev D für 3B
-2. **CAD-Pipeline:** DWG → DXF → strukturierte Geometrie mit Zonenzuordnung; Plan-Diff zwischen Revisionen (§3.5)
-3. Ingestion-Eingang, unabhängig von der Quelle, mit LLM-Extraktion (inkl. DWG-Anhängen aus Mails); Aussagen mit Prüfstatus, Quelle und Zitat
+1. Gebäude-Metadaten und Seed-Daten (Zonen, Terminplan, Crews, Revisionen, Inspections, Hero-Szenario), dazu **synthetische DXF-Pläne** pro Etage inkl. Rev C und Rev D für 3B
+2. **CAD-Pipeline:** DXF → strukturierte Geometrie mit Zonenzuordnung; Plan-Diff zwischen Revisionen (§3.5)
+3. Ingestion-Eingang, unabhängig von der Quelle, mit LLM-Extraktion und Weitergabe von DXF-Anhängen aus Mails an die CAD-Pipeline; Aussagen mit Prüfstatus, Quelle und Zitat
 4. Regel-Engine mit Konflikttypen A und B, Nachweisprüfung gemäß §3.2, Prüfung bei jedem Event, jeder Nachweisentscheidung und Morgen-Scan
 5. Flag-Lebenszyklus mit Audit-Trail, Eskalation, Deduplizierung
-6. **Gmail** ein und aus (Revisionen als DWG und Inspektionsergebnisse rein; Warnungen und Freigabe-Anfragen raus)
+6. **Gmail** ein und aus (Revisionen als DXF und Inspektionsergebnisse rein; Warnungen und Freigabe-Anfragen raus)
 7. **Telegram** ein und aus (Gruppenchat mitlesen, Warnungen und Antworten an Crew Leads), inkl. Compliance (§6)
 8. Terminplan als Seed-Datei (CSV oder Export im MS-Project-Stil)
 9. Dashboard: Übersicht, Flag-Inbox mit Detail, Quellen und Feedback, separate Prüfung/Bestätigung/Ablehnung von Nachweisen (auch ohne Flag), Freigabe von Proposals, Timeline der Änderungen und Entscheidungen
-10. 3D-Ansicht, **erzeugt aus der Geometrie der DWG-Pläne** (einzige räumliche Ansicht)
+10. 3D-Ansicht, **erzeugt aus der Geometrie der DXF-Pläne** (einzige räumliche Ansicht)
 11. REST-API und **MCP-Server** (inkl. Abfragen zu Plänen und Plan-Diffs)
 12. Learning Loop (§3.4)
 13. Replay-Skript mit Reset
@@ -142,8 +142,9 @@ Ein neuer Konflikttyp ist damit nur eine neue Precondition, keine neue Architekt
 - Fotos aus Telegram per Vision-LLM als Beleg („Wand ist zu“)
 
 ### Bewusst out of scope
+- Automatischer DWG-Import und DWG-Export. Der MVP nimmt DXF nach Layer-Konvention an; der LibreDWG-Prototyp bleibt als Grundlage für die spätere Konverter-Anbindung erhalten.
 - BIM/IFC-Import. *Begründung:* Bei Talonas Zielkunden (kleine und mittlere GCs) liegen Pläne als 2D-CAD (DWG) bzw. PDF vor, nicht als BIM.
-- Beliebige DWG-Pläne fremder Architekten ohne Layer-Konvention. In Production bräuchte es eine Layer-Zuordnung pro Architekt (später ein Kandidat für Site Knowledge).
+- Beliebige CAD-Pläne fremder Architekten ohne Layer-Konvention. In Production bräuchte es eine Layer-Zuordnung pro Architekt (später ein Kandidat für Site Knowledge).
 - PDF-Pläne und Vergleich von Plänen per Vision (wir vergleichen CAD-Geometrie, siehe §3.5)
 - WhatsApp (Twilio-Sandbox kann keine Gruppen). In Production über denselben Adapter wie Telegram.
 - Echtes Nachtrainieren von Modellen
@@ -172,7 +173,7 @@ Grundsätze:
 - **Der Chat-Agent lebt in `api` als MCP-Client** des eigenen `mcp`-Servers. Er nutzt dieselben Tools wie externe Agents.
 - **Kanal-Zugangsdaten** (Gmail, Telegram) liegen nur im `worker`, der LLM-Key nur in `api`.
 - **Diagramme:** siehe [README → Architektur](../README.md#architektur). Plan und Diagramme werden gemeinsam geändert.
-- **DWG → DXF über einen externen Konverter**, der in einem Container läuft. Gewählt: LibreDWG (`dwg2dxf`, GPL-3.0-or-later), ausschließlich als separates Programm. Nativer Source-Build für ARM64 und x64; Entscheidung und Testanleitung: [CAD-Konverter](CAD-CONVERTER.md). DXF-Dateien bleiben als direkter Fallback möglich.
+- **CAD-Eingang im MVP: DXF direkt in die Extraktion.** Für die spätere DWG-Erweiterung ist LibreDWG (`dwg2dxf`, GPL-3.0-or-later) als separates Programm in einem optionalen Container vorbereitet. Entscheidung, Testanleitung und bekannte Grenzen: [CAD-Konverter](CAD-CONVERTER.md). Die Extraktion bleibt unabhängig davon, ob eine DXF-Datei direkt geliefert oder konvertiert wurde.
 - **Polling statt Webhooks** (keine öffentliche URL nötig, lokales Deployment).
 - **LLM-Provider austauschbar über die Konfiguration.** Voraussetzungen: strukturierte Ausgaben und Tool-Calling; bevorzugt mit EU-Region.
 - **Für die Demo funktioniert alles auch offline:** Replay direkt in den Ingestion-Eingang, LLM-Antworten des Demo-Szenarios gecacht.
@@ -205,12 +206,12 @@ Grundsätze:
 
 ## 7. Hero-Szenario (Basis für Seed, Replay, Video)
 
-Fiktives Projekt: Wohnbau, 1 Gebäude, 4 Etagen, je 4 Wohnungen (A–D). Pro Etage ein synthetischer DWG-Grundriss. Detailliert gezeichnet (Wände, Sanitär) ist mindestens die Hero-Wohnung 3B, in Rev C und Rev D.
+Fiktives Projekt: Wohnbau, 1 Gebäude, 4 Etagen, je 4 Wohnungen (A–D). Pro Etage ein synthetischer DXF-Grundriss. Detailliert gezeichnet (Wände, Sanitär) ist mindestens die Hero-Wohnung 3B, in Rev C und Rev D.
 
 | Zeitpunkt (simuliert) | Quelle | Was passiert | Erwartete Reaktion |
 |---|---|---|---|
 | Tag 1, 07:00 | Terminplan | Trockenbau 3. OG startet an Tag 3 | – |
-| Tag 1, 10:15 | Gmail (Architekt) | Mail mit `A-103_RevD.dwg`: Badwand 3B um 30 cm verschoben, Abwasserleitung neu geführt | Plan-Diff Rev C → Rev D ergibt Zone 3B → **Flag B**: Installateur-Crew hat nur Rev C bestätigt → Warnung an den Crew Lead; 3D zeigt die geänderte Wand |
+| Tag 1, 10:15 | Gmail (Architekt) | Mail mit `A-103_RevD.dxf`: Badwand 3B um 30 cm verschoben, Abwasserleitung neu geführt | Plan-Diff Rev C → Rev D ergibt Zone 3B → **Flag B**: Installateur-Crew hat nur Rev C bestätigt → Warnung an den Crew Lead; 3D zeigt die geänderte Wand |
 | Tag 1, 11:00 | Telegram + Dashboard | Crew Lead: „Warnung gesehen“ | Flag B wird durch menschliche Aktion „zur Kenntnis genommen“; dies ist kein Nachweis, dass Rev D gelesen oder umgesetzt wurde |
 | Tag 2, 16:40 | Gmail (Inspektor) | Abnahme der Rohinstallation im 3. OG verschoben auf Tag 4 | Unbestätigtes Event „Inspection ausstehend“; keine erfüllte Precondition |
 | Tag 2, 17:00 | Telegram | „Abnahme dürfte passen“ | Unklare Aussage bleibt unbestätigt; ersetzt den fehlenden Abnahmenachweis nicht |
@@ -233,8 +234,8 @@ Keine feste Rollenverteilung, jeder nimmt sich Issues selbst. Die Abhängigkeite
 | WP0 | Repo-Grundgerüst: Compose mit allen 5 Diensten (lauffähige Hüllen), minimale CI, `.env.example`, README-Grundgerüst | – | M0 |
 | WP1 | Domänenmodell, DB-Schema und API-Vertrag inkl. Nachweis-Prüfstatus, Geltungsbereich, menschlicher Bestätigungsaktion und Audit (§2/§3.2) | WP0 | M0 |
 | WP2 | Seed-Daten: Gebäude-Metadaten (Zonen-IDs, Etagenhöhen, Plan ↔ Etage), Terminplan, Crews, Revisionen, Inspections, Hero-Szenario aus §7. explizit gekennzeichnete synthetische Ausgangsnachweise und unbestätigte Gegenbeispiele; Inhalte können sofort als Dateien entstehen | WP1 (für den Import) | M0 |
-| WP15 | Synthetische DWG-Pläne nach Layer-Konvention (§3.5): pro Etage ein Grundriss, für 3B Rev C und Rev D. Raumstempel passen zu den Zonen-IDs aus WP2 | – (sofort startbar) | M0 |
-| WP16 | CAD-Pipeline: DWG → DXF, Extraktion von Räumen, Wänden und Bauteilen, Zuordnung zu Zonen, Geometrie über die API | WP1, WP15 | M1 |
+| WP15 | Synthetische DXF-Pläne nach Layer-Konvention (§3.5): pro Etage ein Grundriss, für 3B Rev C und Rev D. Raumstempel passen zu den Zonen-IDs aus WP2 | – (sofort startbar) | M0 |
+| WP16 | CAD-Pipeline: DXF-Extraktion von Räumen, Wänden und Bauteilen, Zuordnung zu Zonen, Geometrie über die API | WP1, WP15 | M1 |
 | WP17 | Plan-Diff zwischen Revisionen → betroffene Zonen als Event (Auslöser für Konflikttyp B) | WP16, WP3 | M2 (bis dahin Fallback über Revisionsnotiz) |
 | WP3 | Ingestion-Eingang und LLM-Extraktion (Source Message → unbestätigtes Event, Quelle/Zitat, Zuordnung zu Zonen; keine automatische Nachweisbestätigung) | WP1 | M1 |
 | WP4 | Regel-Engine: Preconditions A und B, gültige Nachweise und vier Bewertungen (§3.2); Prüfung bei Events, Nachweisentscheidungen und Morgen-Scan | WP1, WP2 | M1 |
@@ -251,7 +252,7 @@ Keine feste Rollenverteilung, jeder nimmt sich Issues selbst. Die Abhängigkeite
 | S1 | Stretch: Konflikttyp C mit gültigen Abschlussnachweisen gemäß §3.2 | WP4 | M3 |
 | S2 | Stretch: Fotos als Beleg (Vision); LLM-Befunde bleiben unbestätigte Aussagen gemäß §3.2 | WP7 | M3 |
 
-**Sofort parallel zu WP0/WP1 (keine Code-Abhängigkeit):** WP15 (synthetische DWG-Pläne), Wahl des DWG-Konverters, Google-Cloud-Projekt und Gmail-OAuth einrichten (OAuth-Testmodus: Test-User eintragen; Refresh-Tokens laufen nach 7 Tagen ab), Telegram-Bot anlegen (Privacy Mode aus), LLM-Key besorgen, Seed-Inhalte schreiben, 3D-Prototyp, Research und Mentor-Interview.
+**Sofort parallel zu WP0/WP1 (keine Code-Abhängigkeit):** WP15 (synthetische DXF-Pläne), Google-Cloud-Projekt und Gmail-OAuth einrichten (OAuth-Testmodus: Test-User eintragen; Refresh-Tokens laufen nach 7 Tagen ab), Telegram-Bot anlegen (Privacy Mode aus), LLM-Key besorgen, Seed-Inhalte schreiben, 3D-Prototyp, Research und Mentor-Interview.
 
 ### Inhalt jedes Issues (Template)
 - **Ziel:** Was danach möglich ist, aus Sicht des Nutzers bzw. des Systems
@@ -266,7 +267,7 @@ Keine feste Rollenverteilung, jeder nimmt sich Issues selbst. Die Abhängigkeite
 
 | Meilenstein | Bis | Ergebnis |
 |---|---|---|
-| **M0 Fundament** | Fr ~19:30 | WP0–WP2 gemergt; synthetische DWGs (WP15) liegen vor; Accounts, Keys und Konverter-Wahl geklärt |
+| **M0 Fundament** | Fr ~19:30 | WP0–WP2 gemergt; synthetische DXFs (WP15) liegen vor; Accounts, Keys und Konverter-Wahl geklärt |
 | **M1 Tracer Bullet** | Sa ~01:00 | Mail rein → Event → Flag → sichtbar im Dashboard → Warnmail raus, einmal durchgehend; Plan-Geometrie über die API abrufbar |
 | **M2 Breite** | Sa ~09:00 | Telegram, Lebenszyklus komplett, 3D eingebunden, MCP, Replay, Morgen-Scan, Eskalation |
 | **M3 Feature Freeze** | Sa 12:00 | Chat, Learning Loop, Stretch falls Zeit. **Danach keine neuen Features.** |

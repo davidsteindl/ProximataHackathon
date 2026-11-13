@@ -13,11 +13,16 @@ pipeline (#15), the plan diff (#17) and the 3D view (#16).
 | `plans/A-104_RevC.dxf` | A-104 | F4 | C |
 | `plans/manifest.json` | sheets (floor, revisions, files) and layers | | |
 
-**Format:** DXF R2000 (AC1015), units millimetres. DXF is our internal format
-(PLAN §3.5) and opens in free viewers (e.g. LibreCAD, ODA Viewer). A DWG export
-is a follow-up; until then the seed's revisions (`backend/seed/revisions.json`)
-reference these `.dxf` files, the hero mail attaches `A-103_RevD.dxf` and the
-pipeline uses its direct-DXF path.
+**MVP input:** DXF R2000 (AC1015), units millimetres, following the layer
+convention below (PLAN §3.5). Seed revisions (`backend/seed/revisions.json`)
+reference these `.dxf` files and the hero mail attaches `A-103_RevD.dxf`.
+Verify the plans in a free DXF viewer such as LibreCAD or ODA Viewer.
+
+DWG import and export are outside the MVP. A later DWG input adapter can call
+the existing standalone LibreDWG converter before the same DXF extraction.
+Validate that conversion retains layers, labels, units and relevant geometry;
+keep the original file and revision as the source. Conversion limits are
+documented in [CAD-CONVERTER.md](../docs/CAD-CONVERTER.md).
 
 ## Regenerate
 

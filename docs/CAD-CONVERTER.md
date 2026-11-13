@@ -20,9 +20,14 @@ are not overwritten by default. The converter has no network access at runtime.
 This optional Compose job does not start the API or database. It can also be
 combined with the main stack using `-f compose.yaml -f compose.cad.yaml`.
 
-Direct DXF input remains the fallback: pass existing DXF files straight to the
-future CAD extraction pipeline (#16), skipping this converter. No ingestion or
-geometry endpoint is introduced here.
+The MVP requires direct DXF input following the layer convention in
+`cad/README.md`. The CAD extraction pipeline (#15) processes those files without
+this converter. Automatic DWG import and DWG export are outside the MVP; this
+Compose job remains available as a prototype for a later DWG input adapter.
+That adapter must preserve the original DWG and revision and verify that the
+converted DXF retains layers, labels, units and relevant geometry before passing
+it to the same extraction pipeline. No ingestion or geometry endpoint is
+introduced here.
 
 ## Licence and boundaries
 

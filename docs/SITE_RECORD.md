@@ -20,8 +20,8 @@ readable `name` fields are not identifiers and must not be used to join CAD data
 Floors have a height of 3 m; elevations are 0, 3, 6 and 9 m respectively.
 These are synthetic building metadata, not CAD geometry. Plans `A-101` … `A-104`
 belong to `F1` … `F4`. Plan revision file names follow `A-103_RevC.dxf`: issue #3
-supplies the plans as DXF for now (DWG export is a follow-up); this issue stores
-file names and zone links only. Corridors are drawn but have no zone (rooms
+supplies DXF plans as the required MVP input; DWG import/export is outside the MVP.
+This issue stores file names and zone links only. Corridors are drawn but have no zone (rooms
 must belong to units).
 Any additional CAD zone labels must be added to the seed using this hierarchy
 and coordinated between the two issues before use.
