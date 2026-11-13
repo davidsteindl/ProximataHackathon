@@ -1,0 +1,84 @@
+{
+  "revisions": [
+    {
+      "id": "A-101-C",
+      "plan_id": "A-101",
+      "label": "C",
+      "sequence": 3,
+      "issued_at": "2026-11-12T12:00:00Z",
+      "file_name": "A-101_RevC.dwg",
+      "zone_ids": [
+        "1A",
+        "1B",
+        "1C",
+        "1D"
+      ]
+    },
+    {
+      "id": "A-102-C",
+      "plan_id": "A-102",
+      "label": "C",
+      "sequence": 3,
+      "issued_at": "2026-11-12T12:00:00Z",
+      "file_name": "A-102_RevC.dwg",
+      "zone_ids": [
+        "2A",
+        "2B",
+        "2C",
+        "2D"
+      ]
+    },
+    {
+      "id": "A-103-C",
+      "plan_id": "A-103",
+      "label": "C",
+      "sequence": 3,
+      "issued_at": "2026-11-12T12:00:00Z",
+      "file_name": "A-103_RevC.dwg",
+      "zone_ids": [
+        "3A",
+        "3B",
+        "3C",
+        "3D",
+        "3B-BATH",
+        "3B-BATH-WALL"
+      ]
+    },
+    {
+      "id": "A-104-C",
+      "plan_id": "A-104",
+      "label": "C",
+      "sequence": 3,
+      "issued_at": "2026-11-12T12:00:00Z",
+      "file_name": "A-104_RevC.dwg",
+      "zone_ids": [
+        "4A",
+        "4B",
+        "4C",
+        "4D"
+      ]
+    }
+  ],
+  "acknowledgments": [
+    {
+      "crew_id": "plumbing",
+      "revision_id": "A-101-C",
+      "acknowledged_at": "2026-11-13T05:00:00Z"
+    },
+    {
+      "crew_id": "plumbing",
+      "revision_id": "A-102-C",
+      "acknowledged_at": "2026-11-13T05:00:00Z"
+    },
+    {
+      "crew_id": "plumbing",
+      "revision_id": "A-103-C",
+      "acknowledged_at": "2026-11-13T05:00:00Z"
+    },
+    {
+      "crew_id": "plumbing",
+      "revision_id": "A-104-C",
+      "acknowledged_at": "2026-11-13T05:00:00Z"
+    }
+  ]
+}

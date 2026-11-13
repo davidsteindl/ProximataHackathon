@@ -1,0 +1,178 @@
+{
+  "site": {
+    "id": "SITE-DEMO",
+    "name": "Synthetic residential site",
+    "start_date": "2026-11-13",
+    "timezone": "Europe/Vienna"
+  },
+  "zones": [
+    {
+      "id": "B1",
+      "parent_id": null,
+      "kind": "building",
+      "name": "Building B1"
+    },
+    {
+      "id": "F1",
+      "parent_id": "B1",
+      "kind": "floor",
+      "name": "Floor 1",
+      "elevation_m": 0.0,
+      "height_m": 3.0
+    },
+    {
+      "id": "1A",
+      "parent_id": "F1",
+      "kind": "unit",
+      "name": "Unit 1A"
+    },
+    {
+      "id": "1B",
+      "parent_id": "F1",
+      "kind": "unit",
+      "name": "Unit 1B"
+    },
+    {
+      "id": "1C",
+      "parent_id": "F1",
+      "kind": "unit",
+      "name": "Unit 1C"
+    },
+    {
+      "id": "1D",
+      "parent_id": "F1",
+      "kind": "unit",
+      "name": "Unit 1D"
+    },
+    {
+      "id": "F2",
+      "parent_id": "B1",
+      "kind": "floor",
+      "name": "Floor 2",
+      "elevation_m": 3.0,
+      "height_m": 3.0
+    },
+    {
+      "id": "2A",
+      "parent_id": "F2",
+      "kind": "unit",
+      "name": "Unit 2A"
+    },
+    {
+      "id": "2B",
+      "parent_id": "F2",
+      "kind": "unit",
+      "name": "Unit 2B"
+    },
+    {
+      "id": "2C",
+      "parent_id": "F2",
+      "kind": "unit",
+      "name": "Unit 2C"
+    },
+    {
+      "id": "2D",
+      "parent_id": "F2",
+      "kind": "unit",
+      "name": "Unit 2D"
+    },
+    {
+      "id": "F3",
+      "parent_id": "B1",
+      "kind": "floor",
+      "name": "Floor 3",
+      "elevation_m": 6.0,
+      "height_m": 3.0
+    },
+    {
+      "id": "3A",
+      "parent_id": "F3",
+      "kind": "unit",
+      "name": "Unit 3A"
+    },
+    {
+      "id": "3B",
+      "parent_id": "F3",
+      "kind": "unit",
+      "name": "Unit 3B"
+    },
+    {
+      "id": "3C",
+      "parent_id": "F3",
+      "kind": "unit",
+      "name": "Unit 3C"
+    },
+    {
+      "id": "3D",
+      "parent_id": "F3",
+      "kind": "unit",
+      "name": "Unit 3D"
+    },
+    {
+      "id": "F4",
+      "parent_id": "B1",
+      "kind": "floor",
+      "name": "Floor 4",
+      "elevation_m": 9.0,
+      "height_m": 3.0
+    },
+    {
+      "id": "4A",
+      "parent_id": "F4",
+      "kind": "unit",
+      "name": "Unit 4A"
+    },
+    {
+      "id": "4B",
+      "parent_id": "F4",
+      "kind": "unit",
+      "name": "Unit 4B"
+    },
+    {
+      "id": "4C",
+      "parent_id": "F4",
+      "kind": "unit",
+      "name": "Unit 4C"
+    },
+    {
+      "id": "4D",
+      "parent_id": "F4",
+      "kind": "unit",
+      "name": "Unit 4D"
+    },
+    {
+      "id": "3B-BATH",
+      "parent_id": "3B",
+      "kind": "room",
+      "name": "Bathroom 3B"
+    },
+    {
+      "id": "3B-BATH-WALL",
+      "parent_id": "3B-BATH",
+      "kind": "element",
+      "name": "Bathroom wall 3B"
+    }
+  ],
+  "plans": [
+    {
+      "id": "A-101",
+      "name": "Floor plan 1",
+      "floor_id": "F1"
+    },
+    {
+      "id": "A-102",
+      "name": "Floor plan 2",
+      "floor_id": "F2"
+    },
+    {
+      "id": "A-103",
+      "name": "Floor plan 3",
+      "floor_id": "F3"
+    },
+    {
+      "id": "A-104",
+      "name": "Floor plan 4",
+      "floor_id": "F4"
+    }
+  ]
+}

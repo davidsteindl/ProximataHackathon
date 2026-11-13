@@ -1,0 +1,13 @@
+id,name,zone_id,crew_id,starts_at,ends_at,predecessor_ids
+plumbing-F1,Rough-in plumbing F1,F1,plumbing,2026-11-13T07:00:00Z,2026-11-13T16:00:00Z,
+insulation-F1,Insulation F1,F1,insulation,2026-11-14T16:00:00Z,2026-11-14T18:00:00Z,plumbing-F1
+drywall-F1,Drywall F1,F1,drywall,2026-11-15T06:00:00Z,2026-11-15T16:00:00Z,insulation-F1
+plumbing-F2,Rough-in plumbing F2,F2,plumbing,2026-11-13T07:00:00Z,2026-11-13T16:00:00Z,
+insulation-F2,Insulation F2,F2,insulation,2026-11-14T16:00:00Z,2026-11-14T18:00:00Z,plumbing-F2
+drywall-F2,Drywall F2,F2,drywall,2026-11-15T06:00:00Z,2026-11-15T16:00:00Z,insulation-F2
+plumbing-F3,Rough-in plumbing F3,F3,plumbing,2026-11-13T07:00:00Z,2026-11-13T16:00:00Z,
+insulation-F3,Insulation F3,F3,insulation,2026-11-14T16:00:00Z,2026-11-14T18:00:00Z,plumbing-F3
+drywall-F3,Drywall F3,F3,drywall,2026-11-15T06:00:00Z,2026-11-15T16:00:00Z,insulation-F3
+plumbing-F4,Rough-in plumbing F4,F4,plumbing,2026-11-13T07:00:00Z,2026-11-13T16:00:00Z,
+insulation-F4,Insulation F4,F4,insulation,2026-11-14T16:00:00Z,2026-11-14T18:00:00Z,plumbing-F4
+drywall-F4,Drywall F4,F4,drywall,2026-11-15T06:00:00Z,2026-11-15T16:00:00Z,insulation-F4
