@@ -25,6 +25,11 @@ The product is the engine (site record, rules, flags). The agent is replaceable.
 - All inbound sources (Gmail, Telegram, seed, replay) go through the single ingestion entry point.
 - All outbound messages go through the outbox: `api` writes, `worker` sends and reports status.
 - The LLM only advises: extraction, explanation, proposals, answers. It never creates, changes or closes flags and never approves actions.
+- LLM-extracted Events are unconfirmed statements, even with high confidence. They can trigger checks but cannot satisfy any Precondition until a responsible human explicitly confirms the source-backed Evidence in the dashboard. Keep evidence confirmation separate from flag acknowledgment, proposal approval and flag closure; none implies another. Evidence review must also work without an existing Flag.
+- The API validates evidence status and scope (Zone, Inspection/Task or Crew + Revision), records person, time, source and decision, and re-runs rules on confirmation/rejection/clarification. MCP/chat tools cannot confirm/reject Evidence or override its review status. The MVP role switcher is not production authentication.
+- Preconditions evaluate to satisfied / not satisfied / unknown / contradictory. Missing, unconfirmed, stale, mismatched or unresolved contradictory evidence cannot count as satisfied. Surface relevant new counterclaims for review without allowing the LLM to overwrite human confirmations. Explain uncertainty accurately in Flags and agent answers.
+- Explicit synthetic seed evidence may establish the demo baseline with seed provenance; never invent human confirmations. Replayed LLM statements remain unconfirmed, including offline. Deterministic CAD events do not certify inspections, crew acknowledgments or task completion.
+- Learning may correct a specific extraction error using traceable feedback; it cannot auto-confirm evidence, disable safety checks or bypass confirmation. Safety-rule changes require separate human approval, narrow scope and audit; the MVP learning loop does not automatically change safety rules.
 - Flags are created by deterministic rules only. Flags are closed by humans only, always with feedback (`resolved` / `false alarm` + reason). The system never closes a flag.
 - Every flag state change is written to the audit trail (who, when, channel, source).
 - The chat agent uses our own MCP tools, like any external agent. MCP tools can't close flags or approve proposals.
@@ -42,6 +47,7 @@ The product is the engine (site record, rules, flags). The agent is replaceable.
 ## Tests
 - Every piece of logic gets unit tests (rules, lifecycle, dedup, escalation, extraction, CAD parsing, plan diff).
 - LLM, Gmail and Telegram are always mocked in tests. CI runs offline without credentials.
+- Test the evidence boundary: unconfirmed high-confidence claims, missing/stale/mismatched/contradictory evidence, human confirmation and rejection triggering re-evaluation, separation from Flag closure, denial of MCP/chat confirmation, seed/reset provenance and learning preserving genuine conflicts.
 - The hero scenario (PLAN §7) is the acceptance reference. Don't break the seed reset, replay or offline mode.
 
 ## Environment

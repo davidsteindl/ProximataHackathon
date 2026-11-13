@@ -133,7 +133,7 @@ flowchart LR
 
 ### 2. Vom Eingang zum Flag (in `api`)
 
-Durchgezogene Pfeile sind der Hauptfluss, gestrichelte die Rückkopplung aus dem Learning Loop.
+Durchgezogene Pfeile sind der Hauptfluss, gestrichelte die Rückkopplung aus dem Learning Loop. LLM-Events sind Aussagen mit Prüfstatus. Sie dürfen sofort Prüfungen auslösen; als Nachweis zur Erfüllung einer Precondition zählen sie erst nach einer expliziten menschlichen Bestätigung im Dashboard. Bestätigungsstatus und Precondition-Bewertung sind getrennt (PLAN §3.2).
 
 ```mermaid
 flowchart TD
@@ -147,14 +147,17 @@ flowchart TD
   TYP -->|"DWG-Anhang"| CONV["DWG → DXF<br/>externer Konverter"]:::rule
   CONV --> GEO["Geometrie-Extraktion<br/>Räume · Wände · Bauteile → Zonen"]:::rule
   GEO --> DIFF["Plan-Diff<br/>zur vorherigen Revision"]:::rule
-  EXTR --> EV["Event"]
+  EXTR -->|"unbestätigte Aussage"| EV["Event mit Quelle und Herkunft"]
   DIFF -->|"betroffene Zonen"| EV
   GEO -->|"Geometrie für 3D und Agent"| REC
-  EV --> REC[("Site Record<br/>Zonen · Tasks · Revisionen · Inspections · Events")]:::store
+  EV --> REC[("Site Record<br/>Events · Nachweise mit Prüfstatus<br/>Zonen · Tasks · Revisionen · Inspections")]:::store
+  REC --> REVIEW["Mensch im Dashboard<br/>Quelle und Geltungsbereich prüfen<br/>auch ohne Flag"]:::human
+  REVIEW --> VERIFY["api: bestätigen / ablehnen<br/>Audit: Person · Zeitpunkt · Quelle"]:::rule
+  VERIFY -->|"Prüfstatus speichern, erneut prüfen"| REC
   SCAN["Morgen-Scan<br/>täglich, ausgelöst vom worker"] --> RULES
-  REC --> RULES{"Regel-Engine<br/>Preconditions erfüllt?"}:::rule
-  RULES -->|"ja"| OK["kein Flag"]
-  RULES -->|"nein"| DEDUP{"Offener Flag für<br/>denselben Konflikt?"}:::rule
+  REC --> RULES{"Regel-Engine<br/>gültige bestätigte Nachweise?<br/>Precondition-Bewertung"}:::rule
+  RULES -->|"erfüllt"| OK["kein neuer Flag<br/>bestehender bleibt offen"]
+  RULES -->|"nicht erfüllt / unbekannt / widersprüchlich"| DEDUP{"Offener Flag für<br/>denselben Konflikt?"}:::rule
   DEDUP -->|"ja"| ATT["an bestehenden Flag anhängen"]
   DEDUP -->|"nein"| NEW["neuer Flag<br/>+ verantwortliche Person"]
   NEW --> ADV["Advisor<br/>Erklärung · Proposal"]:::llm
@@ -165,8 +168,7 @@ flowchart TD
   SUP -->|"Freigabe · Feedback"| LIFE
   LIFE -->|"Abschluss mit Feedback"| LEARN["Learning Loop"]
   LEARN --> SK[("Site Knowledge")]:::store
-  SK -.->|"Kontext"| EXTR
-  SK -.->|"Unterdrückung / Anpassung"| RULES
+  SK -.->|"Kontext und fallbezogene Extraktionskorrektur<br/>keine Regel-Deaktivierung"| EXTR
 ```
 
 ### 3. Flag-Lebenszyklus
@@ -180,7 +182,7 @@ flowchart LR
   B -->|"keine Reaktion nach X h:<br/>Eskalation an nächsthöhere Stelle"| B
   B -->|"verantwortliche Person:<br/>Feedback bestätigt"| K["zur Kenntnis genommen"]:::open
   K -->|"Superintendent gibt Maßnahme frei"| I["in Bearbeitung"]:::open
-  I -.->|"System: Precondition jetzt erfüllt,<br/>nur Hinweis, kein Abschluss"| I
+  I -.->|"System: gültiger Nachweis bestätigt,<br/>Precondition erfüllt; kein Abschluss"| I
   I -->|"Mensch: Feedback erledigt"| D["erledigt"]:::closed
   B -->|"Mensch: Feedback Fehlalarm"| F["Fehlalarm"]:::closed
   K -->|"Mensch: Feedback Fehlalarm"| F
@@ -193,6 +195,10 @@ flowchart LR
 - **Alle Quellen laufen über einen Ingestion-Eingang.** Ein neuer Kanal (z. B. WhatsApp) ist nur ein neuer Adapter im `worker`.
 - **Ausgehende Nachrichten laufen über eine Outbox.** `api` legt jede Nachricht als Eintrag an, `worker` versendet und meldet den Status zurück. Keine Nachricht geht verloren, und jede steht im Audit-Trail.
 - **Das LLM berät nur** (lila im Diagramm 2). Flags entstehen ausschließlich durch die Regel-Engine, Handlungen und Abschlüsse nur durch Menschen.
+- **Extraktion ist keine Nachweisbestätigung.** Nur ein zuständiger Mensch bestätigt eine LLM-extrahierte Aussage im Dashboard als Nachweis für eine konkrete Precondition. `api` prüft Status und Geltungsbereich; Quelle, Person, Zeitpunkt und Entscheidung werden protokolliert. Hohe Modellkonfidenz genügt nicht. MCP/Chat dürfen Nachweise weder bestätigen noch ablehnen oder ihren Prüfstatus übersteuern; der Rollenumschalter im MVP ersetzt keine produktionsreife Authentifizierung.
+- **Fehlende oder widersprüchliche Daten sind keine Freigabe.** Preconditions werden als erfüllt / nicht erfüllt / unbekannt / widersprüchlich bewertet. Nur gültige bestätigte Nachweise erlauben „erfüllt“. Neue Gegenmeldungen gehen in die Prüfung ein, ohne menschliche Bestätigungen durch das LLM zu überschreiben. Nachweisentscheidungen lösen erneut die Regelprüfung aus; bestehende Flags bleiben bis zum menschlichen Abschluss offen.
+- **Seed und CAD haben explizite Herkunft.** Synthetische bestätigte Ausgangsnachweise werden als Seed markiert; LLM-Aussagen bleiben auch im Offline-Replay unbestätigt. Deterministische CAD-Events aktualisieren Geometrie/betroffene Zonen, bestätigen aber keine Inspection, Crew-Kenntnisnahme oder Task-Abschlüsse.
+- **Learning ersetzt keinen Nachweis.** Im MVP korrigiert Feedback fallbezogen die Extraktion. Es deaktiviert keine Sicherheitsprüfung und umgeht keine Bestätigungspflicht. Änderungen sicherheitsrelevanter Regeln brauchen gesonderte menschliche Freigabe, begrenzten Geltungsbereich und Audit.
 - **Der Chat-Agent nutzt dieselben MCP-Tools wie externe Agents.** Was unser Chat kann, kann auch Talonas Agent.
 - **Kanal-Zugangsdaten** (Gmail, Telegram) liegen nur im `worker`, der LLM-Key nur in `api`.
 

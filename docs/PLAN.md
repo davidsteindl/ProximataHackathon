@@ -36,15 +36,16 @@ Auf Baustellen gehen Entscheidungen in Chats, Mails und Tabellen verloren. Eine 
 | **Task** | Geplanter Arbeitsschritt aus dem Terminplan (Gewerk, Zone, Zeitraum, Vorgänger) |
 | **Crew** | Ausführende Gruppe eines Gewerks mit einem **Crew Lead** |
 | **Superintendent** | Bauleiter, trifft Entscheidungen |
-| **Revision** | Version eines Plans/Planblatts; betrifft Zonen; Crews **bestätigen** Revisionen |
-| **Inspection** | Abnahme einer Zone (ausstehend / bestanden / nicht bestanden) |
+| **Revision** | Version eines Plans/Planblatts; betrifft Zonen; eine aus Nachrichten extrahierte Crew-Bestätigung zählt erst nach menschlicher Nachweisbestätigung (§3.2) |
+| **Inspection** | Abnahme einer Zone (ausstehend / bestanden / nicht bestanden); ein extrahiertes Ergebnis ist zunächst eine unbestätigte Aussage, kein erfüllungsrelevanter Nachweis |
 | **Source Message** | Rohe eingehende Nachricht (Mail, Telegram, Seed), immer mit Herkunft |
-| **Event** | Strukturierte Information, die aus einer Source Message extrahiert wurde (wer, Zone, was, wann, Absicht) |
-| **Precondition** | Bedingung, die erfüllt sein muss, bevor ein Task in einer Zone starten darf |
+| **Event** | Strukturierte Information mit Quelle (wer, Zone, was, wann, Absicht). LLM-extrahierte Aussagen sind zunächst unbestätigt; deterministische Events, z. B. Plan-Diffs, bleiben als solche gekennzeichnet |
+| **Evidence (Nachweis)** | Quellengebundener Beleg für eine konkrete Precondition (Zone, Inspection/Task bzw. Crew und Revision); LLM-extrahierte Aussagen zählen erst nach ausdrücklicher menschlicher Bestätigung. Prüfstatus: unbestätigt / bestätigt / abgelehnt; Bestätigung mit Person, Zeitpunkt und Quelle |
+| **Precondition** | Bedingung vor dem Start eines Tasks in einer Zone; Bewertung: erfüllt / nicht erfüllt / unbekannt / widersprüchlich. Nur gültige Nachweise können sie erfüllen (§3.2) |
 | **Flag** | Erkanntes Problem. Bewusst **nicht** „Issue“, um Verwechslung mit GitHub-Issues zu vermeiden |
 | **Proposal** | Handlungsvorschlag des LLM zu einem Flag, braucht menschliche Freigabe |
 | **Feedback** | Menschliche Bewertung eines Flags, plus Begründung: *bestätigt* (Problem ist echt; beim Übergang zu „zur Kenntnis genommen“), *Fehlalarm* oder *erledigt* (beide schließen den Flag) |
-| **Site Knowledge** | Aus Feedback gelerntes Wissen (Begriffe, Ausnahmen, Unterdrückungen) |
+| **Site Knowledge** | Aus Feedback gelerntes Wissen, z. B. Begriffe und fallbezogene Extraktionskorrekturen; ersetzt keine Nachweisbestätigung und deaktiviert keine Sicherheitsprüfung |
 
 ---
 
@@ -56,29 +57,39 @@ Ein neuer Konflikttyp ist damit nur eine neue Precondition, keine neue Architekt
 
 | Typ | Precondition | Status |
 |---|---|---|
-| **A: Wand zu vor Abnahme** | Die nötige Inspection der Zone ist bestanden | MVP |
-| **B: Änderung nicht angekommen** | Die ausführende Crew hat die neueste Revision der betroffenen Zone bestätigt | MVP |
-| **C: Falsche Reihenfolge** | Vorgänger-Task(s) laut Terminplan abgeschlossen | Stretch |
+| **A: Wand zu vor Abnahme** | Die nötige Inspection der Zone ist durch gültigen Nachweis als bestanden bestätigt | MVP |
+| **B: Änderung nicht angekommen** | Für die ausführende Crew liegt ein gültiger Nachweis der Bestätigung der neuesten Revision der Zone vor | MVP |
+| **C: Falsche Reihenfolge** | Abschluss der Vorgänger-Task(s) laut Terminplan ist durch gültige Nachweise bestätigt | Stretch |
 
 ### 3.2 Wer entscheidet was (Autonomie-Grenze)
 - **LLM:** Extraktion (Source Message → Event), Erklärung von Flags, Proposals, Beantwortung von Fragen. **Rein beratend. Das LLM trifft keine Entscheidungen und löst keine Aktionen aus, die über Information hinausgehen.**
-- **Regeln (deterministisch):** Prüfen Preconditions und erzeugen Flags. Dadurch reproduzierbar und erklärbar.
+- **Regeln (deterministisch):** Prüfen Preconditions anhand gültiger Nachweise und erzeugen Flags. Dadurch reproduzierbar und erklärbar. Ein LLM-Event allein kann keine Precondition erfüllen.
 - **Automatisch (ohne Mensch):** Prüfung bei jedem neuen Event, täglicher Morgen-Scan („Was ist morgen gefährdet?“), **faktische Benachrichtigung** der verantwortlichen Person mit Quelle, Eskalation bei ausbleibender Reaktion.
-- **Nur mit menschlicher Freigabe:** Jede Handlung (Task verschieben, Crew umplanen, Arbeit stoppen) und jeder Abschluss eines Flags.
+- **Nur mit menschlicher Freigabe:** Jede Handlung (Task verschieben, Crew umplanen, Arbeit stoppen), die Bestätigung extrahierter Nachweise und jeder Abschluss eines Flags.
+
+**Nachweisbestätigung (verbindlich für alle Precondition-Typen):**
+
+- Das LLM erzeugt Aussagen mit Quelle und relevantem Zitat; auch hohe `confidence` ist keine Bestätigung. Eine Meldung „Inspection bestanden“, „Rev D gelesen“ oder „Task fertig“ bleibt unbestätigt, bis ein zuständiger Mensch sie im Dashboard anhand der Quelle prüft und ausdrücklich bestätigt oder ablehnt. Nicht jedes Event braucht diese Prüfung: Arbeitsankündigungen dürfen sofort die Regelprüfung auslösen.
+- Die Bestätigung bezieht sich auf eine konkrete Aussage und ihren Geltungsbereich: Zone, erforderliche Inspection bzw. Task oder Crew und konkrete Revision. Veraltete oder unpassende Nachweise erfüllen die Precondition nicht. Die API validiert Geltungsbereich und Prüfstatus; LLM, Chat und MCP können Nachweise weder bestätigen noch ablehnen oder ihren Prüfstatus übersteuern. Im MVP ist dies eine explizite menschliche Dashboard-Aktion mit Rollenumschalter (§4), keine Behauptung produktionsreifer Authentifizierung.
+- Prüfstatus des Nachweises und Bewertung der Precondition sind getrennt: **erfüllt** = gültiger bestätigter positiver Nachweis; **nicht erfüllt** = gültiger bestätigter negativer Nachweis; **unbekannt** = kein ausreichender Nachweis; **widersprüchlich** = relevante Aussagen/Nachweise stehen ungeklärt im Widerspruch. Relevante neue Gegenmeldungen werden zur Prüfung sichtbar gemacht; das LLM überschreibt oder widerruft keine menschlichen Bestätigungen. Solange der Widerspruch ungeklärt ist, gilt die Precondition nicht als erfüllt.
+- Bei anstehender oder beginnender Arbeit führen **nicht erfüllt**, **unbekannt** und **widersprüchlich** zur Konfliktprüfung und ggf. zum deduplizierten Flag. Die Erklärung unterscheidet „nicht bestanden“, „Nachweis fehlt/unbestätigt“ und „Angaben widersprüchlich“. Fehlende Daten sind keine Freigabe.
+- Nachweise können auch ohne bestehenden Flag geprüft werden. Nach jeder Bestätigung, Ablehnung oder Klärung wird die Regelprüfung erneut ausgeführt; Audit-Einträge enthalten Person, Zeitpunkt, Quelle, Geltungsbereich und Entscheidung. Nachweisbestätigung, Kenntnisnahme eines Flags, Proposal-Freigabe und Flag-Abschluss sind getrennte Aktionen.
+- **Seed/Replay:** Explizit gekennzeichnete synthetische Ausgangsnachweise dürfen den bestätigten Demo-Ausgangsstand herstellen; Herkunft und Import werden protokolliert, ohne eine menschliche Bestätigung zu erfinden. Neu eingespielte LLM-Aussagen bleiben auch offline unbestätigt. **Deterministische CAD-Events** dürfen Geometrie und betroffene Zonen aktualisieren und Prüfungen auslösen; sie bestätigen weder Abnahmen noch Crew-Kenntnisnahmen oder Task-Abschlüsse.
 
 ### 3.3 Flag-Lebenszyklus: nichts geht verloren
 `erkannt → benachrichtigt → zur Kenntnis genommen → in Bearbeitung → erledigt | Fehlalarm`
 
 - Jeder Flag hat **eine verantwortliche Person** (über Zone und Gewerk der Crew Lead; Entscheidungen liegen beim Superintendent).
 - Ein Flag bleibt **sichtbar offen**, bis eine verantwortliche Person ihn schließt. Schließen nur mit **Feedback** (*erledigt* oder *Fehlalarm*). Das Feedback *bestätigt* („Problem ist echt“) gehört zum Übergang „zur Kenntnis genommen“.
-- **Das System schließt nie selbst.** Ist eine Precondition nachträglich erfüllt, markiert es den Flag nur als „Vorbedingung erfüllt, wartet auf Bestätigung“.
+- **Das System schließt nie selbst.** Ist eine Precondition nach Prüfung gültiger Nachweise nachträglich erfüllt, markiert es den Flag nur als „Vorbedingung erfüllt, wartet auf menschlichen Flag-Abschluss“. Eine unbestätigte LLM-Aussage erzeugt diesen Erfüllt-Hinweis nicht. Die Nachweisbestätigung schließt keinen Flag; Feedback „bestätigt“ am Flag bestätigt umgekehrt keinen Nachweis.
 - **Eskalation:** Bleibt ein Flag X Stunden ohne Reaktion, geht er an die nächsthöhere Stelle. X ist konfigurierbar.
 - **Deduplizierung:** Wird derselbe Konflikt erneut erkannt, wird das an den bestehenden offenen Flag angehängt, kein neuer Flag.
 - **Audit-Trail:** Jede Zustandsänderung mit *wer, wann, über welchen Kanal, auf Basis welcher Quelle*. Jeder Flag verweist auf die auslösenden Source Messages (mindestens als Zitat).
 
 ### 3.4 Learning Loop
-- Feedback (*bestätigt / Fehlalarm / erledigt* + Begründung) wird zu **Site Knowledge**. Beispiele: „‚die B-Wohnungen‘ = 2B, 3B, 4B“, „Inspektor Y gibt mündliche Freigaben, die zählen als bestanden“.
-- Site Knowledge wirkt zurück auf die **LLM-Extraktion und -Erklärung** (als Kontext) und auf die **Regeln** (Unterdrückung bzw. Anpassung bekannter Fehlalarme).
+- Feedback (*bestätigt / Fehlalarm / erledigt* + Begründung) wird zu **Site Knowledge**. Beispiele: „‚die B-Wohnungen‘ = 2B, 3B, 4B“ oder eine quellengebundene Korrektur einer falsch erkannten Arbeitsankündigung. Eine Aussage über mündliche Freigaben ersetzt niemals die Bestätigung eines konkreten Nachweises (§3.2).
+- Site Knowledge wirkt zurück auf die **LLM-Extraktion und -Erklärung** (als Kontext). Fallbezogene Extraktionskorrekturen dürfen einen belegten Fehlalarm im Replay vermeiden, mit sichtbarem Bezug auf Quelle und Feedback. Ein einzelnes Feedback bestätigt keine anderen Nachweise und unterdrückt keine künftigen echten Konflikte.
+- **Keine automatische Abschwächung von Sicherheitsprüfungen:** Änderungen an sicherheitsrelevanten Regeln oder Nachweisanforderungen sind gesondert menschlich freizugeben, eng im Geltungsbereich zu begrenzen und zu auditieren. Die Nachweisbestätigungspflicht bleibt bestehen. Im MVP korrigiert der Learning Loop die Extraktion, statt Sicherheitsregeln automatisch zu ändern.
 - **Ziel:** Gleiche Fehler bzw. Fehlalarme treten nicht wieder auf. Im Dashboard sichtbar als Kennzahl (Anteil bestätigter Flags über die Zeit).
 - **Vision (nur im Pitch):** Lernen über Projekte hinweg, Fotos gegen Pläne prüfen, Kontext für Roboter.
 
@@ -87,7 +98,7 @@ Ein neuer Konflikttyp ist damit nur eine neue Precondition, keine neue Architekt
 - **Aus einem Plan entstehen strukturierte Daten:** Räume/Wohnungen (geschlossene Polylinien plus Raumstempel-Text), Wände, Türen, Sanitär- und Elektro-Elemente. Welcher Layer was bedeutet, regelt eine **Layer-Konvention** (orientiert an AIA/US National CAD Standard bzw. ISO 13567, z. B. `A-WALL`, `A-DOOR`, `P-PLUM`). Die synthetischen Pläne halten sich daran.
 - **Nicht im DWG und deshalb in Gebäude-Metadaten:** Etagenhöhen, Zuordnung Plan → Etage, Zonen-IDs. Die Zonenhierarchie ist also unabhängig vom CAD-Parsing sofort verfügbar. Das Parsing füllt die Geometrie nach und verknüpft sie über den Raumstempel mit den Zonen-IDs.
 - **Eine Quelle für alle:** Die extrahierte Geometrie wird über die API bereitgestellt. Die 3D-Ansicht (Wände auf Etagenhöhe extrudiert) und der Agent nutzen **dieselben** Daten. Der Agent bekommt nie rohe CAD-Dateien, sondern Abfragen wie „Was ist in Zone X?“ oder „Was hat sich zwischen Rev C und Rev D in Zone X geändert?“.
-- **Plan-Diff statt Vision:** Eine neue Revision wird geometrisch mit der vorherigen verglichen. Das Ergebnis sind die betroffenen Zonen, und das ist der deterministische Auslöser für Konflikttyp B. Die Revisionsnotiz in der Mail dient dem LLM nur zur Erklärung. **Fallback**, falls der Diff nicht rechtzeitig steht: Die betroffenen Zonen kommen aus der Revisionsnotiz (LLM-Extraktion).
+- **Plan-Diff statt Vision:** Eine neue Revision wird geometrisch mit der vorherigen verglichen. Das Ergebnis sind die betroffenen Zonen, und das ist der deterministische Auslöser für Konflikttyp B. Die Revisionsnotiz in der Mail dient dem LLM nur zur Erklärung. **Fallback**, falls der Diff nicht rechtzeitig steht: Die betroffenen Zonen kommen aus der Revisionsnotiz (LLM-Extraktion). Diese Angaben bleiben als unbestätigt gekennzeichnet und dürfen Warnungen auslösen, aber keine Crew-Bestätigung oder andere Precondition erfüllen.
 - **DWG ist proprietär:** Intern wird mit **DXF** gearbeitet (offenes Format). DWG wird beim Eingang per Konverter umgewandelt, das Original-DWG bleibt als Quelle gespeichert. Konverter-Wahl siehe §5 und §12.
 
 ---
@@ -97,13 +108,13 @@ Ein neuer Konflikttyp ist damit nur eine neue Precondition, keine neue Architekt
 ### MVP (muss stehen)
 1. Gebäude-Metadaten und Seed-Daten (Zonen, Terminplan, Crews, Revisionen, Inspections, Hero-Szenario), dazu **synthetische DWG-Pläne** pro Etage inkl. Rev C und Rev D für 3B
 2. **CAD-Pipeline:** DWG → DXF → strukturierte Geometrie mit Zonenzuordnung; Plan-Diff zwischen Revisionen (§3.5)
-3. Ingestion-Eingang, unabhängig von der Quelle, mit LLM-Extraktion (inkl. DWG-Anhängen aus Mails)
-4. Regel-Engine mit Konflikttypen A und B, Prüfung bei jedem Event und Morgen-Scan
+3. Ingestion-Eingang, unabhängig von der Quelle, mit LLM-Extraktion (inkl. DWG-Anhängen aus Mails); Aussagen mit Prüfstatus, Quelle und Zitat
+4. Regel-Engine mit Konflikttypen A und B, Nachweisprüfung gemäß §3.2, Prüfung bei jedem Event, jeder Nachweisentscheidung und Morgen-Scan
 5. Flag-Lebenszyklus mit Audit-Trail, Eskalation, Deduplizierung
 6. **Gmail** ein und aus (Revisionen als DWG und Inspektionsergebnisse rein; Warnungen und Freigabe-Anfragen raus)
 7. **Telegram** ein und aus (Gruppenchat mitlesen, Warnungen und Antworten an Crew Leads), inkl. Compliance (§6)
 8. Terminplan als Seed-Datei (CSV oder Export im MS-Project-Stil)
-9. Dashboard: Übersicht, Flag-Inbox mit Detail, Quellen und Feedback, Freigabe von Proposals, Timeline der Änderungen und Entscheidungen
+9. Dashboard: Übersicht, Flag-Inbox mit Detail, Quellen und Feedback, separate Prüfung/Bestätigung/Ablehnung von Nachweisen (auch ohne Flag), Freigabe von Proposals, Timeline der Änderungen und Entscheidungen
 10. 3D-Ansicht, **erzeugt aus der Geometrie der DWG-Pläne** (einzige räumliche Ansicht)
 11. REST-API und **MCP-Server** (inkl. Abfragen zu Plänen und Plan-Diffs)
 12. Learning Loop (§3.4)
@@ -167,7 +178,7 @@ Grundsätze:
 - Betriebsvereinbarung (AT: ArbVG §96/§96a), da das System potenziell Leistung überwachen könnte
 - Auftragsverarbeitungsvertrag, EU-Region und Zero Data Retention beim LLM-Provider
 - Telegram: Server außerhalb der EU, keine Ende-zu-Ende-Verschlüsselung → in Production WhatsApp Business oder Teams
-- Prompt Injection: Das Risiko ist begrenzt, weil das LLM nur berät
+- Prompt Injection und Extraktionsfehler: LLM-Ausgaben bleiben unbestätigte Aussagen; Nachweisbestätigung und API-Prüfungen begrenzen den Einfluss auf Preconditions (§3.2). Die Beratungsrolle allein garantiert keine korrekten Eingangsdaten.
 - Fehlende Dashboard-Authentifizierung
 
 **Demo:** Ausschließlich synthetische Daten und Test-Accounts aus dem Team.
@@ -182,14 +193,16 @@ Fiktives Projekt: Wohnbau, 1 Gebäude, 4 Etagen, je 4 Wohnungen (A–D). Pro Eta
 |---|---|---|---|
 | Tag 1, 07:00 | Terminplan | Trockenbau 3. OG startet an Tag 3 | – |
 | Tag 1, 10:15 | Gmail (Architekt) | Mail mit `A-103_RevD.dwg`: Badwand 3B um 30 cm verschoben, Abwasserleitung neu geführt | Plan-Diff Rev C → Rev D ergibt Zone 3B → **Flag B**: Installateur-Crew hat nur Rev C bestätigt → Warnung an den Crew Lead; 3D zeigt die geänderte Wand |
-| Tag 1, 11:00 | Telegram | Crew Lead der Installateure bestätigt | Flag B „zur Kenntnis genommen“ |
-| Tag 2, 16:40 | Gmail (Inspektor) | Abnahme der Rohinstallation im 3. OG verschoben auf Tag 4 | Event Inspection ausstehend |
-| Tag 2, 18:05 | Telegram (Trockenbau-Gruppe) | „morgen früh machen wir 3B zu, platten sind da“ | **Flag A (kritisch)**: Abnahme offen und Rev D noch nicht umgesetzt → 3D: Wand 3B rot → Superintendent bekommt Proposal „Trockenbau 3B verschieben, Crew auf 3A/3C umplanen“ → Freigabe → Crew Lead informiert |
+| Tag 1, 11:00 | Telegram + Dashboard | Crew Lead: „Warnung gesehen“ | Flag B wird durch menschliche Aktion „zur Kenntnis genommen“; dies ist kein Nachweis, dass Rev D gelesen oder umgesetzt wurde |
+| Tag 2, 16:40 | Gmail (Inspektor) | Abnahme der Rohinstallation im 3. OG verschoben auf Tag 4 | Unbestätigtes Event „Inspection ausstehend“; keine erfüllte Precondition |
+| Tag 2, 17:00 | Telegram | „Abnahme dürfte passen“ | Unklare Aussage bleibt unbestätigt; ersetzt den fehlenden Abnahmenachweis nicht |
+| Tag 2, 18:05 | Telegram (Trockenbau-Gruppe) | „morgen früh machen wir 3B zu, platten sind da“ | **Flag A (kritisch)**: Abnahme nicht nachgewiesen und Kenntnisnahme von Rev D nicht bestätigt → 3D: Wand 3B rot → Superintendent bekommt Proposal „Trockenbau 3B verschieben, Crew auf 3A/3C umplanen“ → Freigabe → Crew Lead informiert |
 | Tag 2, 18:30 | Telegram | Crew fragt: „welcher plan gilt für 3B?“ | Antwort aus dem Record mit Quelle (Rev D, Mail vom Tag 1) |
-| Tag 3 | Dashboard | Superintendent schließt Flag A als *erledigt* mit Begründung | Audit-Trail vollständig |
-| Learning-Loop-Moment | Telegram + Dashboard | Eine Nachricht erzeugt einen Fehlalarm; der wird als *Fehlalarm* mit Grund geschlossen; Replay neu | Derselbe Fall wird nicht mehr geflaggt |
+| Tag 3 | Dashboard | Superintendent schließt Flag A als *erledigt* mit Begründung „Trockenbau verschoben“ | Audit-Trail vollständig; Abschluss bestätigt keine Inspection und erfüllt keine andere Precondition |
+| Nach Abnahme an Tag 4 | Gmail + Dashboard | Eindeutiges positives Abnahmeergebnis trifft ein; zuständiger Mensch prüft Quelle und bestätigt den Nachweis für die konkrete Inspection in 3B | Erst danach ist Precondition A erfüllt; ein ggf. noch offener Flag bleibt bis zum separaten menschlichen Abschluss offen |
+| Learning-Loop-Moment | Telegram + Dashboard | Eine als Arbeitsankündigung fehlinterpretierte Frage erzeugt einen Fehlalarm; menschliches Feedback korrigiert die Extraktion; Replay neu | Derselbe Fall wird mit sichtbarem Quellen-/Feedback-Bezug richtig interpretiert; echte Arbeitsankündigungen ohne bestätigten Nachweis erzeugen weiterhin Flags |
 
-Das Replay-Skript spielt diese Abfolge über die **echten** Kanäle ein (echte Mails von einem Test-Account, echte Telegram-Nachrichten) und hat einen Offline-Modus (§5).
+Das Replay-Skript spielt diese Abfolge über die **echten** Kanäle ein (echte Mails von einem Test-Account, echte Telegram-Nachrichten) und hat einen Offline-Modus (§5). Bei menschlichen Entscheidungen pausiert es für die Dashboard-Aktion; es bestätigt weder Nachweise noch Proposals oder Flag-Abschlüsse automatisch.
 
 ---
 
@@ -200,25 +213,25 @@ Keine feste Rollenverteilung, jeder nimmt sich Issues selbst. Die Abhängigkeite
 | ID | Paket | Abhängig von | Meilenstein |
 |---|---|---|---|
 | WP0 | Repo-Grundgerüst: Compose mit allen 5 Diensten (lauffähige Hüllen), minimale CI, `.env.example`, README-Grundgerüst | – | M0 |
-| WP1 | Domänenmodell, DB-Schema und API-Vertrag (Entitäten aus §2) | WP0 | M0 |
-| WP2 | Seed-Daten: Gebäude-Metadaten (Zonen-IDs, Etagenhöhen, Plan ↔ Etage), Terminplan, Crews, Revisionen, Inspections, Hero-Szenario aus §7. Inhalte können sofort als Dateien entstehen | WP1 (für den Import) | M0 |
+| WP1 | Domänenmodell, DB-Schema und API-Vertrag inkl. Nachweis-Prüfstatus, Geltungsbereich, menschlicher Bestätigungsaktion und Audit (§2/§3.2) | WP0 | M0 |
+| WP2 | Seed-Daten: Gebäude-Metadaten (Zonen-IDs, Etagenhöhen, Plan ↔ Etage), Terminplan, Crews, Revisionen, Inspections, Hero-Szenario aus §7. explizit gekennzeichnete synthetische Ausgangsnachweise und unbestätigte Gegenbeispiele; Inhalte können sofort als Dateien entstehen | WP1 (für den Import) | M0 |
 | WP15 | Synthetische DWG-Pläne nach Layer-Konvention (§3.5): pro Etage ein Grundriss, für 3B Rev C und Rev D. Raumstempel passen zu den Zonen-IDs aus WP2 | – (sofort startbar) | M0 |
 | WP16 | CAD-Pipeline: DWG → DXF, Extraktion von Räumen, Wänden und Bauteilen, Zuordnung zu Zonen, Geometrie über die API | WP1, WP15 | M1 |
 | WP17 | Plan-Diff zwischen Revisionen → betroffene Zonen als Event (Auslöser für Konflikttyp B) | WP16, WP3 | M2 (bis dahin Fallback über Revisionsnotiz) |
-| WP3 | Ingestion-Eingang und LLM-Extraktion (Source Message → Event, Zuordnung zu Zonen) | WP1 | M1 |
-| WP4 | Regel-Engine: Preconditions A und B, Prüfung bei jedem Event, Morgen-Scan | WP1, WP2 | M1 |
-| WP5 | Flag-Lebenszyklus: Zustände, Verantwortliche, Audit-Trail, Deduplizierung, Eskalation, Proposals | WP1 | M1 |
+| WP3 | Ingestion-Eingang und LLM-Extraktion (Source Message → unbestätigtes Event, Quelle/Zitat, Zuordnung zu Zonen; keine automatische Nachweisbestätigung) | WP1 | M1 |
+| WP4 | Regel-Engine: Preconditions A und B, gültige Nachweise und vier Bewertungen (§3.2); Prüfung bei Events, Nachweisentscheidungen und Morgen-Scan | WP1, WP2 | M1 |
+| WP5 | Flag-Lebenszyklus: Zustände, Verantwortliche, Audit-Trail, Deduplizierung, Eskalation, Proposals; Flag-Abschluss getrennt von Nachweisbestätigung | WP1 | M1 |
 | WP6 | Gmail-Adapter ein und aus | WP3, WP5 | M1 |
 | WP7 | Telegram-Adapter ein und aus, inkl. Compliance-Features (§6) | WP3, WP5 | M2 |
-| WP8 | Dashboard: Übersicht, Flag-Inbox, Detail mit Quellen, Feedback, Freigabe, Timeline | WP1 (Vertrag), WP5 | M1 (Grundversion) / M2 |
+| WP8 | Dashboard: Übersicht, Flag-Inbox, Detail mit Quellen, Feedback, separate Nachweisprüfung auch ohne Flag, Freigabe, Timeline | WP1 (Vertrag), WP5 | M1 (Grundversion) / M2 |
 | WP9 | 3D-Ansicht: extrudiert aus der Plan-Geometrie der API (Wände auf Etagenhöhe), Färbung nach Flag-Status, Klick öffnet Detail. Prototyp mit Mock-Geometrie sofort möglich | WP16 (Geometrie), WP5 | M2 |
-| WP10 | MCP-Server: Tools u. a. Zonenstatus, offene Flags, Änderungshistorie, Plan-Inhalt einer Zone, Plan-Diff, Suche/Frage, Proposal anlegen | WP1, WP5, WP16 | M2 |
+| WP10 | MCP-Server: Tools u. a. Zonenstatus, offene Flags, Änderungshistorie, Plan-Inhalt einer Zone, Plan-Diff, Suche/Frage, Proposal anlegen; Prüfstatus in Antworten, keine Nachweisbestätigung durch Agents | WP1, WP5, WP16 | M2 |
 | WP11 | Chat-Agent für Dashboard und Telegram-Q&A über die eigenen MCP-Tools | WP10, WP7 | M3 |
-| WP12 | Learning Loop: Feedback → Site Knowledge → Extraktion und Regeln; Kennzahl im Dashboard | WP3, WP4, WP5 | M2/M3 |
-| WP13 | Replay-Skript mit simulierter Uhr, Reset, Offline-Modus | WP2, WP6, WP7 | M2 |
+| WP12 | Learning Loop: Feedback → Site Knowledge → fallbezogene Extraktionskorrektur; keine automatische Abschwächung von Sicherheitsregeln; Kennzahl im Dashboard | WP3, WP4, WP5 | M2/M3 |
+| WP13 | Replay-Skript mit simulierter Uhr, Reset, Offline-Modus; menschliche Nachweisbestätigung und unsichere Gegenbeispiele | WP2, WP6, WP7 | M2 |
 | WP14 | Research, Mentor-Interview, Pitch, 3-Min-Video, `COMPLIANCE.md`, finale README, Abgabe | läuft parallel | M4 |
-| S1 | Stretch: Konflikttyp C | WP4 | M3 |
-| S2 | Stretch: Fotos als Beleg (Vision) | WP7 | M3 |
+| S1 | Stretch: Konflikttyp C mit gültigen Abschlussnachweisen gemäß §3.2 | WP4 | M3 |
+| S2 | Stretch: Fotos als Beleg (Vision); LLM-Befunde bleiben unbestätigte Aussagen gemäß §3.2 | WP7 | M3 |
 
 **Sofort parallel zu WP0/WP1 (keine Code-Abhängigkeit):** WP15 (synthetische DWG-Pläne), Wahl des DWG-Konverters, Google-Cloud-Projekt und Gmail-OAuth einrichten (OAuth-Testmodus: Test-User eintragen; Refresh-Tokens laufen nach 7 Tagen ab), Telegram-Bot anlegen (Privacy Mode aus), LLM-Key besorgen, Seed-Inhalte schreiben, 3D-Prototyp, Research und Mentor-Interview.
 
@@ -250,6 +263,7 @@ Schlaf in Schichten, sodass nachts immer jemand reviewen und mergen kann.
 - **Ablauf:** Issue → Branch → PR (verlinkt das Issue) → **1 Approver** → Merge. Kein Review durch alle.
 - **CI (minimal, muss grün sein):** Backend-Tests, Frontend-Build und Lint, Prüfung der Compose-Konfiguration. Ein kaputter `main` blockiert alle.
 - **Tests:** Jede Logik bekommt Unit-Tests, vor allem Regel-Engine, Lebenszyklus, Deduplizierung, Eskalation, Extraktion (mit gemocktem LLM), CAD-Extraktion und Plan-Diff (gegen die synthetischen Pläne) und Learning Loop. LLM-Aufrufe sind in Tests immer gemockt.
+- **Pflichtfälle zur Nachweisgrenze:** Unbestätigte Erfolgsmeldung (auch mit hoher Modellkonfidenz), fehlender Nachweis, falsche Zone/Revision, veralteter Nachweis und widersprüchliche Angaben erfüllen keine Precondition. Menschliche Bestätigung/Ablehnung löst eine erneute Prüfung aus; Bestätigung schließt keinen Flag, Flag-Feedback bestätigt keinen Nachweis. MCP/Chat können keine Bestätigung ausführen. Seed/Reset und Offline-Replay erhalten die Herkunft; Learning korrigiert den Fehlalarm, während echte Konflikte weiterhin geflaggt werden.
 - **Schema-Owner:** Wer gerade WP1 hält, koordiniert DB-Migrationen. Migrationen von parallelen PRs kollidieren sonst (gleiche Nummer).
 - **Änderungen am API-Vertrag oder Schema:** Kurzer Hinweis an alle, bevor gemergt wird.
 - **Definition of Done:** Akzeptanzkriterien erfüllt, Tests grün, läuft per `docker compose up`, keine Secrets im Code.
