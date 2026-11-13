@@ -104,12 +104,12 @@ Ein neuer Konflikttyp ist damit nur eine neue Precondition, keine neue Architekt
   | `A-WALL` | Innen-, Trenn- und Flurwand | Polylinie auf der Wandachse, Breite = Wandstärke; Türöffnungen sind Lücken |
   | `A-DOOR` | Tür | Block `DOOR` am Anschlag, Skalierung = Türbreite |
   | `A-AREA-UNIT` / `A-AREA-UNIT-IDEN` | Wohnung | Geschlossene Polylinie / Text = Zonen-ID (z. B. `3B`) |
-  | `A-AREA` / `A-AREA-IDEN` | Raum (nur Raum-Zonen aus dem Seed) | Geschlossene Polylinie / Raumstempel-Text = Zonen-ID (z. B. `3B-BATH`) |
+  | `A-AREA` / `A-AREA-IDEN` | Raum, Flur | Geschlossene Polylinie / Raumstempel-Text = Zonen-ID (z. B. `3B-BATH`, `F3-CORE`) |
   | `P-FIXT` | Sanitärobjekt | Block `WC`, `SINK`, `SHOWER` |
   | `P-SANR` | Abwasser | Polylinie = Leitung, Block `STACK` = Fallstrang |
   | `A-ANNO-TTLB` | Plankopf (Blatt, Etage, Revision) | Text; wird beim Parsen und im Plan-Diff ignoriert |
 
-  Stempel nur für Zonen aus dem Seed (siehe nächste Punkte): Wohnungen `1A`–`4D` und `3B-BATH`; übrige Räume sind gezeichnet, aber ohne Zone. Jedes Element trägt eine über Revisionen stabile ID als XDATA (`SITEMIND`); die verschobene Badwand trägt die Element-Zone `3B-BATH-WALL`, andere z. B. `3B-WALL-01`, `3B-DOOR-04`.
+  Zonen-IDs: `BLDG` → `F1`–`F4` → Wohnungen `1A`–`4D` und Flur `F<n>-CORE` → Räume `<Wohnung>-<LIV|BED|KIT|HALL|BATH|STOR>`. Plan `A-10<n>` gehört zu Etage `F<n>`. Jedes Element trägt eine über Revisionen stabile ID als XDATA (`SITEMIND`, z. B. `3B-WALL-09`).
 - **Synthetische Pläne liegen vorerst als DXF vor** (`cad/plans/`, Rev C für alle Etagen, Rev D für A-103). Der DWG-Export ist ein Folgeschritt; bis dahin hängt die Hero-Mail `A-103_RevD.dxf` an, und die Pipeline nutzt den direkten DXF-Weg.
 - **Nicht im DWG und deshalb in Gebäude-Metadaten:** Etagenhöhen, Zuordnung Plan → Etage, Zonen-IDs. Die Zonenhierarchie ist also unabhängig vom CAD-Parsing sofort verfügbar. Das Parsing füllt die Geometrie nach und verknüpft sie über den Raumstempel mit den Zonen-IDs.
 - **Gemeinsame Zonen-IDs für #3/#5:** Gebäude `B1`, Etagen `F1`–`F4`, Wohnungen `1A`–`4D`, Hero-Bad `3B-BATH`, Badwand `3B-BATH-WALL`. CAD-Stempel verwenden exakt die IDs. Hierarchie, Plan-Zuordnung und Seed-Vertrag stehen in [SITE_RECORD.md](SITE_RECORD.md).

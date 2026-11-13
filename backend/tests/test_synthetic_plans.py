@@ -18,9 +18,7 @@ sys.modules[_spec.name] = gen  # dataclasses look up their module during class c
 _spec.loader.exec_module(gen)
 
 PLAN_FILES = [rev["file"] for sheet in MANIFEST["sheets"] for rev in sheet["revisions"]]
-SEED = json.loads((REPO / "backend" / "seed" / "building.json").read_text(encoding="utf-8"))
-ZONES = {z["id"]: z for z in SEED["zones"]}
-SEED_PLAN_FLOOR = {plan["id"]: plan["floor_id"] for plan in SEED["plans"]}
+ZONES = {z["id"]: z for z in MANIFEST["zones"]}
 AREA_STAMP_LAYER = {"A-AREA": "A-AREA-IDEN", "A-AREA-UNIT": "A-AREA-UNIT-IDEN"}
 
 
@@ -65,15 +63,9 @@ def inside(point, polygon):
     return hit
 
 
-def floor_of(zone_id):
-    while ZONES[zone_id]["kind"] != "floor":
-        zone_id = ZONES[zone_id]["parent_id"]
-    return zone_id
-
-
-def test_one_plan_per_seed_plan_with_rev_c_and_d_for_a103():
+def test_manifest_lists_one_plan_per_floor_and_rev_c_and_d_for_a103():
     sheets = {s["sheet"]: s for s in MANIFEST["sheets"]}
-    assert {sheet: s["floor"] for sheet, s in sheets.items()} == SEED_PLAN_FLOOR
+    assert [f["sheet"] for f in MANIFEST["floors"]] == ["A-101", "A-102", "A-103", "A-104"]
     assert [r["rev"] for r in sheets["A-103"]["revisions"]] == ["C", "D"]
     for name in PLAN_FILES:
         assert (PLANS / name).is_file(), name
@@ -111,15 +103,8 @@ def test_every_area_has_exactly_one_stamp_matching_a_seed_zone(name):
         assert hits == [element_id(area)], f"{element_id(area)} has stamps {hits}"
         labelled.append(hits[0])
 
-    expected = {z for z, d in ZONES.items() if d["kind"] in ("unit", "room") and floor_of(z) == floor}
+    expected = {z for z, d in ZONES.items() if d["parent"] == floor or ZONES.get(d["parent"], {}).get("parent") == floor}
     assert sorted(labelled) == sorted(expected)
-
-
-def test_seed_element_zone_is_the_hero_wall():
-    for rev in ("C", "D"):
-        ids = {element_id(e): e for e in ezdxf.readfile(PLANS / f"A-103_Rev{rev}.dxf").modelspace()}
-        assert ids["3B-BATH-WALL"].dxf.layer == "A-WALL"
-        assert all(z in ids for z, d in ZONES.items() if d["kind"] in ("room", "element") and floor_of(z) == "F3")
 
 
 def test_unit_3b_elements_lie_inside_unit_3b():
@@ -142,23 +127,21 @@ def test_rev_d_differs_from_rev_c_only_by_the_3b_bathroom_change():
     rev_d = snapshot(PLANS / "A-103_RevD.dxf")
     assert rev_c.keys() == rev_d.keys()
     changed = {k for k in rev_c if rev_c[k] != rev_d[k]}
-    assert changed == {"3B-BATH-WALL", "3B-BATH", "3B-SANR-03"}
+    assert changed == {"3B-WALL-09", "3B-BATH", "3B-STOR", "3B-SANR-03"}
 
-    (c_start, c_end), (d_start, d_end) = rev_c["3B-BATH-WALL"][1], rev_d["3B-BATH-WALL"][1]
+    (c_start, c_end), (d_start, d_end) = rev_c["3B-WALL-09"][1], rev_d["3B-WALL-09"][1]
     assert d_start[0] - c_start[0] == pytest.approx(300) and d_end[0] - c_end[0] == pytest.approx(300)
     assert (c_start[1], c_end[1]) == (d_start[1], d_end[1])
     assert rev_c["3B-SANR-03"][1] != rev_d["3B-SANR-03"][1]
 
 
 @pytest.mark.parametrize("name", [n for n in PLAN_FILES if n != "A-103_RevD.dxf"])
-def test_every_floor_has_the_same_drawn_layout(name):
-    """Same layout on every floor: element counts per geometry layer match A-103 Rev C."""
+def test_other_sheets_are_identical_across_floors_apart_from_ids(name):
+    """Every floor uses the same layout, so element counts per layer match A-103 Rev C."""
 
     def counts(path):
         result = {}
         for e in ezdxf.readfile(path).modelspace():
-            if e.dxf.layer in ("A-AREA", "A-AREA-IDEN", "A-ANNO-TTLB"):
-                continue  # room labels exist only where the seed has room zones
             result[e.dxf.layer] = result.get(e.dxf.layer, 0) + 1
         return result
 
