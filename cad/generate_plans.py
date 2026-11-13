@@ -35,7 +35,7 @@ LAYERS: dict[str, tuple[int, str, str]] = {
     "A-DOOR": (3, "door", "Door, INSERT of block DOOR at the hinge, scale = leaf width"),
     "A-AREA-UNIT": (5, "unit", "Unit outline, closed polyline on wall centrelines"),
     "A-AREA-UNIT-IDEN": (5, "unit_label", "Unit stamp, TEXT = unit zone ID (e.g. 3B)"),
-    "A-AREA": (8, "room", "Room / common area outline, closed polyline on wall centrelines"),
+    "A-AREA": (8, "room", "Room outline, closed polyline on wall centrelines (seed room zones only)"),
     "A-AREA-IDEN": (2, "room_label", "Room stamp, TEXT = room zone ID (e.g. 3B-BATH)"),
     "P-FIXT": (4, "plumbing_fixture", "Plumbing fixture, INSERT of block WC / SINK / SHOWER"),
     "P-SANR": (6, "drain", "Sanitary drain: polyline = pipe run, INSERT of block STACK = stack"),
@@ -43,9 +43,11 @@ LAYERS: dict[str, tuple[int, str, str]] = {
 }
 
 # --- Building metadata --------------------------------------------------------
-BUILDING_ID = "BLDG"
-BUILDING_NAME = "Wohnbau Musterstrasse 12 (synthetic)"
-FLOOR_HEIGHT_MM = 3000
+# Zone IDs, floor heights and plan -> floor live in the seed (#5); the plans only
+# label zones that exist there (docs/SITE_RECORD.md, "Zone IDs shared with #3").
+SEED_BUILDING = Path(__file__).resolve().parents[1] / "backend" / "seed" / "building.json"
+_SEED_ZONES = json.loads(SEED_BUILDING.read_text(encoding="utf-8"))["zones"]
+LABELLED_ZONES = frozenset(z["id"] for z in _SEED_ZONES if z["kind"] in ("room", "element"))
 FLOORS = [1, 2, 3, 4]
 SHEET_REVISIONS = {1: ["C"], 2: ["C"], 3: ["C", "D"], 4: ["C"]}
 REVISION_NOTES = {
@@ -57,15 +59,6 @@ BUILDING_W, BUILDING_D = 24000, 20000
 UNIT_W, UNIT_D = 12000, 8500
 CORRIDOR_Y0, CORRIDOR_Y1 = 8500, 11500
 EXT_WALL, PARTY_WALL, INT_WALL = 300, 200, 100
-
-ROOMS = {
-    "LIV": "Living room",
-    "BED": "Bedroom",
-    "KIT": "Kitchen",
-    "HALL": "Hall",
-    "BATH": "Bathroom",
-    "STOR": "Storage",
-}
 
 # Unit placement: (x offset, y offset, rotated 180°). A/B face south, C/D north.
 UNIT_PLACEMENT = {
@@ -145,23 +138,19 @@ def unit_template(unit: str, moved_bath_wall: bool) -> list[Element]:
         ((bath_x, 5500), (bath_x, 8500)),  # bathroom wall: moved in Rev D
     ]
     for n, pts in enumerate(walls, 1):
-        els.append(Polyline(f"{unit}-WALL-{n:02d}", "A-WALL", pts, width=INT_WALL))
+        wall_id = f"{unit}-WALL-{n:02d}"
+        if n == len(walls) and f"{unit}-BATH-WALL" in LABELLED_ZONES:
+            wall_id = f"{unit}-BATH-WALL"  # the seed's element zone (hero wall)
+        els.append(Polyline(wall_id, "A-WALL", pts, width=INT_WALL))
 
     els.append(Polyline(unit, "A-AREA-UNIT", _rect(0, 0, UNIT_W, UNIT_D), closed=True))
     els.append(Stamp("A-AREA-UNIT-IDEN", unit, (5000, 7600), 400))
 
-    rooms = {
-        "LIV": (_rect(0, 0, 7000, 5500), (3500, 2750)),
-        "BED": (_rect(7000, 0, 12000, 5500), (9500, 2750)),
-        "KIT": (_rect(0, 5500, 3000, 8500), (1500, 7000)),
-        "HALL": (_rect(3000, 5500, 7000, 8500), (5000, 6600)),
-        "BATH": (_rect(7000, 5500, bath_x, 8500), (8300, 6900)),
-        "STOR": (_rect(bath_x, 5500, 12000, 8500), (11150, 7000)),
-    }
-    for code, (outline, stamp_at) in rooms.items():
-        zone = f"{unit}-{code}"
-        els.append(Polyline(zone, "A-AREA", outline, closed=True))
-        els.append(Stamp("A-AREA-IDEN", zone, stamp_at, 250))
+    # Room outlines + stamps only for room zones that exist in the seed.
+    zone = f"{unit}-BATH"
+    if zone in LABELLED_ZONES:
+        els.append(Polyline(zone, "A-AREA", _rect(7000, 5500, bath_x, 8500), closed=True))
+        els.append(Stamp("A-AREA-IDEN", zone, (8300, 6900), 250))
 
     doors = [  # hinge, rotation, leaf width
         ((5500, 8500), 180, 1000),  # entrance from corridor
@@ -229,10 +218,6 @@ def floor_elements(floor: int, rev: str) -> list[Element]:
     for n, (layer, pts, width) in enumerate(floor_walls, 2):
         els.append(Polyline(f"{fid}-WALL-{n:02d}", layer, pts, width=width))
 
-    core = f"{fid}-CORE"
-    els.append(Polyline(core, "A-AREA", _rect(0, CORRIDOR_Y0, BUILDING_W, CORRIDOR_Y1), closed=True))
-    els.append(Stamp("A-AREA-IDEN", core, (12000, 10000), 250))
-
     for letter, (dx, dy, rotated) in UNIT_PLACEMENT.items():
         unit = f"{floor}{letter}"
         moved = unit == HERO_UNIT and rev == HERO_REVISION
@@ -240,35 +225,10 @@ def floor_elements(floor: int, rev: str) -> list[Element]:
     return els
 
 
-def zones() -> list[dict]:
-    """Zone hierarchy: building -> floor -> unit / common area -> room."""
-    out = [{"id": BUILDING_ID, "kind": "building", "parent": None, "name": BUILDING_NAME}]
-    for floor in FLOORS:
-        fid = f"F{floor}"
-        out.append({"id": fid, "kind": "floor", "parent": BUILDING_ID, "name": f"Level {floor}"})
-        out.append({"id": f"{fid}-CORE", "kind": "common", "parent": fid, "name": f"Corridor level {floor}"})
-        for letter in UNIT_PLACEMENT:
-            unit = f"{floor}{letter}"
-            out.append({"id": unit, "kind": "unit", "parent": fid, "name": f"Unit {unit}"})
-            for code, name in ROOMS.items():
-                out.append({"id": f"{unit}-{code}", "kind": "room", "parent": unit, "name": f"{name} {unit}"})
-    return out
-
-
 def manifest() -> dict:
     return {
         "units": "mm",
-        "building": {"id": BUILDING_ID, "name": BUILDING_NAME},
-        "floors": [
-            {
-                "id": f"F{floor}",
-                "level": floor,
-                "elevation_mm": (floor - 1) * FLOOR_HEIGHT_MM,
-                "height_mm": FLOOR_HEIGHT_MM,
-                "sheet": sheet_id(floor),
-            }
-            for floor in FLOORS
-        ],
+        "zones_source": "backend/seed/building.json",
         "sheets": [
             {
                 "sheet": sheet_id(floor),
@@ -286,7 +246,6 @@ def manifest() -> dict:
             for floor in FLOORS
         ],
         "layers": {name: {"type": t, "description": d} for name, (_, t, d) in LAYERS.items()},
-        "zones": zones(),
     }
 
 
