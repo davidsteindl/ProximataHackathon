@@ -55,6 +55,7 @@ def test_missing_ambiguous_and_contradictory_examples_do_not_change_domain_outco
     "confirmed_statement", "invented_human_review", "missing_baseline_scope",
     "wrong_inspection_zone", "wrong_revision_zone", "wrong_exact_revision",
     "claim_mismatch", "mixed_subject", "unknown_reference", "missing_provenance",
+    "negative_ack_with_baseline_record",
 ])
 def test_import_rejects_invalid_or_fabricated_confirmation(client, seed, invalid):
     data = seed.model_dump(mode="json")
@@ -82,8 +83,22 @@ def test_import_rejects_invalid_or_fabricated_confirmation(client, seed, invalid
         record["scope"]["revision_id"] = "A-103-D"
     elif invalid == "missing_provenance":
         record["source_ref"] = "telegram:pretend-human-confirmation"
+    elif invalid == "negative_ack_with_baseline_record":
+        record["claim"] = "not_acknowledged"
     assert client.post("/seed/import", json=data).status_code == 422
     assert client.get("/evidence").json() == baseline
+
+
+def test_negative_baseline_acknowledgment_without_record_is_accepted(client, seed):
+    data = seed.model_dump(mode="json")
+    data["evidence"][0]["claim"] = "not_acknowledged"
+    data["acknowledgments"] = [
+        ack for ack in data["acknowledgments"] if ack["revision_id"] != "A-101-C"
+    ]
+    assert client.post("/seed/import", json=data).status_code == 200
+    record = client.get("/evidence", params={"revision_id": "A-101-C"}).json()[0]
+    assert record["claim"] == "not_acknowledged"
+    assert record["review_status"] == "confirmed"
 
 
 def test_read_api_filters_scope_status_and_exposes_review_history(engine, seed, client):

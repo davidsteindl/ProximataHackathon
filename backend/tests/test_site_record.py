@@ -1,6 +1,7 @@
 from copy import deepcopy
 from datetime import date
 from unittest.mock import patch
+import zoneinfo
 
 import pytest
 from alembic import command
@@ -11,13 +12,24 @@ from sqlalchemy import inspect
 from sqlalchemy.orm import Session
 
 from app import models, schemas
-from app.seed import import_seed
+from app.seed import import_seed, load_seed
 from conftest import BACKEND
 
 
 def import_snapshot(engine, seed):
     with Session(engine) as session:
         return import_seed(session, seed)
+
+
+def test_seed_loads_without_system_timezone_database():
+    previous_path = zoneinfo.TZPATH
+    zoneinfo.ZoneInfo.clear_cache()
+    zoneinfo.reset_tzpath(())
+    try:
+        assert load_seed(BACKEND / "seed").site.timezone == "Europe/Vienna"
+    finally:
+        zoneinfo.reset_tzpath(previous_path)
+        zoneinfo.ZoneInfo.clear_cache()
 
 
 def test_seed_covers_agreed_zone_ids_and_hero_initial_state(seed):

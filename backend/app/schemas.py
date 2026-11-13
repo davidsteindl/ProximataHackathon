@@ -297,8 +297,8 @@ class Seed(Record):
                 require(scope.crew_id is not None and scope.revision_id is not None, "Confirmed acknowledgment needs a crew and exact revision")
                 revision = revisions[scope.revision_id]
                 require(scope.zone_id in revision.zone_ids or scope.zone_id == plans[revision.plan_id].floor_id, "Confirmed acknowledgment zone must belong to the exact revision")
-                if evidence.claim == "acknowledged":
-                    require(any(ack.crew_id == scope.crew_id and ack.revision_id == scope.revision_id for ack in self.acknowledgments), "Confirmed baseline acknowledgment must match a baseline record")
+                acknowledged = any(ack.crew_id == scope.crew_id and ack.revision_id == scope.revision_id for ack in self.acknowledgments)
+                require((evidence.claim == "acknowledged") == acknowledged, "Confirmed baseline acknowledgment must match the baseline outcome")
         return self
 
 
