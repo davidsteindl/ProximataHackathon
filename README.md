@@ -111,7 +111,7 @@ flowchart LR
     TG["Telegram<br/>Crew-Gruppen"]:::ext
   end
 
-  SEED["Seed-Dateien<br/>Terminplan · Gebäude-Metadaten · DWG-Pläne"]:::ext
+  SEED["Seed-Dateien<br/>Terminplan · Gebäude-Metadaten · DXF-Pläne"]:::ext
   REPLAY["Replay-Skript<br/>Demo · Reset"]:::ext
   LLM["LLM-Provider<br/>austauschbar"]:::ext
   EXTAG["Externer Agent<br/>z. B. Talona"]:::ext
@@ -124,7 +124,7 @@ flowchart LR
     DB[("db<br/>PostgreSQL")]:::store
   end
 
-  ARCH -->|"Mails, DWG-Revisionen"| GMAIL
+  ARCH -->|"Mails, DXF-Revisionen"| GMAIL
   CREW <-->|"Chat"| TG
   GMAIL -.->|"Warnungen, Freigabe-Anfragen"| SUP
   SUP -->|"Browser"| WEB
@@ -156,8 +156,9 @@ flowchart TD
 
   IN["Source Message<br/>Mail · Chat · Seed · Replay"] --> TYP{"Inhalt?"}
   TYP -->|"Text"| EXTR["LLM-Extraktion<br/>wer · Zone · was · wann · Absicht"]:::llm
-  TYP -->|"DWG-Anhang"| CONV["DWG → DXF<br/>externer Konverter"]:::rule
-  CONV --> GEO["Geometrie-Extraktion<br/>Räume · Wände · Bauteile → Zonen"]:::rule
+  TYP -->|"DXF-Anhang (MVP)"| GEO["Geometrie-Extraktion<br/>Räume · Wände · Bauteile → Zonen"]:::rule
+  TYP -.->|"DWG-Anhang (Erweiterung)"| CONV["DWG → DXF<br/>externer Konverter"]:::rule
+  CONV -.-> GEO
   GEO --> DIFF["Plan-Diff<br/>zur vorherigen Revision"]:::rule
   EXTR -->|"unbestätigte Aussage"| EV["Event mit Quelle und Herkunft"]
   DIFF -->|"betroffene Zonen"| EV
@@ -214,6 +215,15 @@ flowchart LR
 - **Der Chat-Agent nutzt dieselben MCP-Tools wie externe Agents.** Was unser Chat kann, kann auch Talonas Agent.
 - **Kanal-Zugangsdaten** (Gmail, Telegram) liegen nur im `worker`, der LLM-Key nur in `api`.
 
-## DWG → DXF
+## CAD-Eingabe im MVP
 
-LibreDWG runs as a separate optional Compose job. Setup and usage: [CAD converter](docs/CAD-CONVERTER.md). Direct DXF input remains available as fallback.
+Der MVP setzt DXF-Dateien mit der [Layer-Konvention](cad/README.md) voraus.
+Die synthetischen Pläne liegen in `cad/plans/`; die Hero-Mail enthält
+`A-103_RevD.dxf`. Die CAD-Pipeline (#15) extrahiert daraus die Geometrie.
+Originaldatei und Revision bleiben als Quelle erhalten.
+
+DWG-Import und DWG-Export sind außerhalb des MVP. LibreDWG ist als separates
+Programm in einem optionalen Compose-Job vorbereitet. Eine spätere Anbindung
+kann DWG vor derselben DXF-Extraktion umwandeln; Layer, Beschriftungen, Einheiten
+und relevante Geometrie müssen dabei erhalten bleiben.
+Setup und bekannte Grenzen: [CAD-Konverter](docs/CAD-CONVERTER.md).

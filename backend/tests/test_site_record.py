@@ -34,7 +34,11 @@ def test_seed_loads_without_system_timezone_database():
 
 def test_seed_covers_agreed_zone_ids_and_hero_initial_state(seed):
     zones = {zone.id: zone for zone in seed.zones}
-    assert len(zones) == 23
+    assert len(zones) == 118
+    assert {zone.id for zone in seed.zones if zone.kind == "room"} == {
+        f"{floor}{unit}-{room}" for floor in range(1, 5) for unit in "ABCD"
+        for room in ("LIV", "BED", "KIT", "HALL", "BATH", "STOR")
+    }
     assert {zone.id for zone in seed.zones if zone.kind == "unit"} == {
         f"{floor}{unit}" for floor in range(1, 5) for unit in "ABCD"
     }
@@ -160,7 +164,7 @@ def test_plan_current_revision_uses_sequence_and_preserves_ack_history(engine, s
     data = seed.model_dump(mode="json")
     data["revisions"].append({
         "id": "A-103-AA", "plan_id": "A-103", "label": "AA", "sequence": 4,
-        "issued_at": "2026-11-13T09:15:00Z", "file_name": "A-103_RevAA.dwg", "zone_ids": ["3B"],
+        "issued_at": "2026-11-13T09:15:00Z", "file_name": "A-103_RevAA.dxf", "zone_ids": ["3B"],
     })
     import_snapshot(engine, schemas.Seed.model_validate(data))
     plan = next(item for item in client.get("/plans").json() if item["id"] == "A-103")

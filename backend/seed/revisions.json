@@ -6,7 +6,7 @@
       "label": "C",
       "sequence": 3,
       "issued_at": "2026-11-12T12:00:00Z",
-      "file_name": "A-101_RevC.dwg",
+      "file_name": "A-101_RevC.dxf",
       "zone_ids": [
         "1A",
         "1B",
@@ -20,7 +20,7 @@
       "label": "C",
       "sequence": 3,
       "issued_at": "2026-11-12T12:00:00Z",
-      "file_name": "A-102_RevC.dwg",
+      "file_name": "A-102_RevC.dxf",
       "zone_ids": [
         "2A",
         "2B",
@@ -34,7 +34,7 @@
       "label": "C",
       "sequence": 3,
       "issued_at": "2026-11-12T12:00:00Z",
-      "file_name": "A-103_RevC.dwg",
+      "file_name": "A-103_RevC.dxf",
       "zone_ids": [
         "3A",
         "3B",
@@ -50,7 +50,7 @@
       "label": "C",
       "sequence": 3,
       "issued_at": "2026-11-12T12:00:00Z",
-      "file_name": "A-104_RevC.dwg",
+      "file_name": "A-104_RevC.dxf",
       "zone_ids": [
         "4A",
         "4B",

@@ -1,0 +1,101 @@
+{
+  "units": "mm",
+  "zones_source": "backend/seed/building.json",
+  "sheets": [
+    {
+      "sheet": "A-101",
+      "floor": "F1",
+      "title": "Floor plan level 1",
+      "revisions": [
+        {
+          "rev": "C",
+          "file": "A-101_RevC.dxf",
+          "note": "Rev C: issued for construction."
+        }
+      ]
+    },
+    {
+      "sheet": "A-102",
+      "floor": "F2",
+      "title": "Floor plan level 2",
+      "revisions": [
+        {
+          "rev": "C",
+          "file": "A-102_RevC.dxf",
+          "note": "Rev C: issued for construction."
+        }
+      ]
+    },
+    {
+      "sheet": "A-103",
+      "floor": "F3",
+      "title": "Floor plan level 3",
+      "revisions": [
+        {
+          "rev": "C",
+          "file": "A-103_RevC.dxf",
+          "note": "Rev C: issued for construction."
+        },
+        {
+          "rev": "D",
+          "file": "A-103_RevD.dxf",
+          "note": "Rev D: unit 3B bathroom wall moved 300 mm east, shower drain rerouted along the new wall."
+        }
+      ]
+    },
+    {
+      "sheet": "A-104",
+      "floor": "F4",
+      "title": "Floor plan level 4",
+      "revisions": [
+        {
+          "rev": "C",
+          "file": "A-104_RevC.dxf",
+          "note": "Rev C: issued for construction."
+        }
+      ]
+    }
+  ],
+  "layers": {
+    "A-WALL-EXTR": {
+      "type": "wall",
+      "description": "Exterior wall, centreline polyline, width = thickness"
+    },
+    "A-WALL": {
+      "type": "wall",
+      "description": "Interior / party / corridor wall, centreline polyline, width = thickness"
+    },
+    "A-DOOR": {
+      "type": "door",
+      "description": "Door, INSERT of block DOOR at the hinge, scale = leaf width"
+    },
+    "A-AREA-UNIT": {
+      "type": "unit",
+      "description": "Unit outline, closed polyline on wall centrelines"
+    },
+    "A-AREA-UNIT-IDEN": {
+      "type": "unit_label",
+      "description": "Unit stamp, TEXT = unit zone ID (e.g. 3B)"
+    },
+    "A-AREA": {
+      "type": "room",
+      "description": "Room outline, closed polyline on wall centrelines"
+    },
+    "A-AREA-IDEN": {
+      "type": "room_label",
+      "description": "Room stamp, TEXT = room zone ID (e.g. 3B-BATH)"
+    },
+    "P-FIXT": {
+      "type": "plumbing_fixture",
+      "description": "Plumbing fixture, INSERT of block WC / SINK / SHOWER"
+    },
+    "P-SANR": {
+      "type": "drain",
+      "description": "Sanitary drain: polyline = pipe run, INSERT of block STACK = stack"
+    },
+    "A-ANNO-TTLB": {
+      "type": "annotation",
+      "description": "Title block text (sheet, floor, revision); ignored by parsing and diff"
+    }
+  }
+}

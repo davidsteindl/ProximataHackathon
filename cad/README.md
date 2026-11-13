@@ -1,0 +1,98 @@
+# Synthetic floor plans (issue #3)
+
+Synthetic plans of the fictional building from the hero scenario (PLAN §7):
+1 building, 4 floors, units A–D per floor. They are the input for the CAD
+pipeline (#15), the plan diff (#17) and the 3D view (#16).
+
+| File | Sheet | Floor | Revision |
+|---|---|---|---|
+| `plans/A-101_RevC.dxf` | A-101 | F1 | C |
+| `plans/A-102_RevC.dxf` | A-102 | F2 | C |
+| `plans/A-103_RevC.dxf` | A-103 | F3 | C |
+| `plans/A-103_RevD.dxf` | A-103 | F3 | D: unit 3B bathroom wall moved 300 mm east, shower drain rerouted |
+| `plans/A-104_RevC.dxf` | A-104 | F4 | C |
+| `plans/manifest.json` | sheets (floor, revisions, files) and layers | | |
+
+**MVP input:** DXF R2000 (AC1015), units millimetres, following the layer
+convention below (PLAN §3.5). Seed revisions (`backend/seed/revisions.json`)
+reference these `.dxf` files and the hero mail attaches `A-103_RevD.dxf`.
+Verify the plans in a free DXF viewer such as LibreCAD or ODA Viewer.
+
+DWG import and export are outside the MVP. A later DWG input adapter can call
+the existing standalone LibreDWG converter before the same DXF extraction.
+Validate that conversion retains layers, labels, units and relevant geometry;
+keep the original file and revision as the source. Conversion limits are
+documented in [CAD-CONVERTER.md](../docs/CAD-CONVERTER.md).
+
+## Regenerate
+
+```sh
+pip install ezdxf==1.4.5
+python cad/generate_plans.py        # writes cad/plans/
+python -m pytest backend/tests/test_synthetic_plans.py
+```
+
+The generator is the single source. Do not edit the DXF files by hand: a test
+fails if the committed files differ from the generator output.
+
+## Zone IDs
+
+Zone IDs, floor heights and plan → floor come from the seed
+(`backend/seed/building.json`, contract in `docs/SITE_RECORD.md`). Every stamp
+in the plans is a seed zone, and every seed unit/room has a stamp (tested).
+
+| Kind | Pattern | Example |
+|---|---|---|
+| Building | `B1` | `B1` |
+| Floor | `F<n>`, drawn on sheet `A-10<n>` | `F3` |
+| Unit | `<floor><letter>` | `3B` |
+| Room | `<unit>-<code>`, codes `LIV BED KIT HALL BATH STOR` | `3B-BATH` |
+| Element | `3B-BATH-WALL`: element ID (XDATA) of the wall that moves in Rev D | |
+
+Corridors are drawn but have no zone: the seed only allows rooms under units.
+New labels must be added to the seed first.
+
+## Layer convention
+
+Based on the AIA / US National CAD Standard layer names.
+
+| Layer | Element type | Representation |
+|---|---|---|
+| `A-WALL-EXTR` | Exterior wall | LWPOLYLINE on the wall centreline, `const_width` = thickness (300) |
+| `A-WALL` | Interior, party and corridor walls | LWPOLYLINE on the centreline, `const_width` = thickness (100 / 200). Door openings are gaps |
+| `A-DOOR` | Door | INSERT of block `DOOR` at the hinge; opening runs along the rotated +x axis; `xscale` = leaf width |
+| `A-AREA-UNIT` | Unit outline | Closed LWPOLYLINE on wall centrelines |
+| `A-AREA-UNIT-IDEN` | Unit label | TEXT = unit zone ID, inside its outline |
+| `A-AREA` | Room outline | Closed LWPOLYLINE on wall centrelines |
+| `A-AREA-IDEN` | Room label (Raumstempel) | TEXT = room zone ID, inside its outline |
+| `P-FIXT` | Plumbing fixture | INSERT of block `WC`, `SINK` or `SHOWER` at its centre |
+| `P-SANR` | Sanitary drain | LWPOLYLINE = pipe run; INSERT of block `STACK` = stack |
+| `A-ANNO-TTLB` | Title block | TEXT `SHEET: …`, `FLOOR: …`, `REV: …` and revision notes. Not geometry; ignore for parsing and plan diff |
+
+Rules:
+
+- **Labels map outlines to zones:** every closed polyline on `A-AREA` /
+  `A-AREA-UNIT` contains exactly one TEXT on the matching `-IDEN` layer, and
+  that text is the zone ID. Elements are linked to a zone by position (inside the
+  outline).
+- **Stable element IDs:** every geometry entity carries XDATA of application
+  `SITEMIND` with one string (group 1000), e.g. `3B-WALL-01`, `3B-DOOR-04`,
+  `3B-SANR-03`, `F3-WALL-01` (floor-level walls). Outlines carry their zone ID;
+  the hero wall carries its seed element zone `3B-BATH-WALL`.
+  The same element keeps its ID in every revision, so a diff can report it as
+  moved rather than removed + added.
+- **Block contents** are on layer `0` with colour BYBLOCK; the element type
+  comes from the INSERT's layer and block name.
+- Any other layer is unknown and should be ignored and reported (#15).
+
+## Rev C → Rev D
+
+Only these elements change (all in unit 3B; tested):
+
+| Element | Change |
+|---|---|
+| `3B-BATH-WALL` | bathroom/storage wall moved from x = 22000 to 22300 (+300 mm) |
+| `3B-BATH`, `3B-STOR` | room outlines follow the wall |
+| `3B-SANR-03` | shower drain rerouted along the new wall |
+
+Plus one extra revision-note line on `A-ANNO-TTLB`.

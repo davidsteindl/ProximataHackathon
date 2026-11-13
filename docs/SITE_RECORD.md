@@ -14,13 +14,15 @@ readable `name` fields are not identifiers and must not be used to join CAD data
 | building | `B1` | null |
 | floor | `F1` … `F4` | `B1` |
 | unit | `1A` … `1D`, `2A` … `2D`, `3A` … `3D`, `4A` … `4D` | corresponding `F1` … `F4` |
-| room | `3B-BATH` | `3B` |
+| room | `<unit>-<LIV\|BED\|KIT\|HALL\|BATH\|STOR>` for every unit, e.g. `3B-BATH` | the unit |
 | element | `3B-BATH-WALL` | `3B-BATH` |
 
 Floors have a height of 3 m; elevations are 0, 3, 6 and 9 m respectively.
 These are synthetic building metadata, not CAD geometry. Plans `A-101` … `A-104`
-belong to `F1` … `F4`. Plan revision file names follow `A-103_RevC.dwg`.
-Issue #3 supplies actual DWG files; this issue stores file names and zone links only.
+belong to `F1` … `F4`. Plan revision file names follow `A-103_RevC.dxf`: issue #3
+supplies DXF plans as the required MVP input; DWG import/export is outside the MVP.
+This issue stores file names and zone links only. Corridors are drawn but have no zone (rooms
+must belong to units).
 Any additional CAD zone labels must be added to the seed using this hierarchy
 and coordinated between the two issues before use.
 
@@ -30,7 +32,8 @@ The seed in `backend/seed/` represents the start of the hero scenario on day 1,
 2026-11-13, before Rev D arrives. Day 3 is 2026-11-15. `Site.timezone` is
 `Europe/Vienna`; timestamps in seed files are UTC with a `Z` suffix.
 
-It contains one building, four floors, sixteen units and the hero bathroom/wall;
+It contains one building, four floors, sixteen units with six rooms each
+(96 rooms, matching the CAD room stamps of #3) and the hero bathroom wall;
 three crews and Crew Leads; twelve schedule Tasks with predecessor IDs; four
 Rev C Plan Revisions, each acknowledged by the plumbing crew; and eight pending
 Inspections. In particular, `drywall-F3` starts at 07:00 Vienna time on day 3,
