@@ -1,0 +1,7 @@
+services:
+  cad-converter:
+    profiles: ["cad"]
+    build: ./tools/libredwg
+    network_mode: none
+    volumes:
+      - ./cad-data:/data

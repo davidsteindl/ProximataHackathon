@@ -195,3 +195,7 @@ flowchart LR
 - **Das LLM berät nur** (lila im Diagramm 2). Flags entstehen ausschließlich durch die Regel-Engine, Handlungen und Abschlüsse nur durch Menschen.
 - **Der Chat-Agent nutzt dieselben MCP-Tools wie externe Agents.** Was unser Chat kann, kann auch Talonas Agent.
 - **Kanal-Zugangsdaten** (Gmail, Telegram) liegen nur im `worker`, der LLM-Key nur in `api`.
+
+## DWG → DXF
+
+LibreDWG runs as a separate optional Compose job. Setup and usage: [CAD converter](docs/CAD-CONVERTER.md). Direct DXF input remains available as fallback.
