@@ -7,3 +7,4 @@ COPY app ./app
 COPY alembic.ini ./
 COPY migrations ./migrations
 COPY seed ./seed
+COPY demo ./demo

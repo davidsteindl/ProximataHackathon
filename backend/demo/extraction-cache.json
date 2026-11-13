@@ -1,0 +1,178 @@
+{
+  "version": 1,
+  "provenance": "Explicit synthetic extraction fixtures for the hero demo; not human-reviewed evidence.",
+  "entries": [
+    {
+      "text": "Plan A-103 Rev D: Badwand 3B um 30 cm verschoben, Abwasserleitung neu geführt.",
+      "sender_role": "architect",
+      "result": {
+        "events": [
+          {
+            "quote": "Plan A-103 Rev D: Badwand 3B um 30 cm verschoben, Abwasserleitung neu geführt.",
+            "confidence": 0.95,
+            "intent": "revision",
+            "zones": [
+              "3B"
+            ],
+            "activity": "plan_revision",
+            "plan_reference": "A-103",
+            "revision_label": "D"
+          }
+        ]
+      }
+    },
+    {
+      "text": "Warnung gesehen",
+      "sender_role": "crew_lead",
+      "result": {
+        "events": [
+          {
+            "quote": "Warnung gesehen",
+            "confidence": 0.95,
+            "intent": "observation",
+            "activity": "warning_seen"
+          }
+        ]
+      }
+    },
+    {
+      "text": "Abnahme der Rohinstallation im 3. OG auf Tag 4 verschoben.",
+      "sender_role": "inspector",
+      "result": {
+        "events": [
+          {
+            "quote": "Abnahme der Rohinstallation im 3. OG auf Tag 4 verschoben.",
+            "confidence": 0.95,
+            "intent": "inspection_result",
+            "zones": [
+              "3. OG"
+            ],
+            "inspection_kind": "rough_in",
+            "claim": "pending",
+            "time": {
+              "expression": "Tag 4",
+              "scenario_day": 4
+            }
+          }
+        ]
+      }
+    },
+    {
+      "text": "Abnahme dürfte passen",
+      "sender_role": "crew_lead",
+      "result": {
+        "events": [
+          {
+            "quote": "Abnahme dürfte passen",
+            "confidence": 0.55,
+            "intent": "inspection_result",
+            "claim": "passed"
+          }
+        ]
+      }
+    },
+    {
+      "text": "morgen früh machen wir 3B zu, platten sind da",
+      "sender_role": "crew_lead",
+      "result": {
+        "events": [
+          {
+            "quote": "morgen früh machen wir 3B zu, platten sind da",
+            "confidence": 0.95,
+            "intent": "planned_work",
+            "zones": [
+              "3B"
+            ],
+            "activity": "closing_work",
+            "trade": "drywall",
+            "time": {
+              "expression": "morgen früh",
+              "day_offset": 1,
+              "part_of_day": "morning"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "text": "welcher plan gilt für 3B?",
+      "sender_role": "crew_lead",
+      "result": {
+        "events": [
+          {
+            "quote": "welcher plan gilt für 3B?",
+            "confidence": 0.95,
+            "intent": "question",
+            "zones": [
+              "3B"
+            ],
+            "activity": "plan_question"
+          }
+        ]
+      }
+    },
+    {
+      "text": "Abnahme der Rohinstallation im 3. OG bestanden.",
+      "sender_role": "inspector",
+      "result": {
+        "events": [
+          {
+            "quote": "Abnahme der Rohinstallation im 3. OG bestanden.",
+            "confidence": 0.99,
+            "intent": "inspection_result",
+            "zones": [
+              "F3"
+            ],
+            "inspection_kind": "rough_in",
+            "claim": "passed"
+          }
+        ]
+      }
+    },
+    {
+      "text": "Plan A-103 Rev D für 3B gelesen.",
+      "sender_role": "crew_lead",
+      "result": {
+        "events": [
+          {
+            "quote": "Plan A-103 Rev D für 3B gelesen.",
+            "confidence": 0.95,
+            "intent": "revision_acknowledgment",
+            "zones": [
+              "3B"
+            ],
+            "claim": "acknowledged",
+            "plan_reference": "A-103",
+            "revision_label": "D"
+          }
+        ]
+      }
+    },
+    {
+      "text": "Task drywall-F3 im 3. OG fertig.",
+      "sender_role": "crew_lead",
+      "result": {
+        "events": [
+          {
+            "quote": "Task drywall-F3 im 3. OG fertig.",
+            "confidence": 0.95,
+            "intent": "task_completion",
+            "zones": [
+              "F3"
+            ],
+            "claim": "completed",
+            "task_reference": "drywall-F3",
+            "trade": "drywall"
+          }
+        ]
+      }
+    },
+    {
+      "text": "Danke, bis später!",
+      "sender_role": "crew_lead",
+      "result": {
+        "events": []
+      }
+    }
+  ]
+}
