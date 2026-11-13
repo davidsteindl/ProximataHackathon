@@ -43,7 +43,7 @@ Auf Baustellen gehen Entscheidungen in Chats, Mails und Tabellen verloren. Eine 
 | **Precondition** | Bedingung, die erfüllt sein muss, bevor ein Task in einer Zone starten darf |
 | **Flag** | Erkanntes Problem. Bewusst **nicht** „Issue“, um Verwechslung mit GitHub-Issues zu vermeiden |
 | **Proposal** | Handlungsvorschlag des LLM zu einem Flag, braucht menschliche Freigabe |
-| **Feedback** | Abschluss-Bewertung eines Flags: *bestätigt / Fehlalarm / erledigt*, plus Begründung |
+| **Feedback** | Menschliche Bewertung eines Flags, plus Begründung: *bestätigt* (Problem ist echt; beim Übergang zu „zur Kenntnis genommen“), *Fehlalarm* oder *erledigt* (beide schließen den Flag) |
 | **Site Knowledge** | Aus Feedback gelerntes Wissen (Begriffe, Ausnahmen, Unterdrückungen) |
 
 ---
@@ -70,7 +70,7 @@ Ein neuer Konflikttyp ist damit nur eine neue Precondition, keine neue Architekt
 `erkannt → benachrichtigt → zur Kenntnis genommen → in Bearbeitung → erledigt | Fehlalarm`
 
 - Jeder Flag hat **eine verantwortliche Person** (über Zone und Gewerk der Crew Lead; Entscheidungen liegen beim Superintendent).
-- Ein Flag bleibt **sichtbar offen**, bis eine verantwortliche Person ihn schließt. Schließen nur mit **Feedback**.
+- Ein Flag bleibt **sichtbar offen**, bis eine verantwortliche Person ihn schließt. Schließen nur mit **Feedback** (*erledigt* oder *Fehlalarm*). Das Feedback *bestätigt* („Problem ist echt“) gehört zum Übergang „zur Kenntnis genommen“.
 - **Das System schließt nie selbst.** Ist eine Precondition nachträglich erfüllt, markiert es den Flag nur als „Vorbedingung erfüllt, wartet auf Bestätigung“.
 - **Eskalation:** Bleibt ein Flag X Stunden ohne Reaktion, geht er an die nächsthöhere Stelle. X ist konfigurierbar.
 - **Deduplizierung:** Wird derselbe Konflikt erneut erkannt, wird das an den bestehenden offenen Flag angehängt, kein neuer Flag.
@@ -137,7 +137,12 @@ Ein neuer Konflikttyp ist damit nur eine neue Precondition, keine neue Architekt
 Grundsätze:
 - **Alles startet per `docker compose up`.** Die Jury muss es nach README nachvollziehen können.
 - **Der API-Vertrag ist die OpenAPI-Spezifikation von FastAPI.** Das Frontend arbeitet gegen diesen Vertrag.
+- **`api` ist der einzige Dienst mit Zugriff auf die DB.** `worker`, `mcp` und `web` sprechen ausschließlich über die REST-API.
 - **Alle Quellen laufen über denselben Ingestion-Eingang.** Ein neuer Kanal ist nur ein neuer Adapter.
+- **Ausgehende Nachrichten laufen über eine Outbox:** `api` legt jede Nachricht an, `worker` versendet sie und meldet den Status zurück. Keine Benachrichtigung geht verloren, jede steht im Audit-Trail.
+- **Der Chat-Agent lebt in `api` als MCP-Client** des eigenen `mcp`-Servers. Er nutzt dieselben Tools wie externe Agents.
+- **Kanal-Zugangsdaten** (Gmail, Telegram) liegen nur im `worker`, der LLM-Key nur in `api`.
+- **Diagramme:** siehe [README → Architektur](../README.md#architektur). Plan und Diagramme werden gemeinsam geändert.
 - **DWG → DXF über einen externen Konverter**, der in einem Container läuft. Kandidaten: LibreDWG (`dwg2dxf`, GPL, läuft auch auf ARM64) oder ODA File Converter (proprietäre Lizenz, nur x64; auf ARM-Rechnern Emulation). Die Wahl muss vor WP15 feststehen (§12). Im Fallback werden DXF-Dateien direkt angenommen.
 - **Polling statt Webhooks** (keine öffentliche URL nötig, lokales Deployment).
 - **LLM-Provider austauschbar über die Konfiguration.** Voraussetzungen: strukturierte Ausgaben und Tool-Calling; bevorzugt mit EU-Region.
