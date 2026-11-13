@@ -1,1 +1,7 @@
 Case_Book_00_All_Themes.docx
+.env
+.venv/
+__pycache__/
+.pytest_cache/
+node_modules/
+.next/

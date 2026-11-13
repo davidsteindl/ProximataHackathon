@@ -1,5 +1,70 @@
 # Puntimata
 
+## Lokal starten (Issue #2)
+
+Voraussetzung: Docker mit Compose v2 und laufender Docker Engine (Linux-Container).
+Die Basis-Images unterstützen x64 und ARM64; es wird keine Plattform erzwungen.
+
+```sh
+cp .env.example .env
+docker compose up --build
+```
+
+In PowerShell statt `cp`: `Copy-Item .env.example .env`. Beim ersten Start baut auch
+`docker compose up` die noch fehlenden Images; nach Codeänderungen `--build` verwenden.
+
+- Dashboard: http://localhost:3000 – zeigt den aktuellen API- und DB-Status.
+  Der Next.js-Server fragt dafür die API ab, die mit `SELECT 1` PostgreSQL prüft.
+  Zum Aktualisieren die Seite neu laden.
+- API-Health: http://localhost:8000/health – `200` mit
+  `{"api":"ok","db":"ok"}`, bei DB-Ausfall `503` mit `db: "error"`.
+- OpenAPI: http://localhost:8000/openapi.json, interaktive Dokumentation unter `/docs`.
+- MCP: http://localhost:8001/mcp – startbarer Streamable-HTTP-Server ohne Tools.
+- `docker compose logs worker mcp` zeigt den erfolgreichen API-Zugriff beider Dienste.
+  Der Worker wiederholt die Prüfung alle 30 Sekunden; MCP prüft beim Start.
+
+`.env.example` enthält alle derzeit benötigten Einstellungen: lokale DB-Zugangsdaten,
+Host-Ports und `API_BASE_URL` (Compose-intern, standardmäßig `http://api:8000`).
+Das Beispielpasswort ist ausschließlich für lokale Entwicklung. `.env` wird nicht
+versioniert. Nur `api` liegt im DB-Netz und erhält DB-Zugangsdaten; die übrigen
+Anwendungsdienste verwenden die REST-API.
+
+Stoppen: `docker compose down`. Die Daten bleiben im Volume `db-data` erhalten.
+`docker compose down --volumes` löscht auch die lokalen Daten.
+
+Das Gerüst enthält ausschließlich Infrastruktur und Health-Prüfungen. Domänenmodell,
+Kanal-Adapter, MCP-Tools, Authentifizierung und Hosting folgen in ihren eigenen Issues.
+
+### Lokale Checks
+
+Backend (Python 3.13, aus dem Repository-Ordner):
+
+```sh
+python -m venv .venv
+# Aktivieren: Windows .venv\Scripts\Activate.ps1; Linux/macOS source .venv/bin/activate
+python -m pip install -r backend/requirements-dev.txt
+cd backend
+python -m pytest tests
+```
+
+Frontend (Node.js 22, aus dem Repository-Ordner):
+
+```sh
+cd web
+npm ci
+npm test
+npm run lint
+npm run build
+```
+
+Compose-Konfiguration (aus dem Repository-Ordner):
+
+```sh
+docker compose --env-file .env.example config --quiet
+```
+
+Diese Checks laufen bei jedem Pull Request und bei Pushes auf `main` in GitHub Actions.
+
 ## Links
 
 **Google Docs:**
