@@ -27,10 +27,82 @@
       "name": "Unit 1A"
     },
     {
+      "id": "1A-LIV",
+      "parent_id": "1A",
+      "kind": "room",
+      "name": "Living room 1A"
+    },
+    {
+      "id": "1A-BED",
+      "parent_id": "1A",
+      "kind": "room",
+      "name": "Bedroom 1A"
+    },
+    {
+      "id": "1A-KIT",
+      "parent_id": "1A",
+      "kind": "room",
+      "name": "Kitchen 1A"
+    },
+    {
+      "id": "1A-HALL",
+      "parent_id": "1A",
+      "kind": "room",
+      "name": "Hall 1A"
+    },
+    {
+      "id": "1A-BATH",
+      "parent_id": "1A",
+      "kind": "room",
+      "name": "Bathroom 1A"
+    },
+    {
+      "id": "1A-STOR",
+      "parent_id": "1A",
+      "kind": "room",
+      "name": "Storage 1A"
+    },
+    {
       "id": "1B",
       "parent_id": "F1",
       "kind": "unit",
       "name": "Unit 1B"
+    },
+    {
+      "id": "1B-LIV",
+      "parent_id": "1B",
+      "kind": "room",
+      "name": "Living room 1B"
+    },
+    {
+      "id": "1B-BED",
+      "parent_id": "1B",
+      "kind": "room",
+      "name": "Bedroom 1B"
+    },
+    {
+      "id": "1B-KIT",
+      "parent_id": "1B",
+      "kind": "room",
+      "name": "Kitchen 1B"
+    },
+    {
+      "id": "1B-HALL",
+      "parent_id": "1B",
+      "kind": "room",
+      "name": "Hall 1B"
+    },
+    {
+      "id": "1B-BATH",
+      "parent_id": "1B",
+      "kind": "room",
+      "name": "Bathroom 1B"
+    },
+    {
+      "id": "1B-STOR",
+      "parent_id": "1B",
+      "kind": "room",
+      "name": "Storage 1B"
     },
     {
       "id": "1C",
@@ -39,10 +111,82 @@
       "name": "Unit 1C"
     },
     {
+      "id": "1C-LIV",
+      "parent_id": "1C",
+      "kind": "room",
+      "name": "Living room 1C"
+    },
+    {
+      "id": "1C-BED",
+      "parent_id": "1C",
+      "kind": "room",
+      "name": "Bedroom 1C"
+    },
+    {
+      "id": "1C-KIT",
+      "parent_id": "1C",
+      "kind": "room",
+      "name": "Kitchen 1C"
+    },
+    {
+      "id": "1C-HALL",
+      "parent_id": "1C",
+      "kind": "room",
+      "name": "Hall 1C"
+    },
+    {
+      "id": "1C-BATH",
+      "parent_id": "1C",
+      "kind": "room",
+      "name": "Bathroom 1C"
+    },
+    {
+      "id": "1C-STOR",
+      "parent_id": "1C",
+      "kind": "room",
+      "name": "Storage 1C"
+    },
+    {
       "id": "1D",
       "parent_id": "F1",
       "kind": "unit",
       "name": "Unit 1D"
+    },
+    {
+      "id": "1D-LIV",
+      "parent_id": "1D",
+      "kind": "room",
+      "name": "Living room 1D"
+    },
+    {
+      "id": "1D-BED",
+      "parent_id": "1D",
+      "kind": "room",
+      "name": "Bedroom 1D"
+    },
+    {
+      "id": "1D-KIT",
+      "parent_id": "1D",
+      "kind": "room",
+      "name": "Kitchen 1D"
+    },
+    {
+      "id": "1D-HALL",
+      "parent_id": "1D",
+      "kind": "room",
+      "name": "Hall 1D"
+    },
+    {
+      "id": "1D-BATH",
+      "parent_id": "1D",
+      "kind": "room",
+      "name": "Bathroom 1D"
+    },
+    {
+      "id": "1D-STOR",
+      "parent_id": "1D",
+      "kind": "room",
+      "name": "Storage 1D"
     },
     {
       "id": "F2",
@@ -59,10 +203,82 @@
       "name": "Unit 2A"
     },
     {
+      "id": "2A-LIV",
+      "parent_id": "2A",
+      "kind": "room",
+      "name": "Living room 2A"
+    },
+    {
+      "id": "2A-BED",
+      "parent_id": "2A",
+      "kind": "room",
+      "name": "Bedroom 2A"
+    },
+    {
+      "id": "2A-KIT",
+      "parent_id": "2A",
+      "kind": "room",
+      "name": "Kitchen 2A"
+    },
+    {
+      "id": "2A-HALL",
+      "parent_id": "2A",
+      "kind": "room",
+      "name": "Hall 2A"
+    },
+    {
+      "id": "2A-BATH",
+      "parent_id": "2A",
+      "kind": "room",
+      "name": "Bathroom 2A"
+    },
+    {
+      "id": "2A-STOR",
+      "parent_id": "2A",
+      "kind": "room",
+      "name": "Storage 2A"
+    },
+    {
       "id": "2B",
       "parent_id": "F2",
       "kind": "unit",
       "name": "Unit 2B"
+    },
+    {
+      "id": "2B-LIV",
+      "parent_id": "2B",
+      "kind": "room",
+      "name": "Living room 2B"
+    },
+    {
+      "id": "2B-BED",
+      "parent_id": "2B",
+      "kind": "room",
+      "name": "Bedroom 2B"
+    },
+    {
+      "id": "2B-KIT",
+      "parent_id": "2B",
+      "kind": "room",
+      "name": "Kitchen 2B"
+    },
+    {
+      "id": "2B-HALL",
+      "parent_id": "2B",
+      "kind": "room",
+      "name": "Hall 2B"
+    },
+    {
+      "id": "2B-BATH",
+      "parent_id": "2B",
+      "kind": "room",
+      "name": "Bathroom 2B"
+    },
+    {
+      "id": "2B-STOR",
+      "parent_id": "2B",
+      "kind": "room",
+      "name": "Storage 2B"
     },
     {
       "id": "2C",
@@ -71,10 +287,82 @@
       "name": "Unit 2C"
     },
     {
+      "id": "2C-LIV",
+      "parent_id": "2C",
+      "kind": "room",
+      "name": "Living room 2C"
+    },
+    {
+      "id": "2C-BED",
+      "parent_id": "2C",
+      "kind": "room",
+      "name": "Bedroom 2C"
+    },
+    {
+      "id": "2C-KIT",
+      "parent_id": "2C",
+      "kind": "room",
+      "name": "Kitchen 2C"
+    },
+    {
+      "id": "2C-HALL",
+      "parent_id": "2C",
+      "kind": "room",
+      "name": "Hall 2C"
+    },
+    {
+      "id": "2C-BATH",
+      "parent_id": "2C",
+      "kind": "room",
+      "name": "Bathroom 2C"
+    },
+    {
+      "id": "2C-STOR",
+      "parent_id": "2C",
+      "kind": "room",
+      "name": "Storage 2C"
+    },
+    {
       "id": "2D",
       "parent_id": "F2",
       "kind": "unit",
       "name": "Unit 2D"
+    },
+    {
+      "id": "2D-LIV",
+      "parent_id": "2D",
+      "kind": "room",
+      "name": "Living room 2D"
+    },
+    {
+      "id": "2D-BED",
+      "parent_id": "2D",
+      "kind": "room",
+      "name": "Bedroom 2D"
+    },
+    {
+      "id": "2D-KIT",
+      "parent_id": "2D",
+      "kind": "room",
+      "name": "Kitchen 2D"
+    },
+    {
+      "id": "2D-HALL",
+      "parent_id": "2D",
+      "kind": "room",
+      "name": "Hall 2D"
+    },
+    {
+      "id": "2D-BATH",
+      "parent_id": "2D",
+      "kind": "room",
+      "name": "Bathroom 2D"
+    },
+    {
+      "id": "2D-STOR",
+      "parent_id": "2D",
+      "kind": "room",
+      "name": "Storage 2D"
     },
     {
       "id": "F3",
@@ -91,10 +379,76 @@
       "name": "Unit 3A"
     },
     {
+      "id": "3A-LIV",
+      "parent_id": "3A",
+      "kind": "room",
+      "name": "Living room 3A"
+    },
+    {
+      "id": "3A-BED",
+      "parent_id": "3A",
+      "kind": "room",
+      "name": "Bedroom 3A"
+    },
+    {
+      "id": "3A-KIT",
+      "parent_id": "3A",
+      "kind": "room",
+      "name": "Kitchen 3A"
+    },
+    {
+      "id": "3A-HALL",
+      "parent_id": "3A",
+      "kind": "room",
+      "name": "Hall 3A"
+    },
+    {
+      "id": "3A-BATH",
+      "parent_id": "3A",
+      "kind": "room",
+      "name": "Bathroom 3A"
+    },
+    {
+      "id": "3A-STOR",
+      "parent_id": "3A",
+      "kind": "room",
+      "name": "Storage 3A"
+    },
+    {
       "id": "3B",
       "parent_id": "F3",
       "kind": "unit",
       "name": "Unit 3B"
+    },
+    {
+      "id": "3B-LIV",
+      "parent_id": "3B",
+      "kind": "room",
+      "name": "Living room 3B"
+    },
+    {
+      "id": "3B-BED",
+      "parent_id": "3B",
+      "kind": "room",
+      "name": "Bedroom 3B"
+    },
+    {
+      "id": "3B-KIT",
+      "parent_id": "3B",
+      "kind": "room",
+      "name": "Kitchen 3B"
+    },
+    {
+      "id": "3B-HALL",
+      "parent_id": "3B",
+      "kind": "room",
+      "name": "Hall 3B"
+    },
+    {
+      "id": "3B-STOR",
+      "parent_id": "3B",
+      "kind": "room",
+      "name": "Storage 3B"
     },
     {
       "id": "3C",
@@ -103,10 +457,82 @@
       "name": "Unit 3C"
     },
     {
+      "id": "3C-LIV",
+      "parent_id": "3C",
+      "kind": "room",
+      "name": "Living room 3C"
+    },
+    {
+      "id": "3C-BED",
+      "parent_id": "3C",
+      "kind": "room",
+      "name": "Bedroom 3C"
+    },
+    {
+      "id": "3C-KIT",
+      "parent_id": "3C",
+      "kind": "room",
+      "name": "Kitchen 3C"
+    },
+    {
+      "id": "3C-HALL",
+      "parent_id": "3C",
+      "kind": "room",
+      "name": "Hall 3C"
+    },
+    {
+      "id": "3C-BATH",
+      "parent_id": "3C",
+      "kind": "room",
+      "name": "Bathroom 3C"
+    },
+    {
+      "id": "3C-STOR",
+      "parent_id": "3C",
+      "kind": "room",
+      "name": "Storage 3C"
+    },
+    {
       "id": "3D",
       "parent_id": "F3",
       "kind": "unit",
       "name": "Unit 3D"
+    },
+    {
+      "id": "3D-LIV",
+      "parent_id": "3D",
+      "kind": "room",
+      "name": "Living room 3D"
+    },
+    {
+      "id": "3D-BED",
+      "parent_id": "3D",
+      "kind": "room",
+      "name": "Bedroom 3D"
+    },
+    {
+      "id": "3D-KIT",
+      "parent_id": "3D",
+      "kind": "room",
+      "name": "Kitchen 3D"
+    },
+    {
+      "id": "3D-HALL",
+      "parent_id": "3D",
+      "kind": "room",
+      "name": "Hall 3D"
+    },
+    {
+      "id": "3D-BATH",
+      "parent_id": "3D",
+      "kind": "room",
+      "name": "Bathroom 3D"
+    },
+    {
+      "id": "3D-STOR",
+      "parent_id": "3D",
+      "kind": "room",
+      "name": "Storage 3D"
     },
     {
       "id": "F4",
@@ -123,10 +549,82 @@
       "name": "Unit 4A"
     },
     {
+      "id": "4A-LIV",
+      "parent_id": "4A",
+      "kind": "room",
+      "name": "Living room 4A"
+    },
+    {
+      "id": "4A-BED",
+      "parent_id": "4A",
+      "kind": "room",
+      "name": "Bedroom 4A"
+    },
+    {
+      "id": "4A-KIT",
+      "parent_id": "4A",
+      "kind": "room",
+      "name": "Kitchen 4A"
+    },
+    {
+      "id": "4A-HALL",
+      "parent_id": "4A",
+      "kind": "room",
+      "name": "Hall 4A"
+    },
+    {
+      "id": "4A-BATH",
+      "parent_id": "4A",
+      "kind": "room",
+      "name": "Bathroom 4A"
+    },
+    {
+      "id": "4A-STOR",
+      "parent_id": "4A",
+      "kind": "room",
+      "name": "Storage 4A"
+    },
+    {
       "id": "4B",
       "parent_id": "F4",
       "kind": "unit",
       "name": "Unit 4B"
+    },
+    {
+      "id": "4B-LIV",
+      "parent_id": "4B",
+      "kind": "room",
+      "name": "Living room 4B"
+    },
+    {
+      "id": "4B-BED",
+      "parent_id": "4B",
+      "kind": "room",
+      "name": "Bedroom 4B"
+    },
+    {
+      "id": "4B-KIT",
+      "parent_id": "4B",
+      "kind": "room",
+      "name": "Kitchen 4B"
+    },
+    {
+      "id": "4B-HALL",
+      "parent_id": "4B",
+      "kind": "room",
+      "name": "Hall 4B"
+    },
+    {
+      "id": "4B-BATH",
+      "parent_id": "4B",
+      "kind": "room",
+      "name": "Bathroom 4B"
+    },
+    {
+      "id": "4B-STOR",
+      "parent_id": "4B",
+      "kind": "room",
+      "name": "Storage 4B"
     },
     {
       "id": "4C",
@@ -135,10 +633,82 @@
       "name": "Unit 4C"
     },
     {
+      "id": "4C-LIV",
+      "parent_id": "4C",
+      "kind": "room",
+      "name": "Living room 4C"
+    },
+    {
+      "id": "4C-BED",
+      "parent_id": "4C",
+      "kind": "room",
+      "name": "Bedroom 4C"
+    },
+    {
+      "id": "4C-KIT",
+      "parent_id": "4C",
+      "kind": "room",
+      "name": "Kitchen 4C"
+    },
+    {
+      "id": "4C-HALL",
+      "parent_id": "4C",
+      "kind": "room",
+      "name": "Hall 4C"
+    },
+    {
+      "id": "4C-BATH",
+      "parent_id": "4C",
+      "kind": "room",
+      "name": "Bathroom 4C"
+    },
+    {
+      "id": "4C-STOR",
+      "parent_id": "4C",
+      "kind": "room",
+      "name": "Storage 4C"
+    },
+    {
       "id": "4D",
       "parent_id": "F4",
       "kind": "unit",
       "name": "Unit 4D"
+    },
+    {
+      "id": "4D-LIV",
+      "parent_id": "4D",
+      "kind": "room",
+      "name": "Living room 4D"
+    },
+    {
+      "id": "4D-BED",
+      "parent_id": "4D",
+      "kind": "room",
+      "name": "Bedroom 4D"
+    },
+    {
+      "id": "4D-KIT",
+      "parent_id": "4D",
+      "kind": "room",
+      "name": "Kitchen 4D"
+    },
+    {
+      "id": "4D-HALL",
+      "parent_id": "4D",
+      "kind": "room",
+      "name": "Hall 4D"
+    },
+    {
+      "id": "4D-BATH",
+      "parent_id": "4D",
+      "kind": "room",
+      "name": "Bathroom 4D"
+    },
+    {
+      "id": "4D-STOR",
+      "parent_id": "4D",
+      "kind": "room",
+      "name": "Storage 4D"
     },
     {
       "id": "3B-BATH",

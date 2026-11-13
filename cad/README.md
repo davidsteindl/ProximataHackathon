@@ -11,11 +11,12 @@ pipeline (#15), the plan diff (#17) and the 3D view (#16).
 | `plans/A-103_RevC.dxf` | A-103 | F3 | C |
 | `plans/A-103_RevD.dxf` | A-103 | F3 | D: unit 3B bathroom wall moved 300 mm east, shower drain rerouted |
 | `plans/A-104_RevC.dxf` | A-104 | F4 | C |
-| `plans/manifest.json` | sheets, floors (elevation, height), zone hierarchy, layers | | |
+| `plans/manifest.json` | sheets (floor, revisions, files) and layers | | |
 
 **Format:** DXF R2000 (AC1015), units millimetres. DXF is our internal format
 (PLAN §3.5) and opens in free viewers (e.g. LibreCAD, ODA Viewer). A DWG export
-is a follow-up; until then the hero mail attaches `A-103_RevD.dxf` and the
+is a follow-up; until then the seed's revisions (`backend/seed/revisions.json`)
+reference these `.dxf` files, the hero mail attaches `A-103_RevD.dxf` and the
 pipeline uses its direct-DXF path.
 
 ## Regenerate
@@ -31,19 +32,20 @@ fails if the committed files differ from the generator output.
 
 ## Zone IDs
 
-These IDs are shared with the seed (#5).
+Zone IDs, floor heights and plan → floor come from the seed
+(`backend/seed/building.json`, contract in `docs/SITE_RECORD.md`). Every stamp
+in the plans is a seed zone, and every seed unit/room has a stamp (tested).
 
 | Kind | Pattern | Example |
 |---|---|---|
-| Building | `BLDG` | `BLDG` |
-| Floor | `F<n>` | `F3` |
+| Building | `B1` | `B1` |
+| Floor | `F<n>`, drawn on sheet `A-10<n>` | `F3` |
 | Unit | `<floor><letter>` | `3B` |
 | Room | `<unit>-<code>`, codes `LIV BED KIT HALL BATH STOR` | `3B-BATH` |
-| Common area (corridor) | `F<n>-CORE` | `F3-CORE` |
+| Element | `3B-BATH-WALL`: element ID (XDATA) of the wall that moves in Rev D | |
 
-The full list with parents and names is in `plans/manifest.json` (`zones`).
-Floor `F<n>` is drawn on sheet `A-10<n>`; elevation `(n-1) × 3000 mm`, storey
-height 3000 mm (not in the DXF, metadata only).
+Corridors are drawn but have no zone: the seed only allows rooms under units.
+New labels must be added to the seed first.
 
 ## Layer convention
 
@@ -56,7 +58,7 @@ Based on the AIA / US National CAD Standard layer names.
 | `A-DOOR` | Door | INSERT of block `DOOR` at the hinge; opening runs along the rotated +x axis; `xscale` = leaf width |
 | `A-AREA-UNIT` | Unit outline | Closed LWPOLYLINE on wall centrelines |
 | `A-AREA-UNIT-IDEN` | Unit label | TEXT = unit zone ID, inside its outline |
-| `A-AREA` | Room / common area outline | Closed LWPOLYLINE on wall centrelines |
+| `A-AREA` | Room outline | Closed LWPOLYLINE on wall centrelines |
 | `A-AREA-IDEN` | Room label (Raumstempel) | TEXT = room zone ID, inside its outline |
 | `P-FIXT` | Plumbing fixture | INSERT of block `WC`, `SINK` or `SHOWER` at its centre |
 | `P-SANR` | Sanitary drain | LWPOLYLINE = pipe run; INSERT of block `STACK` = stack |
@@ -69,8 +71,9 @@ Rules:
   that text is the zone ID. Elements are linked to a zone by position (inside the
   outline).
 - **Stable element IDs:** every geometry entity carries XDATA of application
-  `SITEMIND` with one string (group 1000), e.g. `3B-WALL-09`, `3B-DOOR-04`,
-  `3B-SANR-03`, `F3-WALL-01` (floor-level walls). Outlines carry their zone ID.
+  `SITEMIND` with one string (group 1000), e.g. `3B-WALL-01`, `3B-DOOR-04`,
+  `3B-SANR-03`, `F3-WALL-01` (floor-level walls). Outlines carry their zone ID;
+  the hero wall carries its seed element zone `3B-BATH-WALL`.
   The same element keeps its ID in every revision, so a diff can report it as
   moved rather than removed + added.
 - **Block contents** are on layer `0` with colour BYBLOCK; the element type
@@ -83,7 +86,7 @@ Only these elements change (all in unit 3B; tested):
 
 | Element | Change |
 |---|---|
-| `3B-WALL-09` | bathroom/storage wall moved from x = 22000 to 22300 (+300 mm) |
+| `3B-BATH-WALL` | bathroom/storage wall moved from x = 22000 to 22300 (+300 mm) |
 | `3B-BATH`, `3B-STOR` | room outlines follow the wall |
 | `3B-SANR-03` | shower drain rerouted along the new wall |
 
