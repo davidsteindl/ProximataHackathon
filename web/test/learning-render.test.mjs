@@ -9,6 +9,8 @@ const React = require("react");
 const { renderToStaticMarkup } = require("react-dom/server");
 const swc = require("next/dist/build/swc");
 
+let viewer = { role: "superintendent", actor: "synthetic-superintendent" };
+
 async function loadComponent(name) {
   await swc.loadBindings();
   const source = await readFile(new URL(`../app/${name}.js`, import.meta.url), "utf8");
@@ -18,9 +20,12 @@ async function loadComponent(name) {
     module: { type: "commonjs" },
   });
   const stubs = {
-    "next/link": { __esModule: true, default: ({ href, children }) => React.createElement("a", { href }, children) },
+    "next/link": { __esModule: true, default: ({ href, children, ...rest }) => React.createElement("a", { href, ...rest }, children) },
     "../lib/site.mjs": await import("../lib/site.mjs"),
     "./actions/review": { submitReview: async () => ({}) },
+    // Demo role from the app shell; tests switch it through `viewer`.
+    "./app-context": { useApp: () => viewer, RoleSwitch: () => null, ScenarioClock: () => null },
+    "./site-view/zone-panel": { Chip: ({ children }) => React.createElement("span", null, children), reviewTone: () => "ok" },
   };
   const component = { exports: {} };
   vm.runInThisContext(`(function (exports, require, module) {${code}\n})`)(component.exports, (id) => stubs[id] || require(id), component);
@@ -62,9 +67,8 @@ test("dashboard renders metric chart, definition and linked source-backed knowle
 });
 
 test("human feedback offers explicit correction only for linked planned work", async () => {
-  const { FlagActions, HumanReview } = await loadComponent("human-review");
-  const render = (sources) => renderToStaticMarkup(React.createElement(HumanReview, { crews: [] },
-    React.createElement(FlagActions, { flag: { id: "flag-1", state: "notified", sources } })));
+  const { FlagDecisions } = await loadComponent("decisions");
+  const render = (sources) => renderToStaticMarkup(React.createElement(FlagDecisions, { flag: { id: "flag-1", state: "notified", sources } }));
   const html = render([{ id: "event-1", intent: "planned_work", quote: "A question?" }]);
   assert.match(html, /name="correction_event_id"/);
   assert.match(html, /No extraction correction/);
@@ -76,15 +80,42 @@ test("human feedback offers explicit correction only for linked planned work", a
 test("corrected timeline Event visibly links back to knowledge, feedback and original source", async () => {
   const { default: EventTimeline } = await loadComponent("event-timeline");
   const html = renderToStaticMarkup(React.createElement(EventTimeline, {
-    timezone: "UTC", crewNames: {}, events: [{
+    site: { start_date: "2026-11-13", timezone: "UTC" }, crewNames: {}, events: [{
       id: "replayed-event", intent: "question", zone_ids: ["3B"], unresolved_zones: [],
       quote: "A question?", evidence: [],
       source: { sent_at: "2026-11-14T08:00:00Z", channel: "replay", sender_role: "crew_lead", text: "A question?", attachments: [] },
       details: { learning: { knowledge_id: "known-1", feedback_id: 42, source_message_id: "original-source" } },
     }],
   }));
-  assert.match(html, /href="\/#knowledge-known-1"/);
+  assert.match(html, /href="\/activity#knowledge-known-1"/);
   assert.match(html, /Extraction corrected: planned work → question/);
   assert.match(html, /Feedback: 42/);
   assert.match(html, /Original source: original-source/);
+});
+
+test("Proposal decisions: Superintendent only, approval only after acknowledgment, decided ones are read-only", async () => {
+  const { ProposalDecision } = await loadComponent("decisions");
+  const proposal = { id: "proposal-1", status: "proposed" };
+  const render = (flag, item = proposal) => renderToStaticMarkup(React.createElement(ProposalDecision, { flag, proposal: item }));
+  const notified = render({ id: "flag-1", state: "notified" });
+  assert.match(notified, /value="rejected"/);
+  assert.doesNotMatch(notified, /value="approved"/);
+  assert.match(notified, /Acknowledge the Flag before approving/);
+  assert.match(render({ id: "flag-1", state: "acknowledged" }), /value="approved"/);
+  assert.equal(render({ id: "flag-1", state: "acknowledged" }, { ...proposal, status: "approved" }), "");
+  assert.equal(render({ id: "flag-1", state: "false_alarm" }), "");
+  viewer = { role: "crew_lead", actor: "lead-drywall" };
+  try {
+    assert.match(render({ id: "flag-1", state: "acknowledged" }), /Only the Superintendent decides on Proposals/);
+  } finally {
+    viewer = { role: "superintendent", actor: "synthetic-superintendent" };
+  }
+});
+
+test("the work-view sidebar exposes Proposals and marks it as the current page there", async () => {
+  const { WorkShell } = await loadComponent("shell");
+  const html = renderToStaticMarkup(React.createElement(WorkShell, { current: "proposals" }, "content"));
+  assert.match(html, /href="\/proposals"/);
+  assert.match(html, /<a href="\/proposals" class="nav-item cur" aria-current="page">/);
+  assert.equal((html.match(/aria-current="page"/g) || []).length, 1, "only the current page is marked");
 });

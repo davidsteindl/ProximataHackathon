@@ -18,8 +18,9 @@ export const EVALUATION = {
   contradictory: { text: "Contradictory", tone: "vio", note: "Statements disagree. A person has to review the counterclaims." },
 };
 
-export function Chip({ tone, children }) {
-  return <span className={`chip t-${tone}`}>{children}</span>;
+/** Status chip. `glyph` marks a Precondition result with its own symbol (✓ ✕ ? ≠), not only a colour. */
+export function Chip({ tone, glyph, children }) {
+  return <span className={`chip t-${tone}${glyph ? " glyph" : ""}`}>{children}</span>;
 }
 
 // A confirmation recorded for a superseded revision stays a true historical decision, but it is not proof
@@ -42,16 +43,17 @@ function lastDecision(record, timezone) {
   return `${label(entry.status)} by ${who} · ${formatTime(entry.decided_at || entry.recorded_at, timezone)}`;
 }
 
-export function EvidenceItem({ record, timezone }) {
+export function EvidenceItem({ record, timezone, href }) {
   return (
-    <li className="ev">
+    <li className="ev-item">
       <div className="ev-head">
-        <Chip tone={reviewTone(record.review_status)}>{record.review_status}</Chip>
-        <span className="ev-claim">claims <strong>{label(record.claim)}</strong></span>
+        <Chip tone={reviewTone(record.review_status)}>{label(record.review_status)}</Chip>
+        <span className="small">claims <strong>{label(record.claim)}</strong></span>
+        {href && <Link className="link small" href={href}>Review →</Link>}
       </div>
-      <blockquote>{record.quote}</blockquote>
+      <blockquote className="q">{record.quote}</blockquote>
       <p className="meta">{ORIGIN[record.origin] || label(record.origin)} · <span className="mono">{record.source_ref}</span></p>
-      {record.review_status === "unconfirmed" && <p className="meta warn-text">Unconfirmed — not proof, whatever its confidence.</p>}
+      {record.review_status === "unconfirmed" && <p className="meta warn-text">Unconfirmed: not proof, whatever its confidence.</p>}
       <p className="meta">{lastDecision(record, timezone)}</p>
     </li>
   );
@@ -70,7 +72,7 @@ function FlagCard({ flag, timezone, isNew }) {
       <h4>{label(flag.activity)} in {flag.zone_id} before {label(flag.precondition)}</h4>
       <div className="precondition">
         <span className="meta">Precondition · inspection <span className="mono">{flag.inspection_id || "missing or ambiguous"}</span></span>
-        <Chip tone={evaluation.tone}>{evaluation.text}</Chip>
+        <Chip tone={evaluation.tone} glyph>{evaluation.text}</Chip>
       </div>
       <p>{flag.explanation}</p>
       {announcement && (
@@ -201,7 +203,7 @@ export function ZonePanel({ details, timezone, changes, newFlagIds, now }) {
         <p className="fineprint">Evidence review, Flag acknowledgment and Flag closure are separate human decisions. This view only reads them.</p>
       </Widget>
 
-      <Widget title="Tasks" aside={<span className="meta">{current.length} current or upcoming</span>}>
+      <Widget title="Upcoming tasks" aside={<span className="meta">{current.length} running or upcoming</span>}>
         {current.length === 0 ? <p className="empty">No running or upcoming task in this zone.</p> : <TaskList tasks={current} flags={flags} timezone={timezone} />}
         {earlier.length > 0 && (
           <details className="earlier">

@@ -56,3 +56,32 @@ test("zone choices retain hierarchy and task timestamps use the site's time zone
   ]);
   assert.match(formatTime("2026-11-15T06:00:00Z", "Europe/Vienna"), /07:00/);
 });
+
+test("scenario time counts days from the site start date in the site timezone", async () => {
+  const { scenarioTime } = await import("../lib/site.mjs");
+  const site = { start_date: "2026-11-13", timezone: "Europe/Vienna" };
+  assert.equal(scenarioTime("2026-11-14T17:10:00Z", site), "Day 2 · 18:10");
+  assert.equal(scenarioTime("2026-11-13T23:30:00Z", site), "Day 2 · 00:30", "local midnight, not UTC, starts a day");
+  assert.equal(scenarioTime("2026-11-14T17:10:00Z", null), null);
+});
+
+test("Flag titles, severity and lifecycle steps", async () => {
+  const { flagTitle, lifecycleStep } = await import("../lib/site.mjs");
+  assert.equal(flagTitle({ type: "A", zone_id: "3B", activity: "closing_work", precondition: "inspection_passed" }), "Closing work in 3B before inspection passed");
+  assert.equal(flagTitle({ type: "B", zone_id: "3B", context: { crew_id: "drywall", current_revision: "D" } }), "Rev D receipt not confirmed: drywall crew · 3B");
+  assert.equal(lifecycleStep("notified"), 1);
+  assert.equal(lifecycleStep("false_alarm"), 4);
+  assert.equal(lifecycleStep("resolved"), lifecycleStep("false_alarm"));
+});
+
+test("morning-scan sources come from schedule audit refs; escalation is read from the audit", async () => {
+  const { isEscalated, scheduleSources } = await import("../lib/site.mjs");
+  const audit = [
+    { action: "detected", source_ref: "schedule:drywall-F3@2026-11-15T06:00:00+00:00" },
+    { action: "morning_scan", source_ref: "schedule:drywall-F3@2026-11-15T06:00:00+00:00" },
+    { action: "escalated", source_ref: "outbox:abc" },
+  ];
+  assert.deepEqual(scheduleSources({ audit }), [{ ref: "schedule:drywall-F3@2026-11-15T06:00:00+00:00", taskId: "drywall-F3", startsAt: "2026-11-15T06:00:00+00:00" }]);
+  assert.equal(isEscalated({ audit }), true);
+  assert.equal(isEscalated({ audit: audit.slice(0, 2) }), false);
+});
