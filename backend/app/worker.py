@@ -14,6 +14,7 @@ logger = logging.getLogger(__name__)
 
 def main() -> None:
     logging.basicConfig(level=logging.INFO)
+    logging.getLogger("httpx").setLevel(logging.WARNING)
     enabled = os.environ.get("GMAIL_ENABLED", "false").lower()
     if enabled not in {"true", "false"}:
         raise SystemExit("GMAIL_ENABLED must be true or false")
@@ -28,7 +29,7 @@ def main() -> None:
                     poll_gmail(GmailClient(settings, gmail_http), api)
                 else:
                     check_api("worker")
-            except (httpx.HTTPError, GoogleAuthError, GmailError, OSError, ValueError, KeyError, TypeError) as error:
+            except (httpx.HTTPError, GoogleAuthError, GmailError, OSError, ValueError, LookupError, TypeError) as error:
                 logger.warning("Worker poll failed (%s); retry next interval", type(error).__name__)
             time.sleep(interval)
 

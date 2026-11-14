@@ -13,9 +13,9 @@ from pathlib import Path
 
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
+from pydantic import TypeAdapter
 
 from app.ingestion_schemas import SenderRole, SourceMessageInput
-from pydantic import TypeAdapter
 
 READ_SCOPE = "https://www.googleapis.com/auth/gmail.readonly"
 GMAIL_URL = "https://gmail.googleapis.com/gmail/v1/users/me"
@@ -31,7 +31,7 @@ class GmailSettings:
     label: str = "INBOX"
     token_file: str = "/gmail/token.json"
     poll_seconds: float = 15
-    sender_roles: dict | None = None
+    sender_roles: dict[str, SenderRole] | None = None
 
     @classmethod
     def from_env(cls):

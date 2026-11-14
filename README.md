@@ -97,6 +97,27 @@ Gmail-ID übersprungen. Einrichtung und Grenzen: [docs/GMAIL.md](docs/GMAIL.md).
 Die OAuth-Zugangsdaten erhält ausschließlich der Worker; ohne Konfiguration
 bleibt Gmail deaktiviert.
 
+Kurzsetup: Gmail API im Team-Cloud-Projekt aktivieren, OAuth-Consent im Testmodus
+konfigurieren und das Projekt-Testkonto als **Test user** eintragen. Einen OAuth-
+Client vom Typ **Desktop app** anlegen; dessen JSON lokal unter
+`.gmail/client-secret.json` speichern. Nach Installation der Backend-Abhängigkeiten
+vom Repository-Root aus autorisieren:
+
+```powershell
+$env:PYTHONPATH = 'backend'
+python -m app.gmail_auth
+```
+
+Im Browser das Projektkonto auswählen. Danach in `.env` `GMAIL_ENABLED=true`,
+`GMAIL_MAILBOX=<Projektkonto>` und optional `GMAIL_LABEL=<exakter Labelname>` setzen;
+`GMAIL_POLL_SECONDS=15` steuert die Pause zwischen Polls. Mit
+`docker compose up --build -d worker` starten (Seed-Baseline muss vorhanden sein).
+Nur `gmail.readonly` wird angefordert. `.gmail/` bleibt lokal und wird nur in den
+Worker gemountet. **External/Testing:** Ohne eingetragenen Testnutzer scheitert die
+Anmeldung; Refresh-Tokens für Gmail laufen nach **7 Tagen** ab. Dann die lokale
+Autorisierung erneut ausführen. Vollständige Schritte, Hero-Mails und Fehlerhilfe:
+[docs/GMAIL.md](docs/GMAIL.md).
+
 ### Lokale Checks
 
 Backend (Python 3.13, aus dem Repository-Ordner):

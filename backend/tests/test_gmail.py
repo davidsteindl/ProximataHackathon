@@ -14,9 +14,9 @@ MAILBOX = "project@example.test"
 SETTINGS = GmailSettings(MAILBOX, sender_roles={"architect@example.test": "architect"})
 
 
-def gmail_message(subject="Plan revision", body="Badwand 3B verschoben.", attachments=(), html=None):
+def gmail_message(subject="Plan revision", body="Badwand 3B verschoben.", attachments=(), html=None, sender="architect@example.test"):
     mail = EmailMessage()
-    mail["From"] = "Architect <architect@example.test>"
+    mail["From"] = f"Team test sender <{sender}>"
     mail["To"] = MAILBOX
     mail["Subject"] = subject
     mail["Date"] = "Thu, 01 Jan 1970 00:00:00 +0000"

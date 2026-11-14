@@ -28,7 +28,7 @@ def poll_gmail(gmail, api):
             response.raise_for_status()
             if response.json()["source"]["status"] == "processed":
                 delivered += 1
-        except (httpx.HTTPError, GoogleAuthError, GmailError, OSError, ValueError, KeyError, TypeError) as error:
+        except (httpx.HTTPError, GoogleAuthError, GmailError, OSError, ValueError, LookupError, TypeError) as error:
             # Do not log responses, message content, sender addresses or OAuth credentials.
             # Leave the source eligible for another attempt; one bad mail cannot block the rest.
             logger.warning("Gmail message deferred (%s); retry next poll", type(error).__name__)

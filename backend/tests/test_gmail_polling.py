@@ -15,9 +15,9 @@ HEROES = [
     ("Plan A-103 Rev D", "Plan A-103 Rev D: Badwand 3B um 30 cm verschoben, Abwasserleitung neu geführt.",
      "architect@example.test", "architect"),
     ("Abnahme verschoben", "Abnahme der Rohinstallation im 3. OG auf Tag 4 verschoben.",
-     "architect@example.test", "inspector"),
+     "inspector@example.test", "inspector"),
     ("Abnahme Rohinstallation", "Abnahme der Rohinstallation im 3. OG bestanden.",
-     "architect@example.test", "inspector"),
+     "inspector@example.test", "inspector"),
 ]
 
 
@@ -56,7 +56,7 @@ def identity(client, message_id="gmail-1", **changes):
 @pytest.mark.parametrize("subject,body,sender,role", HEROES)
 def test_hero_mail_to_timeline_and_byte_exact_dxf(initialized, subject, body, sender, role):
     dxf = (ROOT / "cad/plans/A-103_RevD.dxf").read_bytes()
-    message = gmail_message(subject, body, attachments=[("A-103_RevD.dxf", dxf)])
+    message = gmail_message(subject, body, attachments=[("A-103_RevD.dxf", dxf)], sender=sender)
     gmail, http, calls = make_gmail(message)
     gmail.settings = GmailSettings(MAILBOX, sender_roles={sender: role})
     with http:
@@ -72,7 +72,7 @@ def test_hero_mail_to_timeline_and_byte_exact_dxf(initialized, subject, body, se
         assert len(timeline) == 1
         assert timeline[0]["source"]["id"] == source["id"]
         assert timeline[0]["quote"] == body
-        assert all(not evidence["review_status"] == "confirmed" for evidence in timeline[0]["evidence"])
+        assert all(evidence["review_status"] == "unconfirmed" for evidence in timeline[0]["evidence"])
         # New client instance represents a restarted worker; no local cursor is needed.
         restarted = GmailClient(gmail.settings, http, credentials())
         assert poll_gmail(restarted, initialized) == 0
@@ -153,3 +153,25 @@ def test_processed_irrelevant_mail_is_skipped(initialized):
         assert poll_gmail(gmail, initialized) == 0
         assert initialized.get("/events").json() == []
         assert sum(path.endswith("/messages/gmail-1") for path in calls) == 1
+
+
+@pytest.mark.parametrize("enabled,interval", [("false", 30), ("true", 2)])
+def test_worker_enable_switch_and_configurable_interval(monkeypatch, enabled, interval):
+    from app import worker
+
+    monkeypatch.setenv("API_BASE_URL", "http://api:8000")
+    monkeypatch.setenv("GMAIL_ENABLED", enabled)
+    monkeypatch.setenv("GMAIL_MAILBOX", MAILBOX)
+    monkeypatch.setenv("GMAIL_POLL_SECONDS", "2")
+    monkeypatch.setenv("GMAIL_SENDER_ROLES_JSON", "")
+    health, poll, gmail_factory = Mock(), Mock(), Mock()
+    monkeypatch.setattr(worker, "check_api", health)
+    monkeypatch.setattr(worker, "poll_gmail", poll)
+    monkeypatch.setattr(worker, "GmailClient", gmail_factory)
+    pause = Mock(side_effect=StopIteration)
+    monkeypatch.setattr(worker.time, "sleep", pause)
+    with pytest.raises(StopIteration):
+        worker.main()
+    pause.assert_called_once_with(interval)
+    assert health.call_count == (enabled == "false")
+    assert poll.call_count == gmail_factory.call_count == (enabled == "true")
