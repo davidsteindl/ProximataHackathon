@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <title>GroundIQ — Proposal</title>
 <script src="./support.js"></script>
+<script src="./mockup.js" defer></script>
 </head>
 <body>
 <x-dc>
@@ -76,11 +77,11 @@ h1,h2,h3,h4{font-family:'Space Grotesk',Inter,sans-serif;margin:0;letter-spacing
     </section>
 
     <section class="panel" aria-labelledby="dec-h">
-      <h3 id="dec-h">Decision</h3>
+      <h3 id="dec-h">Decision</h3><p class="pad small" data-proposal-state></p>
       <div class="pad">
         <div style="display:flex;gap:10px;flex-wrap:wrap">
-          <button type="button" class="btn btn-ok">Approve</button>
-          <button type="button" class="btn">Reject</button>
+          <button type="button" class="btn btn-ok" data-action="approve">Approve</button>
+          <button type="button" class="btn" data-action="reject-proposal">Reject</button>
         </div>
         <p class="small muted" style="margin:10px 0 0">Superintendent only. Approval updates the schedule and queues the notification — it does not close the flag or confirm evidence.</p>
       </div>

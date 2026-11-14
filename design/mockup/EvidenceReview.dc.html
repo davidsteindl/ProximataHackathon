@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <title>GroundIQ — Evidence review</title>
 <script src="./support.js"></script>
+<script src="./mockup.js" defer></script>
 </head>
 <body>
 <x-dc>
@@ -94,10 +95,10 @@ blockquote.q{margin:6px 0;padding:8px 12px;border-left:3px solid #176AC6;backgro
     </section>
 
     <section class="panel" style="flex:999 1 460px;min-width:0" aria-label="Evidence detail">
-      <h3>Claim: rough-in inspection 3B passed</h3>
+      <h3>Claim: rough-in inspection 3B passed</h3><p class="pad small">Day 4 fixture: the later positive inspection result. Earlier Day 2 claims remain historical.</p>
       <div class="pad" style="display:flex;flex-direction:column;gap:14px">
         <div class="small">
-          <span class="chip s-unk">Unconfirmed</span>
+          <span class="chip s-unk" data-evidence-state>Unconfirmed</span>
           <p class="muted" style="margin:6px 0 0">Extracted by LLM (confidence 0.93) — confidence is not confirmation.</p>
         </div>
 
@@ -113,19 +114,20 @@ blockquote.q{margin:6px 0;padding:8px 12px;border-left:3px solid #176AC6;backgro
 
         <div class="small">
           <strong>History</strong>
-          <p style="margin:4px 0 0" class="muted"><span class="mono" style="color:#5AA2EE">D4 09:12</span> — recorded, unconfirmed · rule check: precondition still unknown</p>
+          <p data-review-history style="margin:4px 0 0" class="muted"><span class="mono" style="color:#5AA2EE">D4 09:12</span> — recorded, unconfirmed · rule check: precondition still unknown</p>
         </div>
 
         <div style="border-top:1px solid #232830;padding-top:14px">
           <div style="display:flex;gap:10px;flex-wrap:wrap">
-            <button type="button" class="btn btn-ok">Confirm</button>
-            <button type="button" class="btn btn-crit">Reject</button>
+            <button type="button" class="btn btn-ok" data-action="confirm">Confirm</button>
+            <button type="button" class="btn btn-crit" data-action="reject-evidence">Reject</button>
           </div>
           <p class="small muted" style="margin:10px 0 0">Recorded with person, time and source. Does not close any flag; MCP/chat cannot review evidence.</p>
         </div>
       </div>
     </section>
   </div>
+<p class="small" data-inspection-state></p><a href="FlagDetail.dc.html">Return to the still-open hero flag</a>
 </main>
 </div>
 </x-dc>

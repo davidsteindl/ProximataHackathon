@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <title>GroundIQ — Flag detail</title>
 <script src="./support.js"></script>
+<script src="./mockup.js" defer></script>
 </head>
 <body>
 <x-dc>
@@ -79,6 +80,7 @@ textarea{font:13.5px Inter,sans-serif;border:1px solid #333B46;border-radius:8px
     <span>Responsible: M. Leitner (crew lead)</span>
   </div>
 
+  <p data-flag-state role="status">Notified - open</p>
   <div class="panel pad" style="display:flex;gap:22px;flex-wrap:wrap;margin-bottom:18px" aria-label="Lifecycle">
     <span class="step done"><span class="dot"></span>Detected</span>
     <span class="step cur"><span class="dot"></span>Notified</span>
@@ -94,7 +96,7 @@ textarea{font:13.5px Inter,sans-serif;border:1px solid #333B46;border-radius:8px
         <h3 id="pre-h">Why this flag exists</h3>
         <div class="pad" style="display:flex;flex-direction:column;gap:10px">
           <p class="small" style="margin:0">The drywall group announced closing wall 3B tomorrow morning, but:</p>
-          <div class="small"><span class="chip s-unk">Unknown</span> Rough-in inspection 3B is not confirmed passed — latest claims are unreviewed.</div>
+          <div class="small"><span data-inspection-state><span class="chip s-unk">Unknown</span> Rough-in inspection 3B is not confirmed passed</span> — latest claims are unreviewed.</div>
           <div class="small"><span class="chip s-crit">Not satisfied</span> The crew has not confirmed Rev D, which moved this wall 30 cm.</div>
         </div>
       </section>
@@ -115,7 +117,7 @@ textarea{font:13.5px Inter,sans-serif;border:1px solid #333B46;border-radius:8px
       </section>
 
       <section class="panel" aria-labelledby="audit-h">
-        <h3 id="audit-h">Timeline</h3>
+        <h3 id="audit-h">Timeline</h3><p class="pad small" data-audit style="white-space:pre-line"></p>
         <div class="pad">
           <ul class="tl" style="list-style:none;margin:0;padding:0">
             <li><span class="when">D2 18:05</span><span>Detected by rule engine (Telegram message, quote stored)</span></li>
@@ -130,7 +132,7 @@ textarea{font:13.5px Inter,sans-serif;border:1px solid #333B46;border-radius:8px
       <section class="panel" aria-labelledby="ack-h">
         <h3 id="ack-h">Acknowledge</h3>
         <div class="pad">
-          <button type="button" class="btn" style="width:100%">Acknowledge flag</button>
+          <button type="button" class="btn" data-action="acknowledge" style="width:100%">Acknowledge flag</button>
           <p class="small muted" style="margin:8px 0 0">Confirms the warning was seen — nothing else.</p>
         </div>
       </section>
@@ -138,17 +140,18 @@ textarea{font:13.5px Inter,sans-serif;border:1px solid #333B46;border-radius:8px
       <section class="panel" aria-labelledby="close-h">
         <h3 id="close-h">Close flag</h3>
         <form class="pad" style="display:flex;flex-direction:column;gap:10px">
-          <label class="small"><input type="radio" name="fb"> Resolved</label>
-          <label class="small"><input type="radio" name="fb"> False alarm</label>
+          <label class="small"><input type="radio" name="fb" value="Resolved" required> Resolved</label>
+          <label class="small"><input type="radio" name="fb" value="False alarm" required> False alarm</label>
           <label class="small" style="display:flex;flex-direction:column;gap:4px">Reason
-            <textarea rows="2"></textarea>
+            <textarea rows="2" required></textarea>
           </label>
-          <button type="button" class="btn btn-crit">Close flag</button>
+          <button type="button" class="btn btn-crit" data-action="close">Close flag</button>
           <p class="small muted" style="margin:0">Superintendent only. Closing confirms no evidence; the system never closes flags itself.</p>
         </form>
       </section>
     </div>
   </div>
+<p class="small muted">Local synthetic demo only. <button type="button" class="btn" data-action="reset">Reset walkthrough</button></p>
 </main>
 </div>
 </x-dc>

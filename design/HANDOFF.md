@@ -1,7 +1,7 @@
 # Dashboard mockup handoff (issue #35)
 
 The mockup lives in `design/mockup/`. Open `design/mockup/index.html` in any
-browser. Every page is static HTML with inline CSS and SVG. Nothing needs to
+browser. Pages use static HTML with inline CSS and SVG plus local demo interaction JavaScript. Nothing needs to
 be built or served, and only Google Fonts loads from the network. All data is
 synthetic and comes from the hero scenario in `docs/PLAN.md` §7.
 
@@ -87,3 +87,9 @@ are 14–16 px radius, and pills and buttons are fully rounded.
 3. Chat placement (#19): a drawer from the dock/sidebar or a separate page.
 4. Role switcher roles beyond superintendent and crew lead, and which controls each role hides.
 5. Accessibility: tab order and labels are in place, but colour contrast on glass cards over the plan still needs a check in the real build.
+
+## Local decision walkthrough
+
+Open the hero Flag, then Evidence review to use the Day 4 positive-result fixture. Confirming or rejecting changes only that Evidence. Return to the Flag: a confirmed inspection is shown as satisfied while the Flag stays open. Proposal approval/rejection, acknowledgment and closure are independent local actions. Closure requires Resolved/False alarm plus a non-empty reason. The timeline records synthetic demo decisions. Reset walkthrough on the Flag clears them.
+
+State is kept in browser session storage for navigation between local pages; if storage is unavailable, changes apply only to the current page and a notice explains this. No API requests, real schedule changes or notifications occur. Production actions and validation remain in #9, #13 and #30; this defines no new API contract.
