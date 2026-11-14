@@ -21,7 +21,7 @@ router = APIRouter(tags=["Outbox"])
 class OutboxView(Record):
     id: Identifier
     flag_id: Identifier | None
-    kind: Literal["warning", "escalation"]
+    kind: Literal["warning", "escalation", "approval_request", "proposal_followup", "compliance_reply"]
     recipient: str | None
     channel: Literal["gmail", "telegram"]
     subject: str
@@ -51,10 +51,27 @@ def dashboard_link(flag):
     return f"{base}/#flag-{flag.id}"
 
 
+def flag_link(flag_id):
+    return f"{os.environ.get('DASHBOARD_BASE_URL', 'http://localhost:3000').rstrip('/')}/#flag-{flag_id}"
+
+
+def lead_route(lead):
+    """Crew Leads mapped in TELEGRAM_CREW_LEADS_JSON get Telegram, others email."""
+    telegram = json.loads(os.environ.get("TELEGRAM_CREW_LEADS_JSON") or "{}").get(lead.id) if lead else None
+    return ("telegram", str(telegram)) if telegram else ("gmail", lead.email if lead else None)
+
+
+def enqueue(session, flag, kind, dedup_key, recipient, subject, content, now, channel="gmail"):
+    session.add(models.OutboxMessage(
+        id=uuid4().hex, flag=flag, kind=kind, dedup_key=dedup_key, recipient=recipient,
+        channel=channel, subject=subject, content=content,
+        status="pending", attempts=0, available_at=now, created_at=now,
+    ))
+
+
 def enqueue_flag_warning(session, flag, statement, crew, now, task=None):
     """Queue the factual warning; ``statement`` is None for schedule-only scan Flags."""
     lead = session.get(models.CrewLead, crew.lead_id) if crew else None
-    telegram_recipient = json.loads(os.environ.get("TELEGRAM_CREW_LEADS_JSON") or "{}").get(lead.id) if lead else None
     if statement is not None:
         source = (f"Source: {statement.source.channel}, source:{statement.source_message_id}.\n"
                   f"Work announcement (unconfirmed statement): {statement.quote}\n")
@@ -70,18 +87,16 @@ def enqueue_flag_warning(session, flag, statement, crew, now, task=None):
         f"Current details: {dashboard_link(flag)}\n"
         "This warning conveys facts only. Work decisions require the Superintendent."
     )
-    session.add(models.OutboxMessage(
-        id=uuid4().hex, flag=flag, kind="warning",
-        recipient=str(telegram_recipient) if telegram_recipient else lead.email if lead else None,
-        channel="telegram" if telegram_recipient else "gmail", subject=f"SiteMind Flag {flag.type} — Zone {flag.zone_id}",
-        content=content, status="pending", attempts=0, available_at=now, created_at=now,
-    ))
+    channel, recipient = lead_route(lead)
+    enqueue(session, flag, "warning", f"warning:{flag.id}", recipient,
+            f"SiteMind Flag {flag.type} — Zone {flag.zone_id}", content, now, channel)
+
 
 
 def enqueue_escalation(session, flag, hours, now):
     """Queue the factual escalation to the Superintendent (next level, PLAN §3.3)."""
     message = models.OutboxMessage(
-        id=uuid4().hex, flag=flag, kind="escalation",
+        id=uuid4().hex, flag=flag, kind="escalation", dedup_key=f"escalation:{flag.id}",
         recipient=os.environ.get("SUPERINTENDENT_EMAIL") or None, channel="gmail",
         subject=f"SiteMind escalation: Flag {flag.type} — Zone {flag.zone_id}",
         content=(

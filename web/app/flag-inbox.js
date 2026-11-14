@@ -1,5 +1,49 @@
-import { FlagActions } from "./human-review";
+import { FlagActions, ProposalActions } from "./human-review";
 import { formatTime } from "../lib/site.mjs";
+
+const notificationLabels = {
+  warning: "Warning",
+  escalation: "Escalation",
+  approval_request: "Approval request",
+  proposal_followup: "Approved follow-up",
+};
+
+function citationNote(citation) {
+  if (citation.review_status) return ` · Evidence ${citation.review_status}`;
+  return citation.ref.startsWith("source:") ? " · unconfirmed statement" : " · site record";
+}
+
+function Advice({ flag, timezone }) {
+  const { advice } = flag;
+  return (
+    <section aria-label="Advisor proposals">
+      <h4>Advisor explanation <small>(advisory only · {advice.backend})</small></h4>
+      <p>{advice.explanation}</p>
+      <ul>{advice.citations.map((citation) => (
+        <li key={citation.handle}><code>[{citation.handle}]</code> <small className="record-id">{citation.ref}</small>{citationNote(citation)}</li>
+      ))}</ul>
+      {advice.proposals.length === 0 ? <p>No proposals.</p> : (
+        <ol>{advice.proposals.map((proposal) => (
+          <li key={proposal.id}>
+            <p><strong>{proposal.action}</strong> · {proposal.status}</p>
+            <p>{proposal.rationale}</p>
+            <p>Affected: crews {proposal.affected_crews.join(", ")}
+              {" · "}tasks {proposal.affected_tasks.join(", ") || "—"}
+              {" · "}zones {proposal.affected_zones.join(", ") || "—"}</p>
+            <details>
+              <summary>Follow-up sent only after approval</summary>
+              <blockquote className="source-text">{proposal.message}</blockquote>
+            </details>
+            {proposal.status !== "proposed" && (
+              <p>{proposal.status} by {proposal.decided_by} · {formatTime(proposal.decided_at, timezone)} · {proposal.decision_reason}</p>
+            )}
+            <ProposalActions flag={flag} proposal={proposal} />
+          </li>
+        ))}</ol>
+      )}
+    </section>
+  );
+}
 
 const evaluationLabels = {
   satisfied: "Precondition satisfied — awaiting human Flag closure",
@@ -39,9 +83,10 @@ export default function FlagInbox({ flags, timezone, closed = false }) {
                 )}
                 <p>State: {flag.state.replaceAll("_", " ")} · Detected {formatTime(flag.created_at, timezone)}</p>
                 <FlagActions flag={flag} />
+                {flag.advice && <Advice flag={flag} timezone={timezone} />}
                 {(flag.notifications || []).map((message) => (
                   <p key={message.id} role={message.status === "failed" ? "alert" : undefined}>
-                    Gmail warning: {message.status} · Attempts: {message.attempts}
+                    {notificationLabels[message.kind] || "Message"} ({message.channel}): {message.status} · Attempts: {message.attempts}
                     {message.status === "failed" && message.error_code ? ` · ${message.error_code.replaceAll("_", " ")} · Retry scheduled` : ""}
                   </p>
                 ))}

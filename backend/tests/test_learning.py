@@ -282,12 +282,14 @@ def test_same_quote_in_different_message_is_not_corrected_after_retention(initia
 @pytest.mark.parametrize("raw_expired", [False, True])
 def test_fingerprint_migration_preserves_existing_feedback(initialized, engine, monkeypatch, raw_expired):
     original, _ = false_alarm(initialized)
+    # Exercise cleanup with the current API before moving to the older schema.
+    # The fingerprint migration must then handle the already-erased raw source.
+    if raw_expired:
+        expire_source(initialized, engine, original["source"]["id"], monkeypatch)
     config = Config(str(BACKEND / "alembic.ini"))
     with engine.begin() as connection:
         config.attributes["connection"] = connection
         command.downgrade(config, "0012")
-    if raw_expired:
-        expire_source(initialized, engine, original["source"]["id"], monkeypatch)
     with engine.begin() as connection:
         config.attributes["connection"] = connection
         command.upgrade(config, "head")

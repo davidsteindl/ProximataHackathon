@@ -143,6 +143,7 @@ transaction, after acquiring the Site lock and validating the signal/source:
 - #13: `action_approved` with the approving Superintendent as human actor and
   Proposal reference, acknowledged → in_progress. The caller must validate the
   actual Proposal approval; this helper does not approve Proposals.
+  Implemented by `POST /proposals/{id}/decisions`, see [PROPOSALS.md](PROPOSALS.md).
 - #14: `escalated` (system), detected/notified → unchanged state, with the escalation outbox message as source.
 
 These signals have no public action endpoint in #9. A detected Flag awaits successful outbox
