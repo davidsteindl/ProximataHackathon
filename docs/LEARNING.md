@@ -24,7 +24,7 @@ No LLM call is used to interpret free-text feedback as executable instructions.
   Evidence are not rewritten. Corrected Event `details.learning` exposes the
   knowledge, feedback, original source/Event and Flag references for explanations,
   including the existing zone-context and timeline MCP tools via the REST API.
-- Migration `0012` adds a retained SHA-256 fingerprint of the full original
+- Migration `0013` adds a retained SHA-256 fingerprint of the full original
   message to correction knowledge. Exact replay matching survives Telegram raw
   retention and deletion without retaining another raw-text copy. Role, Crew,
   ordinal, quote and intent checks still apply. The fingerprint is not sent to

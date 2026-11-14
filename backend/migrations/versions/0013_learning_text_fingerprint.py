@@ -1,12 +1,12 @@
-﻿"""Keep exact learning matches independent of raw-message retention."""
+"""Keep exact learning matches independent of raw-message retention."""
 
 import hashlib
 
 from alembic import op
 import sqlalchemy as sa
 
-revision = "0012"
-down_revision = "0011"
+revision = "0013"
+down_revision = "0012"
 branch_labels = None
 depends_on = None
 

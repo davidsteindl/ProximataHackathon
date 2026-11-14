@@ -285,7 +285,7 @@ def test_fingerprint_migration_preserves_existing_feedback(initialized, engine, 
     config = Config(str(BACKEND / "alembic.ini"))
     with engine.begin() as connection:
         config.attributes["connection"] = connection
-        command.downgrade(config, "0011")
+        command.downgrade(config, "0012")
     if raw_expired:
         expire_source(initialized, engine, original["source"]["id"], monkeypatch)
     with engine.begin() as connection:
