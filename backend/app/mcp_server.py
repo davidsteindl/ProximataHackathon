@@ -51,8 +51,11 @@ async def api_request(method, path, *, params=None, payload=None):
 
 
 async def list_zones() -> dict[str, Any]:
-    """Discover exact Zone IDs and the building/floor/unit/room hierarchy. Use 3B for apartment 3B."""
-    return {"zones": await api_request("GET", "/zones"), "source_refs": ["record:zones"]}
+    """Discover exact Zone IDs and the building/floor/unit/room hierarchy. Use 3B for apartment 3B.
+    Also returns the Site (timezone, start_date = scenario day 1) for reading local times.
+    """
+    return {"site": await api_request("GET", "/site"), "zones": await api_request("GET", "/zones"),
+            "source_refs": ["record:site", "record:zones"]}
 
 
 async def get_zone_status(zone_id: Identifier) -> dict[str, Any]:
