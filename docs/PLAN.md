@@ -294,6 +294,21 @@ Keine feste Rollenverteilung, jeder nimmt sich Issues selbst. Die Abhängigkeite
 | WP18 | Neuigkeiten-Feed: chronologische Übersicht für den Superintendent über Events, Revisionen, Nachweisentscheidungen, Flag-Änderungen und abgeschlossene Tasks; API + Dashboard-Startseite (§3.6) | WP3, WP5 | M3 |
 | S3 | Stretch: blockierte Tasks bei Konflikten + faktische Hinweise an deren Crews; „pausiert“-Hinweis nach Proposal-Freigabe (§3.2) | WP4, WP5, WP6 | M3 |
 
+**MCP-Vertrag (#18):** Der Streamable-HTTP-Endpunkt `/mcp` bietet neun Tools
+(Verbindung und Argumente im README). Aggregierter Kontext kommt ausschließlich
+aus `GET /context/zones/{id}`, `/context/search`, `/context/timeline` und den
+bestehenden REST-Leseendpunkten, einschließlich Plan-Inhalt und deterministischem
+Plan-Diff. Preconditions werden durch die bestehenden API-Regeln lesend bewertet;
+fehlende Auswertung bedeutet `unknown`, keine Freigabe. Quellen und aktueller
+Evidence-Prüfstatus bleiben sichtbar. `X-SiteMind-Client: mcp|chat|agent` sperrt
+in der API alle Mutationen außer `POST /agent/proposals`; insbesondere auch
+indirekte Nachweisänderungen über Seed/Import/Ingestion. Dies ist eine MVP-
+Zugangskonvention, keine Produktionsauthentifizierung. Die neue Tabelle
+`proposals` (Migration `0009`) speichert nur `proposed`, Flag-Bezug, Handlung,
+Begründung, Kanal, Zeitpunkt und serverseitige Quellen. Kein Versand, keine
+Freigabe und kein Flag-/Evidence-Übergang entstehen daraus; die menschliche
+Approval-Integration bleibt #13. Seed-Reset löscht auch diese Vorschläge.
+
 **Sofort parallel zu WP0/WP1 (keine Code-Abhängigkeit):** WP15 (synthetische DXF-Pläne), Google-Cloud-Projekt und Gmail-OAuth einrichten (OAuth-Testmodus: Test-User eintragen; Refresh-Tokens laufen nach 7 Tagen ab), Telegram-Bot anlegen (Privacy Mode aus), LLM-Key besorgen, Seed-Inhalte schreiben, 3D-Prototyp, Research und Mentor-Interview.
 
 ### Inhalt jedes Issues (Template)
