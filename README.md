@@ -68,7 +68,7 @@ Issue #5, Nachrichten-Ingestion, Event-Extraktion und Timeline aus #6 sowie
 DXF-Extraktion und Geometrie-API aus #15, Conflict A und Flag-Inbox aus #7,
 Conflict B aus Revisionsnotizen (#8), Gmail-Eingang aus #11,
 Outbox-/Gmail-Versand aus #10 sowie die 3D-Ansicht aus #16 und der DXF-Plan-Diff
-aus #17 sowie MCP-Kontext-Tools aus #18. Telegram-Adapter, Authentifizierung
+aus #17 sowie MCP-Kontext-Tools aus #18 und der Q&A-Kern aus #19. Telegram-Adapter, Authentifizierung
 und Hosting folgen in ihren eigenen Issues.
 
 ### MCP-Verbindung (Issue #18)
@@ -142,6 +142,28 @@ isolierte Test-DB, ohne LLM-/Gmail-/Telegram-Zugang):
 
 ```sh
 PYTHONPATH=backend python -m pytest backend/tests/test_mcp_server.py backend/tests/test_context_api.py backend/tests/test_agent_proposals.py
+```
+
+### Q&A-Kern (Issue #19)
+
+`POST /qa` mit `{"text": "...", "sender_role": "crew_lead"}` beantwortet eine Frage
+für den Telegram-Bot (#20). `api` ist dabei MCP-Client des eigenen `mcp`-Servers
+(`MCP_URL`) und nutzt nur dessen Tools. Das LLM klassifiziert nur (Fragetyp und Zone
+aus fester Auswahl, `QA_ROUTER_PROVIDER=decisions` mit `OPENAI_API_KEY`, sonst
+`cached`); der Antworttext wird deterministisch aus den Tool-Ergebnissen mit Quellen
+und Prüfstatus gebaut. Antwortarten: `answer`, `clarification` (Konfidenz unter
+`QA_CONFIDENCE_THRESHOLD` oder unbekannte Zone, mit Vorschlägen), `not_found`,
+`decision_request` (nicht beantwortet, #20 leitet weiter), `dashboard_review`
+(Nachweis bestätigen geht nur im Dashboard) und `not_a_question`. Routing- oder
+Record-Fehler ergeben HTTP 503 mit Fehlercode, nie eine geratene Antwort.
+`list_zones` liefert dafür zusätzlich die Site (Zeitzone, Starttag = Tag 1).
+`get_zone_status` enthaelt zudem `plans` mit vollstaendiger Revisionshistorie und
+aktueller Revision je abdeckendem Plan, unabhaengig von Timeline-Limits.
+Empfangsmeldungen stammen aus Evidence mit aktuellem Pruefstatus und Zone;
+Extraktionsherkunft und menschliche Nachweispruefung werden getrennt dargestellt.
+
+```sh
+PYTHONPATH=backend python -m pytest backend/tests/test_qa.py
 ```
 
 ### Nachricht → Event → Timeline (Issue #6)

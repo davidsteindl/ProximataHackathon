@@ -51,14 +51,18 @@ async def api_request(method, path, *, params=None, payload=None):
 
 
 async def list_zones() -> dict[str, Any]:
-    """Discover exact Zone IDs and the building/floor/unit/room hierarchy. Use 3B for apartment 3B."""
-    return {"zones": await api_request("GET", "/zones"), "source_refs": ["record:zones"]}
+    """Discover exact Zone IDs and the building/floor/unit/room hierarchy. Use 3B for apartment 3B.
+    Also returns the Site (timezone, start_date = scenario day 1) for reading local times.
+    """
+    return {"site": await api_request("GET", "/site"), "zones": await api_request("GET", "/zones"),
+            "source_refs": ["record:site", "record:zones"]}
 
 
 async def get_zone_status(zone_id: Identifier) -> dict[str, Any]:
     """Answer 'what is the status of 3B?': contents, covering schedule, inspections, Evidence review status,
     deterministic Preconditions (satisfied/not_satisfied/unknown/contradictory), open Flags and sources.
-    Includes descendants and covering ancestor records, not sibling-only records. Never grants clearance.
+    Includes descendants and covering ancestor records, not sibling-only records. Also returns complete
+    covering Plan metadata and current revisions, independent of timeline truncation. Never grants clearance.
     """
     return await api_request("GET", f"/context/zones/{zone_id}")
 
