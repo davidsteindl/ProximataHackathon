@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>GroundIQ — Start</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=JetBrains+Mono:wght@400;500&amp;family=Space+Grotesk:wght@500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#0E1116;color:#E9ECF1;font:14px/1.55 Inter,system-ui,sans-serif}
+a{color:#E9ECF1;text-decoration:none}a:hover{color:#5AA2EE}
+h1,h2,h3,h4{font-family:'Space Grotesk',Inter,sans-serif;margin:0;letter-spacing:-.01em}
+.mono{font-family:'JetBrains Mono',monospace;font-size:12px}
+.app{display:flex;min-height:100vh}
+.side{width:216px;flex:0 0 216px;background:#12151B;border-right:1px solid #22272F;padding:22px 14px 18px;box-sizing:border-box;display:flex;flex-direction:column}
+.logo{width:158px;margin:0 6px 24px;display:block}
+.item{display:flex;align-items:center;gap:11px;padding:9px 12px;border-radius:10px;color:#8A93A1;font-size:13.5px;font-weight:500;margin-bottom:3px}
+.item svg{flex:0 0 auto}
+.item:hover{color:#fff;background:#1A1F27}
+.item.cur,.item.cur:hover{color:#fff;background:#176AC6}
+.foot{margin-top:auto;display:flex;flex-direction:column;gap:10px;padding:0 4px}
+.clock{font-family:'JetBrains Mono',monospace;font-size:12px;color:#8A93A1}
+.rolebtn{font:600 13px Inter,sans-serif;color:#E9ECF1;background:#1A1F27;border:1px solid #2C333D;border-radius:9px;padding:8px 12px;cursor:pointer;text-align:left}
+.main{flex:1;min-width:0;padding:22px 26px 30px;box-sizing:border-box}
+.panel{background:#171A1F;border:1px solid #262B33;border-radius:14px}
+.panel h3{font-size:13.5px;padding:12px 16px;border-bottom:1px solid #232830;color:#C7CDD6}
+.pad{padding:16px}
+.muted{color:#8A93A1}
+.small{font-size:12.5px}
+.num{font:600 30px/1 'Space Grotesk',sans-serif}
+.chip{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;font-weight:600;padding:3px 8px;border-radius:6px;border:1px solid;white-space:nowrap}
+.chip::before{content:"";width:7px;height:7px;border-radius:2px;background:currentColor}
+.s-crit{color:#FF7A66;background:#2A1512;border-color:#55281F}
+.s-warn{color:#E8B04B;background:#272011;border-color:#55451F}
+.s-ok{color:#43CD8A;background:#102A1D;border-color:#1E5538}
+.s-unk{color:#9BA4B2;background:#1B2027;border-color:#333B46}
+.s-info{color:#5AA2EE;background:#12223A;border-color:#1F4470}
+.btn{font:600 13px Inter,sans-serif;border-radius:9px;padding:8px 14px;cursor:pointer;border:1px solid #333B46;background:#1A1F27;color:#E9ECF1;display:inline-block}
+.btn-acc{background:#176AC6;border-color:#176AC6;color:#fff}
+.vbtn{font:600 12px Inter,sans-serif;padding:6px 12px;border:1px solid #333B46;background:#1A1F27;border-radius:8px;color:#E9ECF1;text-decoration:none;display:inline-block}
+.vbtn.cur{background:#176AC6;border-color:#176AC6;color:#fff}
+.mk{position:absolute;display:inline-flex;align-items:center;gap:7px;background:rgba(14,17,22,.94);border:1px solid #2C333D;border-radius:999px;padding:6px 12px;font:600 12px Inter,sans-serif;color:#E9ECF1;box-shadow:0 8px 20px rgba(0,0,0,.4);white-space:nowrap}
+.mk i{width:8px;height:8px;border-radius:50%;flex:0 0 auto}
+.row{display:flex;gap:12px;align-items:baseline;justify-content:space-between;padding:11px 16px;border-bottom:1px solid #20252D}
+.row:last-child{border-bottom:0}
+.when{font-family:'JetBrains Mono',monospace;font-size:11.5px;color:#5AA2EE;flex:0 0 86px}
+</style>
+</helmet>
+
+<div class="app">
+<aside class="side">
+  <a href="Main.dc.html" aria-label="GroundIQ start"><img class="logo" src="groundiq-logo-white.svg" alt="GroundIQ"></a>
+  <nav style="display:flex;flex-direction:column" aria-label="Main">
+    <a class="item cur" href="Main.dc.html" aria-current="page"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 8.2 8 3l5.5 5.2M4.2 7.4V13h7.6V7.4"/></svg>Overview</a>
+    <a class="item" href="SiteOverview.dc.html"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="2.5" width="11" height="11" rx="1.5"/><path d="M8 2.5V8h5.5M2.5 10.8H8V8"/></svg>Site plan</a>
+    <a class="item" href="FlagInbox.dc.html"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.2 13.5V2.8h8l-1.8 2.7 1.8 2.7h-8"/></svg>Flags</a>
+    <a class="item" href="EvidenceReview.dc.html"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="2.2" width="10" height="11.6" rx="1.5"/><path d="m5.6 8.4 1.8 1.8 3.2-3.6"/></svg>Evidence</a>
+    <a class="item" href="#chat" title="Chat agent (issue #19): read-only Q&amp;A"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" aria-hidden="true"><path d="M2.8 3.4h10.4v6.8H7.4l-2.8 2.6v-2.6H2.8z"/></svg>Chat</a>
+  </nav>
+  <div class="foot">
+    <span class="clock">Day 2 · 18:10</span>
+    <a class="rolebtn" href="CrewLead.dc.html" title="Switch demo view to Crew Lead; not authentication">Superintendent → Crew Lead</a>
+    <span class="mono muted">synthetic demo data</span>
+  </div>
+</aside>
+
+<main class="main">
+  <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:18px">
+    <h1 style="font-size:23px">Riverside Apartments — B1</h1>
+    <span class="chip s-info">Live · Day 2</span>
+    <span class="mono muted" style="margin-left:auto">last event 18:05</span>
+  </div>
+
+  <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px;margin-bottom:16px">
+    <div class="panel pad">
+      <p class="small muted" style="margin:0 0 8px">Critical flags</p>
+      <div style="display:flex;align-items:center;gap:10px"><span class="num" style="color:#FF7A66">1</span><span class="chip s-crit">+1 today</span></div>
+    </div>
+    <div class="panel pad">
+      <p class="small muted" style="margin:0 0 8px">Open flags</p>
+      <div style="display:flex;align-items:center;gap:10px"><span class="num">3</span><a href="FlagInbox.dc.html" class="small" style="color:#5AA2EE">inbox →</a></div>
+    </div>
+    <div class="panel pad">
+      <p class="small muted" style="margin:0 0 8px">Awaiting your decision</p>
+      <div style="display:flex;align-items:center;gap:10px"><span class="num">3</span><span class="chip s-warn">1 proposal · 2 evidence</span></div>
+    </div>
+    <div class="panel pad" style="display:flex;align-items:center;gap:14px">
+      <svg width="52" height="52" viewBox="0 0 52 52" aria-hidden="true"><circle cx="26" cy="26" r="21" fill="none" stroke="#223042" stroke-width="6"/><circle cx="26" cy="26" r="21" fill="none" stroke="#176AC6" stroke-width="6" stroke-linecap="round" stroke-dasharray="84.4 131.9" transform="rotate(-90 26 26)"/></svg>
+      <div><p class="small muted" style="margin:0 0 2px">Day-2 tasks on track</p><span class="num" style="font-size:24px">64%</span></div>
+    </div>
+  </div>
+
+  <div style="display:grid;grid-template-columns:minmax(0,1.85fr) minmax(0,1fr);gap:16px;margin-bottom:16px">
+    <section class="panel" aria-label="Digital site model">
+      <div style="display:flex;gap:10px;align-items:center;padding:12px 16px;border-bottom:1px solid #232830;flex-wrap:wrap">
+        <h3 style="padding:0;border:0;font-size:13.5px;color:#C7CDD6">Digital site model — B1 · F3</h3>
+        <span class="mono muted">A-103 · Rev D</span>
+        <div style="margin-left:auto;display:flex;gap:6px">
+          <span class="vbtn cur" aria-current="true">3D</span>
+          <a href="SiteOverview.dc.html" class="vbtn">2D</a>
+          <a href="Site3D.dc.html" class="vbtn" aria-label="Expand site model">⤢</a>
+        </div>
+      </div>
+      <div style="position:relative;padding:10px 14px 4px">
+        <svg viewBox="0 0 900 440" style="width:100%;height:auto;display:block" role="img" aria-label="Isometric model of floor F3. Zone 3B is highlighted in blue; its moved bathroom wall from revision D is a red face with the old position dashed.">
+          <polygon points="80,225 450,380 450,424 80,269" fill="#0B0E13" stroke="#22272F" stroke-width="1.5"/>
+          <polygon points="450,380 820,225 820,269 450,424" fill="#090C10" stroke="#22272F" stroke-width="1.5"/>
+          <polygon points="450,70 820,225 450,380 80,225" fill="#161A21" stroke="#39414D" stroke-width="2"/>
+          <g stroke="#2C333D" stroke-width="1.5">
+            <line x1="265" y1="147" x2="635" y2="302"/>
+            <line x1="635" y1="147" x2="265" y2="302"/>
+          </g>
+          <g stroke="#1C212A" stroke-width="1">
+            <line x1="172" y1="186" x2="542" y2="341"/>
+            <line x1="358" y1="108" x2="728" y2="263"/>
+            <line x1="542" y1="108" x2="172" y2="263"/>
+            <line x1="728" y1="186" x2="358" y2="341"/>
+          </g>
+          <polygon points="450,70 635,147 450,225 265,147" fill="rgba(23,106,198,.20)" stroke="#4D96E8" stroke-width="2"/>
+          <polygon points="468,146 548,112 548,78 468,112" fill="#E2492F" stroke="#FF6B5A" stroke-width="2"/>
+          <polygon points="484,153 564,119 564,85 484,119" fill="none" stroke="#8A93A1" stroke-width="1.8" stroke-dasharray="6 5"/>
+          <g font-family="'JetBrains Mono',monospace" font-size="15" fill="#8A93A1">
+            <text x="235" y="232">3A</text>
+            <text x="418" y="130" fill="#5AA2EE">3B</text>
+            <text x="438" y="318">3C</text>
+            <text x="638" y="232">3D</text>
+          </g>
+        </svg>
+        <a class="mk" href="SiteZone3B.dc.html" style="left:50%;top:7%"><i style="background:#FF5C49"></i>3B — do not close wall</a>
+        <a class="mk" href="EvidenceReview.dc.html" style="left:60%;top:52%"><i style="background:#5AA2EE"></i>Inspection pending · D4</a>
+        <span class="mk" style="left:6%;top:64%"><i style="background:#43CD8A"></i>3A — drywall on track</span>
+      </div>
+      <p class="small muted" style="margin:0;padding:8px 16px 14px">Static placeholder (Three.js: issue #16). Markers open the zone or the review.</p>
+    </section>
+
+    <section class="panel" aria-label="Needs your attention">
+      <h3>Needs your attention</h3>
+      <div class="pad" style="display:flex;flex-direction:column;gap:12px">
+        <div style="border:1px solid #55281F;background:#1D1114;border-radius:12px;padding:13px 14px">
+          <p style="margin:0 0 8px"><span class="chip s-crit">Critical</span></p>
+          <a href="FlagDetail.dc.html"><strong>Wall closure in 3B before confirmed inspection</strong></a>
+          <div class="small" style="margin-top:10px;display:flex;flex-direction:column;gap:6px;color:#C7CDD6">
+            <span><span class="mono" style="color:#5AA2EE">D1</span> Rev D moved wall 3B by 30 cm (plan diff)</span>
+            <span><span class="mono" style="color:#9BA4B2">?</span> Rough-in inspection 3B not confirmed</span>
+            <span><span class="mono" style="color:#FF7A66">D2</span> <span lang="de">„morgen früh machen wir 3B zu“</span> — Telegram</span>
+          </div>
+          <div style="background:#12223A;border:1px solid #1F4470;border-radius:10px;padding:10px 12px;margin-top:12px" class="small">
+            <span class="chip s-info">LLM proposal — advisory</span>
+            <p style="margin:6px 0 0;color:#C7CDD6">Reschedule drywall closing 3B; crew to 3A/3C on Day 3.</p>
+          </div>
+          <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
+            <a href="FlagDetail.dc.html" class="btn btn-acc">Open flag</a>
+            <a href="ProposalDetail.dc.html" class="btn">Decide proposal</a>
+          </div>
+        </div>
+        <div class="small" style="display:flex;flex-direction:column;gap:9px">
+          <a href="EvidenceReview.dc.html"><span class="chip s-unk">Review</span>&ensp;2 evidence items for 3B await review →</a>
+          <a href="FlagInbox.dc.html"><span class="chip s-warn">Warning</span>&ensp;Rev D not acknowledged by plumbing crew →</a>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <div style="display:grid;grid-template-columns:minmax(0,1.85fr) minmax(0,1fr);gap:16px">
+    <section class="panel" aria-label="Activity">
+      <h3>Activity</h3>
+      <div class="row"><span class="when">18:05 · TG</span><span class="small" style="flex:1">Drywall group: <span lang="de">“morgen früh machen wir 3B zu”</span> → <a href="FlagDetail.dc.html" style="color:#5AA2EE">critical flag</a></span></div>
+      <div class="row"><span class="when">17:00 · TG</span><span class="small" style="flex:1"><span lang="de">“Abnahme dürfte passen”</span> — unconfirmed, <a href="EvidenceReview.dc.html" style="color:#5AA2EE">awaiting review</a></span></div>
+      <div class="row"><span class="when">16:40 · MAIL</span><span class="small" style="flex:1">Inspector: rough-in inspection F3 postponed to Day 4 — unconfirmed</span></div>
+      <div class="row"><span class="when">D1 10:15</span><span class="small" style="flex:1">Rev D changes 3B (wall moved 30 cm) → <a href="FlagInbox.dc.html" style="color:#5AA2EE">warning flag</a> · <a href="RoomView.dc.html" style="color:#5AA2EE">room 3B</a></span></div>
+    </section>
+    <section class="panel" aria-label="Next 48 hours">
+      <h3>Next 48 h</h3>
+      <div class="row"><span class="small"><strong>Drywall closing 3B</strong><br><span class="mono muted">Day 3 · 07:00</span></span><span class="chip s-crit">Blocked</span></div>
+      <div class="row"><span class="small"><strong>Drywall closing 3A</strong><br><span class="mono muted">Day 3 · 07:00</span></span><span class="chip s-ok">Ready</span></div>
+      <div class="row"><span class="small"><strong>Rough-in inspection F3</strong><br><span class="mono muted">Day 4 · unconfirmed</span></span><span class="chip s-unk">Pending</span></div>
+    </section>
+  </div>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1360,"height":940}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>
