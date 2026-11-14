@@ -83,6 +83,29 @@ relevant completion Events are linked as sources. Flag details and Context/MCP
 reads expose the same completion Evidence. Confirmation/rejection rechecks the
 Flag but never closes it, and MCP/chat cannot review Evidence.
 
+### Offline seed example
+
+The seed marks `insulation-F1` as explicitly synthetic `not_completed` Evidence.
+After importing/resetting the seed, start the API with `LLM_PROVIDER=cached` and
+submit the synthetic early work announcement through the normal ingestion entry:
+
+```sh
+curl -X POST http://localhost:8000/ingestion/messages \
+  -H 'Content-Type: application/json' \
+  --data-binary @backend/demo/out-of-sequence.json
+```
+
+`GET /flags` includes Flag C for `drywall-F1` / Zone F1, with predecessor
+`insulation-F1`, evaluation `not_satisfied`, its seed provenance and the work
+announcement source. The independent pending rough-in Inspection also creates
+Flag A; completion and inspection are separate Preconditions. The explicit Task
+reference preserves the early start even though the scheduled start is tomorrow.
+Repeated submission deduplicates normally; reset restores the same synthetic
+baseline, never a fabricated human review. F3 predecessor Tasks have explicit
+synthetic completion baselines so the hero's unresolved inspection remains
+Conflict A, rather than an additional missing-completion Conflict C. These
+baselines do not certify an Inspection or grant clearance for closing work.
+
 ## Persistence and integration
 
 Migration `0005` adds `flags`, `flag_sources`, and `flag_audit`. The deterministic

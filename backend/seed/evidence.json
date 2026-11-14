@@ -69,6 +69,45 @@
     }
   },
   {
+    "id": "baseline-completed-plumbing-F3",
+    "origin": "seed_baseline",
+    "source_ref": "seed:schedule.csv#plumbing-F3",
+    "quote": "Explicit synthetic baseline: rough-in plumbing F3 is complete; this does not certify its inspection.",
+    "claim": "completed",
+    "review_status": "confirmed",
+    "scope": {
+      "kind": "task_completion",
+      "zone_id": "F3",
+      "task_id": "plumbing-F3"
+    }
+  },
+  {
+    "id": "baseline-completed-insulation-F3",
+    "origin": "seed_baseline",
+    "source_ref": "seed:schedule.csv#insulation-F3",
+    "quote": "Explicit synthetic baseline: insulation F3 is complete; the pending rough-in inspection still blocks closing work in the hero scenario.",
+    "claim": "completed",
+    "review_status": "confirmed",
+    "scope": {
+      "kind": "task_completion",
+      "zone_id": "F3",
+      "task_id": "insulation-F3"
+    }
+  },
+  {
+    "id": "baseline-incomplete-insulation-F1",
+    "origin": "seed_baseline",
+    "source_ref": "seed:schedule.csv#insulation-F1",
+    "quote": "Explicit synthetic conflict C baseline: insulation F1 is not complete, so its successor drywall F1 must not start.",
+    "claim": "not_completed",
+    "review_status": "confirmed",
+    "scope": {
+      "kind": "task_completion",
+      "zone_id": "F1",
+      "task_id": "insulation-F1"
+    }
+  },
+  {
     "id": "example-missing-scope",
     "origin": "seed_statement",
     "statement_ref": "example-statement-missing-scope",

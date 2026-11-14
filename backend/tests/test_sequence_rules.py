@@ -1,27 +1,26 @@
+import json
 from unittest.mock import Mock
 
 import pytest
-from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app import ingestion, models, rules
 from app.extraction import ExtractedBatch, ExtractedEvent
+from conftest import BACKEND
 from test_lifecycle import signal
-from test_rules import ingest, initialized
+from test_rules import ingest
 
 
 @pytest.fixture
-def sequence_site(initialized, engine):
+def sequence_site(client, seed, monkeypatch, engine):
+    monkeypatch.setenv("LLM_PROVIDER", "cached")
+    monkeypatch.delenv("LLM_CACHE_PATH", raising=False)
+    seed.evidence = [item for item in seed.evidence if item.scope.kind not in {"inspection", "task_completion"}]
+    assert client.post("/seed/import", json=seed.model_dump(mode="json")).status_code == 200
     with Session(engine) as session, session.begin():
         task = session.get(models.Task, "drywall-F3")
         task.predecessors = [session.get(models.Task, "plumbing-F3")]
-        for record in session.scalars(select(models.Evidence).where(
-            models.Evidence.kind == "task_completion", models.Evidence.task_id == "plumbing-F3",
-        )):
-            for review in record.history:
-                session.delete(review)
-            session.delete(record)
-    return initialized
+    return client
 
 
 def completion(client, monkeypatch, *, claim="completed", zone="F3", reference="plumbing-F3",
@@ -206,3 +205,25 @@ def test_human_closed_sequence_flag_is_not_reopened(sequence_site, engine, monke
     assert all(item["type"] != "C" for item in sequence_site.get("/flags").json())
     ingest(sequence_site, external_id="new-work")
     assert all(item["type"] != "C" for item in sequence_site.get("/flags").json())
+
+
+def test_seed_scenario_flags_missing_predecessor_and_reset_preserves_provenance(client, seed, monkeypatch):
+    monkeypatch.setenv("LLM_PROVIDER", "cached")
+    monkeypatch.delenv("LLM_CACHE_PATH", raising=False)
+    payload = json.loads((BACKEND / "demo" / "out-of-sequence.json").read_text())
+    for _ in range(2):
+        assert client.post("/seed/import", json=seed.model_dump(mode="json")).status_code == 200
+        assert client.get("/flags").json() == []
+        response = client.post("/ingestion/messages", json=payload)
+        assert response.status_code == 201, response.text
+        flag = sequence_flag(client)
+        assert (flag["task_id"], flag["zone_id"], flag["evaluation"]) == ("drywall-F1", "F1", "not_satisfied")
+        assert "insulation-F1" in flag["explanation"]
+        assert flag["sources"][0]["quote"] == payload["text"]
+        [proof] = flag["evidence"]
+        assert proof["origin"] == "seed_baseline"
+        assert proof["source_ref"] == "seed:schedule.csv#insulation-F1"
+        assert proof["history"][0]["actor_type"] == "seed_import"
+        assert proof["history"][0]["reviewer_id"] is None
+        assert client.post("/ingestion/messages", json=payload).status_code == 200
+        assert sequence_flag(client)["id"] == flag["id"]
