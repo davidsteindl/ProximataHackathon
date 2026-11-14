@@ -21,6 +21,7 @@ export default async function Home({ searchParams }) {
   return (
     <main>
       <h1>SiteMind</h1>
+      <p><Link href="/site">Open the 3D site model →</Link></p>
       <div className="health">
         <h2>Service health</h2>
         <dl>

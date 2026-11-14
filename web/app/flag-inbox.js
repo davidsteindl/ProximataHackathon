@@ -7,15 +7,15 @@ const evaluationLabels = {
   contradictory: "Conflicting statements — review required",
 };
 
-export default function FlagInbox({ flags, timezone }) {
+export default function FlagInbox({ flags, timezone, title = "Flag inbox", expanded = false }) {
   return (
     <section aria-labelledby="flags-title">
-      <h2 id="flags-title">Flag inbox</h2>
+      <h2 id="flags-title">{title}</h2>
       <p>Open flags, highest severity first. Flags stay open until a responsible human closes them.</p>
       {flags.length === 0 ? <p>No open flags.</p> : (
         <ol className="flag-inbox">
           {flags.map((flag) => (
-            <li key={flag.id}>
+            <li key={flag.id} id={`flag-${flag.id}`}>
               <article>
                 <h3>Flag {flag.type} · {flag.zone_id} · {flag.severity} severity</h3>
                 <p>{evaluationLabels[flag.evaluation] || flag.evaluation}</p>
@@ -33,7 +33,7 @@ export default function FlagInbox({ flags, timezone }) {
                   </div>
                 )}
                 <p>State: {flag.state.replaceAll("_", " ")} · Detected {formatTime(flag.created_at, timezone)}</p>
-                <details>
+                <details open={expanded}>
                   <summary>Flag details · {flag.sources.length} source(s)</summary>
                   <p>Last updated: {formatTime(flag.updated_at, timezone)}</p>
                   <h4>Triggering sources</h4>
