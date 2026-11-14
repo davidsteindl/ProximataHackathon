@@ -39,6 +39,15 @@ In PowerShell statt `cp`: `Copy-Item .env.example .env`. Beim ersten Start baut 
   `/geometry?zone_id=3B&revision_id=A-103-D`. API-/Importvertrag und 3D-Koordinaten:
   [docs/CAD-PIPELINE.md](docs/CAD-PIPELINE.md). Ein Seed-Reset entfernt auch die
   daraus abgeleitete Geometrie; danach den CAD-Import erneut ausführen.
+- 3D-Baustellenansicht (#16): http://localhost:3000/site, Raumansicht unter
+  `/zones/<zoneId>` (z. B. `/zones/3B-BATH`, teilbarer Link). Braucht Seed,
+  CAD-Import und für Flag A die Hero-Nachricht unten. Das Gebäude wird nur aus
+  `/geometry` erzeugt (Wände auf Geschosshöhe extrudiert, Räume, Türen, Sanitär,
+  Abwasser); Kräne, Gerüst, Zaun, Bäume und Container sind als dekorativer
+  Kontext gekennzeichnet. Status kommt aus `/flags`, `/inspections`, `/evidence`
+  und wird alle 3 s über `web` (`/api/site-state`) nachgeladen, ohne Reload.
+  Die Ansicht liest nur; Evidence-Prüfung und Flag-Abschluss bleiben getrennte
+  menschliche Aktionen. Flag-Detail (lesend): `/flags/<id>`.
 - OpenAPI: http://localhost:8000/openapi.json, interaktive Dokumentation unter `/docs`.
 - MCP: http://localhost:8001/mcp – startbarer Streamable-HTTP-Server ohne Tools.
 - `docker compose logs worker mcp` zeigt den erfolgreichen API-Zugriff beider Dienste.
@@ -55,9 +64,9 @@ Stoppen: `docker compose down`. Die Daten bleiben im Volume `db-data` erhalten.
 
 Enthalten sind Infrastruktur, Health-Prüfungen, der statische Site Record aus
 Issue #5, Nachrichten-Ingestion, Event-Extraktion und Timeline aus #6 sowie
-DXF-Extraktion und Geometrie-API aus #15, Conflict A und Flag-Inbox aus #7
-sowie Conflict B aus Revisionsnotizen (#8), Gmail-Eingang aus #11 und
-Outbox-/Gmail-Versand aus #10. 3D-Ansicht, Plan-Diff,
+DXF-Extraktion und Geometrie-API aus #15, Conflict A und Flag-Inbox aus #7,
+Conflict B aus Revisionsnotizen (#8), Gmail-Eingang aus #11,
+Outbox-/Gmail-Versand aus #10 sowie die 3D-Ansicht aus #16. Plan-Diff,
 Telegram-Adapter, MCP-Tools, Authentifizierung
 und Hosting folgen in ihren eigenen Issues.
 
