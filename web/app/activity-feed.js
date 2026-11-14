@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { FEED_POLL_MS, confirmationLabels, entryContext, kindLabels, mergeNewest } from "../lib/feed.mjs";
+import { FEED_POLL_MS, confirmationLabels, entryContext, kindLabels, readFeedPages } from "../lib/feed.mjs";
 import { formatTime } from "../lib/site.mjs";
 
 function feedUrl(filters, cursor) {
@@ -15,46 +15,43 @@ function feedUrl(filters, cursor) {
 }
 
 export default function ActivityFeed({ initial, filters, timezone, zones }) {
-  const [entries, setEntries] = useState(initial.entries);
-  const [cursor, setCursor] = useState(initial.next_cursor);
+  const [feed, setFeed] = useState(initial);
+  const [pageCount, setPageCount] = useState(1);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
+  const { entries, next_cursor: cursor } = feed;
 
   useEffect(() => {
     let active = true;
+    let running = false;
+    const controller = new AbortController();
     const poll = async () => {
+      if (running) return;
+      running = true;
+      setLoading(true);
       try {
-        const response = await fetch(feedUrl(filters), { cache: "no-store" });
-        const result = await response.json();
-        if (!active) return;
-        if (result.error) setError(result.error);
-        else {
+        const updated = await readFeedPages(async (after) => {
+          const response = await fetch(feedUrl(filters, after), {
+            cache: "no-store", signal: controller.signal,
+          });
+          if (!response.ok) throw new Error("The activity feed could not be refreshed.");
+          return response.json();
+        }, pageCount);
+        if (active) {
+          setFeed(updated);
           setError(null);
-          setEntries((current) => mergeNewest(current, result.data.entries));
         }
-      } catch {
-        if (active) setError("The activity feed could not be refreshed.");
+      } catch (failure) {
+        if (active) setError(failure.message || "The activity feed could not be refreshed.");
+      } finally {
+        running = false;
+        if (active) setLoading(false);
       }
     };
+    poll();
     const timer = setInterval(poll, FEED_POLL_MS);
-    return () => { active = false; clearInterval(timer); };
-  }, [filters]);
-
-  const loadOlder = async () => {
-    setLoading(true);
-    try {
-      const result = await (await fetch(feedUrl(filters, cursor), { cache: "no-store" })).json();
-      if (result.error) setError(result.error);
-      else {
-        setEntries((current) => [...current, ...result.data.entries.filter((entry) => !current.some((item) => item.id === entry.id))]);
-        setCursor(result.data.next_cursor);
-      }
-    } catch {
-      setError("Older entries could not be loaded.");
-    } finally {
-      setLoading(false);
-    }
-  };
+    return () => { active = false; controller.abort(); clearInterval(timer); };
+  }, [filters, pageCount]);
 
   return (
     <section aria-labelledby="feed-title">
@@ -93,7 +90,7 @@ export default function ActivityFeed({ initial, filters, timezone, zones }) {
           ))}
         </ol>
       )}
-      {cursor && <button type="button" onClick={loadOlder} disabled={loading}>{loading ? "Loading…" : "Show older entries"}</button>}
+      {cursor && <button type="button" onClick={() => setPageCount((count) => count + 1)} disabled={loading}>{loading ? "Loading…" : "Show older entries"}</button>}
     </section>
   );
 }

@@ -28,12 +28,18 @@ export async function getFeed(baseUrl, filters = {}) {
   }
 }
 
-/** Put newly polled entries on top without duplicating ones already shown. */
-export function mergeNewest(current, latest) {
-  const known = new Set(current.map((entry) => entry.id));
-  const fresh = latest.filter((entry) => !known.has(entry.id));
-  const updated = new Map(latest.map((entry) => [entry.id, entry]));
-  return [...fresh, ...current.map((entry) => updated.get(entry.id) || entry)];
+/** Reload the complete visible prefix; entries and its paging cursor form one snapshot. */
+export async function readFeedPages(loadPage, pageCount = 1) {
+  const entries = new Map();
+  let cursor = null;
+  for (let page = 0; page < pageCount; page += 1) {
+    const result = await loadPage(cursor);
+    if (result.error) throw new Error(result.error);
+    for (const entry of result.data.entries) entries.set(entry.id, entry);
+    cursor = result.data.next_cursor;
+    if (!cursor) break;
+  }
+  return { entries: [...entries.values()], next_cursor: cursor };
 }
 
 export const kindLabels = {
