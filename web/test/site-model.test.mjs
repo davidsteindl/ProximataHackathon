@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   ancestors, changedElements, describeChange, elementStatus, flagsForZone, floorOf, floorVisible, indexZones,
-  focusBounds, inspectionConfirmedPassed, inspectionKindLabel, inspectionPass, splitTasks, viewForZone, zoneBounds, zoneDetails, zoneStatus,
+  focusBounds, inspectionConfirmedPassed, inspectionKindLabel, inspectionPass, revisionAcknowledgments, splitTasks, viewForZone, zoneBounds, zoneDetails, zoneStatus,
 } from "../lib/site-model.mjs";
 
 const zone = (id, kind, children = []) => ({ id, kind, name: id, children });
@@ -179,4 +179,39 @@ test("an element is framed together with its parent room", () => {
   ] };
   assert.deepEqual(focusBounds(index, [plan], "3B-BATH-WALL"), { minX: 19, maxX: 22.3, minY: 5.5, maxY: 8.5 });
   assert.deepEqual(focusBounds(index, [plan], "3B-BATH"), { minX: 19, maxX: 22.3, minY: 5.5, maxY: 8.5 });
+});
+
+// Mirrors the live seed: plumbing has a confirmed baseline acknowledgment of A-103 Rev C, but Rev D is current.
+const revC = { id: "A-103-C", label: "C", sequence: 3, issued_at: "2026-11-12T12:00:00Z" };
+const revD = { id: "A-103-D", label: "D", sequence: 4, issued_at: "2026-11-13T09:15:00Z" };
+const planF3 = { id: "A-103", floor_id: "F3", current_revision: revD, revisions: [revC, revD] };
+const ack = (id, revision_id, review_status, origin = "seed_baseline", zone_id = "F3", crew_id = "plumbing") => ({
+  id, claim: "acknowledged", review_status, origin,
+  scope: { kind: "revision_acknowledgment", zone_id, inspection_id: null, task_id: null, crew_id, revision_id },
+  history: [{ status: review_status, actor_type: review_status === "unconfirmed" ? "extractor" : origin === "seed_baseline" ? "seed_import" : "human" }],
+});
+
+test("a confirmed acknowledgment of an earlier revision is stale, never proof for the current one", () => {
+  assert.deepEqual(revisionAcknowledgments(index, planF3, [ack("c", "A-103-C", "confirmed")]),
+    [{ crewId: "plumbing", state: "stale", label: "C" }]);
+  assert.equal(revisionAcknowledgments(index, planF3, [ack("c", "A-103-C", "confirmed"), ack("d", "A-103-D", "unconfirmed", "llm_statement")])[0].state,
+    "unconfirmed", "an extracted Rev D acknowledgment awaits review");
+  assert.equal(revisionAcknowledgments(index, planF3, [ack("d", "A-103-D", "confirmed", "llm_statement")])[0].state, "current",
+    "a human-confirmed Rev D acknowledgment covers Rev D");
+  assert.deepEqual(revisionAcknowledgments(index, planF3, [ack("d", "A-103-D", "confirmed", "seed_baseline", "F2")]), [],
+    "evidence for another floor does not apply");
+  assert.deepEqual(revisionAcknowledgments(index, planF3, [ack("d", "A-103-D", "rejected", "llm_statement")]), []);
+  const machine = { ...ack("d", "A-103-D", "confirmed", "llm_statement"), history: [{ status: "confirmed", actor_type: "extractor" }] };
+  assert.equal(revisionAcknowledgments(index, planF3, [machine])[0].state, "unconfirmed", "only a human confirms");
+});
+
+test("a confirmed pass scheduled before the current plan revision is not shown as a pass", () => {
+  const passed = evidence("human", "passed", "confirmed");
+  const before = { ...roughIn, scheduled_at: "2026-11-12T15:00:00Z" };
+  const after = { ...roughIn, scheduled_at: "2026-11-14T15:00:00Z" };
+  assert.equal(inspectionPass(index, after, [passed], [planF3]), "confirmed");
+  assert.equal(inspectionPass(index, before, [passed], [planF3]), "revised");
+  assert.equal(inspectionPass(index, roughIn, [passed], [planF3]), "revised", "unknown order is not a pass");
+  assert.equal(zoneStatus(index, state({ flags: [], inspections: [before], evidence: [passed], plans: [planF3] }), "3A"), "open");
+  assert.equal(zoneStatus(index, state({ flags: [], inspections: [after], evidence: [passed], plans: [planF3] }), "3A"), "ok");
 });

@@ -93,12 +93,24 @@
 .callout::after { content: ""; position: absolute; left: -6px; top: -6px; width: 12px; height: 12px; border-radius: 50%; background: var(--tone); box-shadow: 0 0 0 3px rgba(20, 20, 16, .55), 0 0 0 6px color-mix(in srgb, var(--tone) 30%, transparent); }
 /* Leader line from the anchor to the nearest point of the card, in any direction (set by the scene). */
 .callout::before { content: ""; position: absolute; left: 0; top: -1px; width: var(--len, 0); height: 2px; transform-origin: 0 50%; transform: rotate(var(--ang, 0rad)); background: linear-gradient(to right, var(--tone), color-mix(in srgb, var(--tone) 55%, transparent)); }
-.callout button { pointer-events: auto; position: absolute; left: 0; top: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 1px; width: max-content; max-width: 250px; padding: 8px 12px 8px 11px; border-radius: 10px; text-align: left; background: rgba(22, 22, 18, .92); color: #F2EFE6; border-left: 3px solid var(--tone); box-shadow: 0 10px 26px rgba(0, 0, 0, .38); backdrop-filter: blur(6px); }
+.callout button { pointer-events: auto; position: absolute; z-index: 1; left: 0; top: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 1px; width: max-content; max-width: 250px; padding: 8px 12px 8px 11px; border-radius: 10px; text-align: left; background: rgba(22, 22, 18, .92); color: #F2EFE6; border-left: 3px solid var(--tone); box-shadow: 0 10px 26px rgba(0, 0, 0, .38); backdrop-filter: blur(6px); }
 .callout button strong { font-family: var(--display); font-size: 13.5px; color: #fff; display: flex; align-items: center; gap: 7px; }
 .callout.t-crit button strong::before { content: "!"; display: inline-grid; place-items: center; width: 17px; height: 17px; border-radius: 5px; background: var(--crit); color: #fff; font: 700 11px/1 var(--mono); }
 .callout button span { font-size: 12px; color: #CFCABB; }
 .callout button:hover { background: #141410; }
-.callouts.compact .callout button span { display: none; }
+/* Placement modes (set by the scene). Hidden text stays in the accessibility tree (clip, not display:none). */
+.callout button .pin { display: none; font: 600 12px/1 var(--mono); font-style: normal; color: #fff; }
+.callouts.compact .callout button span, .callout[data-mode="compact"] button span,
+.callout[data-mode="pin"] button strong, .callout[data-mode="pin"] button span,
+.callout[data-mode="offstage"] button { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; padding: 0; border: 0; }
+.callout[data-mode="pin"] button { padding: 6px 9px 6px 8px; border-radius: 8px; }
+.callout[data-mode="pin"] button .pin { display: block; }
+.callout[data-mode="offstage"]::after, .callout[data-mode="offstage"]::before { display: none; }
+/* A pin expands to the full card while hovered or focused (user-initiated, so it may cover its neighbours). */
+.callout[data-mode="pin"]:is(:hover, :focus-within) { z-index: 3; }
+.callout[data-mode="pin"] button:is(:hover, :focus-visible) { padding: 8px 12px 8px 11px; }
+.callout[data-mode="pin"] button:is(:hover, :focus-visible) .pin { display: none; }
+.callout[data-mode="pin"] button:is(:hover, :focus-visible) :is(strong, span) { position: static; width: auto; height: auto; overflow: visible; clip: auto; white-space: normal; }
 
 .hover-tip { position: absolute; left: 0; top: 0; z-index: 4; pointer-events: none; padding: 6px 10px; border-radius: 9px; background: rgba(251, 250, 246, .96); box-shadow: 0 8px 20px rgba(0, 0, 0, .3); font-size: 12px; display: flex; flex-direction: column; }
 .hover-tip[hidden] { display: none; }
@@ -109,6 +121,19 @@
 .sv-state.overlay { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); margin: 0; z-index: 5; box-shadow: 0 20px 50px rgba(0, 0, 0, .4); width: min(460px, calc(100% - 32px)); }
 .sv-state h1 { font-size: 20px; margin-bottom: 6px; }
 .sv-state p { color: var(--muted); }
+/* First-load failure: same layout, an empty graphite stage with a faint plan grid, panel placeholders. */
+.sv-offline { background: radial-gradient(ellipse at 50% 45%, #2C2F28 0%, var(--canvas) 70%), var(--canvas); }
+.sv-offline::before { content: ""; position: absolute; inset: 0; opacity: .5;
+  background-image: linear-gradient(rgba(237, 234, 224, .05) 1px, transparent 1px), linear-gradient(90deg, rgba(237, 234, 224, .05) 1px, transparent 1px);
+  background-size: 32px 32px; mask-image: radial-gradient(ellipse at center, #000 30%, transparent 75%); }
+.retry-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin-top: 12px; }
+.retry-row .primary-btn { margin: 0; padding: 9px 16px; background: var(--accent); color: var(--nav) !important; }
+.skeleton { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+.skeleton i { display: block; height: 10px; border-radius: 5px; background: linear-gradient(90deg, #ECE9E1, #F6F4EE, #ECE9E1); background-size: 200% 100%; animation: sk 1.6s linear infinite; }
+.skeleton i:nth-child(2) { width: 80%; } .skeleton i:nth-child(3) { width: 55%; }
+@keyframes sk { to { background-position: -200% 0; } }
+@media (max-width: 900px) { .sv-offline { min-height: 60dvh; } }
+@media (prefers-reduced-motion: reduce) { .skeleton i { animation: none; } }
 .primary-btn { display: inline-block; margin-top: 8px; padding: 9px 16px; border-radius: 999px; background: var(--ink); color: #fff !important; text-decoration: none; font-weight: 600; }
 
 /* Side panel */
@@ -221,7 +246,7 @@
   .toolbar { width: auto; flex: 1 1 260px; justify-content: flex-start; }
   .legend { flex: 1 1 100%; }
   .legend summary { white-space: normal; }
-  .callout button span { display: none; }
+  .callout button span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
   .collapsed .sv-side { width: auto; }
 }
 @media (max-width: 400px) {

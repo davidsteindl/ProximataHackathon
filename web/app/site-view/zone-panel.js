@@ -102,6 +102,7 @@ const PASS = {
   confirmed: { tone: "ok", text: "confirmed pass" },
   review: { tone: "vio", text: "disputed: counterclaim open" },
   unchecked: { tone: "warn", text: "confirmed statement, freshness not shown" },
+  revised: { tone: "warn", text: "pass predates current plan revision" },
   none: { tone: "warn", text: "pass not confirmed" },
 };
 
@@ -125,6 +126,34 @@ function InspectionRow({ summary }) {
   );
 }
 
+const ACK = {
+  current: { tone: "ok", text: (label) => `acknowledged Rev ${label}, confirmed` },
+  unconfirmed: { tone: "warn", text: (label) => `Rev ${label} acknowledgment unconfirmed` },
+  stale: { tone: "warn", text: (label) => `only Rev ${label} confirmed: stale` },
+  none: { tone: "unk", text: () => "no confirmed acknowledgment" },
+};
+
+// Current plan revision and, per crew, whether its acknowledgment Evidence covers exactly that revision.
+function RevisionRow({ plan, acknowledgments, timezone }) {
+  const current = plan.current_revision;
+  const stale = acknowledgments.filter((ack) => ack.state !== "current");
+  return (
+    <li className="pc-row">
+      <div className="pc-main">
+        <strong>Plan {plan.id} · Rev {current.label} current</strong>
+        <span className="meta mono">issued {formatTime(current.issued_at, timezone)}</span>
+      </div>
+      <div className="pc-chips">
+        {acknowledgments.length === 0 && <Chip tone="unk">no acknowledgment evidence</Chip>}
+        {acknowledgments.map((ack) => (
+          <Chip key={ack.crewId} tone={ACK[ack.state].tone}>{ack.crew?.name || ack.crewId}: {ACK[ack.state].text(ack.label)}</Chip>
+        ))}
+      </div>
+      {stale.length > 0 && <p className="meta warn-text">Acknowledgments count only for the exact revision. An earlier or unconfirmed one is not proof for Rev {current.label}.</p>}
+    </li>
+  );
+}
+
 function TaskList({ tasks, flags, timezone }) {
   return (
     <ol className="tasks">
@@ -143,7 +172,7 @@ function TaskList({ tasks, flags, timezone }) {
 }
 
 export function ZonePanel({ details, timezone, changes, newFlagIds, now }) {
-  const { zone, flags, tasks, inspections, unresolvedEvidence, plan, revisions } = details;
+  const { zone, flags, tasks, inspections, unresolvedEvidence, plan, revisions, acknowledgments } = details;
   const status = STATUS[details.status];
   const floorChanges = changes.filter((change) => change.floorId === details.floorId);
   const { current, earlier } = splitTasks(tasks, now);
@@ -158,6 +187,12 @@ export function ZonePanel({ details, timezone, changes, newFlagIds, now }) {
           <div className="pc">
             <h4>Inspection evidence in scope</h4>
             <ul>{inspections.map((summary) => <InspectionRow key={summary.inspection.id} summary={summary} />)}</ul>
+          </div>
+        )}
+        {plan?.current_revision && (
+          <div className="pc">
+            <h4>Plan revision in scope</h4>
+            <ul><RevisionRow plan={plan} acknowledgments={acknowledgments} timezone={timezone} /></ul>
           </div>
         )}
         <p className="fineprint">Evidence review, Flag acknowledgment and Flag closure are separate human decisions. This view only reads them.</p>
@@ -191,7 +226,11 @@ export function ZonePanel({ details, timezone, changes, newFlagIds, now }) {
                       <p className="meta" key={ack.crew_id}>{ack.crew?.name || ack.crew_id} acknowledged · {formatTime(ack.acknowledged_at, timezone)}</p>
                     ))}
                   {evidence.map((record) => (
-                    <p className="meta" key={record.id}><Chip tone={reviewTone(record.review_status)}>{record.review_status}</Chip> {ORIGIN[record.origin]} · <span className="mono">{record.source_ref}</span></p>
+                    <p className="meta" key={record.id}>
+                      <Chip tone={reviewTone(record.review_status)}>{record.review_status}</Chip>
+                      {revision.id !== plan.current_revision?.id && <> <Chip tone="unk">superseded revision</Chip></>}
+                      {" "}{ORIGIN[record.origin]} · <span className="mono">{record.source_ref}</span>
+                    </p>
                   ))}
                 </li>
               ))}

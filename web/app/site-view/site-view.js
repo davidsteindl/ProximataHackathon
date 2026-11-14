@@ -176,6 +176,7 @@ export default function SiteView({ model, initialState, error }) {
   const sceneRef = useRef(null);
   const tipRef = useRef(null);
   const calloutRefs = useRef(new Map());
+  const sideRef = useRef(null);
 
   const selectZone = useCallback((id) => {
     router.push(id ? `/zones/${encodeURIComponent(id)}` : "/site", { scroll: false });
@@ -219,6 +220,21 @@ export default function SiteView({ model, initialState, error }) {
     return () => { cancelled = true; scene?.dispose(); sceneRef.current = null; };
   }, [geometry, index, changes]);
 
+  // A new selection starts the panel at its Status widget. Keyed on the route only, so polling never scrolls.
+  // If the selection came from inside the panel (the Zones list), focus moves to the Status heading so keyboard
+  // users land on the answer instead of on a link that scrolled away.
+  const lastZone = useRef(zoneId);
+  useEffect(() => {
+    if (lastZone.current === zoneId) return;
+    lastZone.current = zoneId;
+    const side = sideRef.current;
+    if (!side) return;
+    const fromPanel = side.contains(document.activeElement);
+    side.scrollTop = 0;
+    const heading = side.querySelector(".widget-head h3");
+    if (fromPanel && heading) { heading.tabIndex = -1; heading.focus(); }
+  }, [zoneId]);
+
   // Route-derived view: isolation, camera mode, highlight and focus.
   const focus = useMemo(() => (route.highlight ? focusBounds(index, geometry, route.highlight) : null), [index, route, geometry]);
   useEffect(() => {
@@ -252,28 +268,28 @@ export default function SiteView({ model, initialState, error }) {
         const own = elementZone(index, element);
         if (own && flagsForZone(index, [flag], own).length && element.kind === "wall") { anchor = `${plan.floor_id}:${element.element_id}`; target = own; }
       }
-      list.push({ key: `flag-${flag.id}`, anchor, floorId: floorOf(index, flag.zone_id), tone: "crit", title: `Flag ${flag.type} · ${flag.zone_id}`, text: `${flag.activity.replaceAll("_", " ")} announced · precondition ${flag.evaluation.replaceAll("_", " ")}`, target });
+      list.push({ key: `flag-${flag.id}`, anchor, floorId: floorOf(index, flag.zone_id), tone: "crit", short: `Flag ${flag.type}`, title: `Flag ${flag.type} · ${flag.zone_id}`, text: `${flag.activity.replaceAll("_", " ")} announced · precondition ${flag.evaluation.replaceAll("_", " ")}`, target });
     }
     if (filters.changes) for (const change of changes.filter((c) => c.element.kind === "wall")) {
-      list.push({ key: `rev-${change.element.element_id}`, anchor: `${change.floorId}:${change.element.element_id}`, floorId: change.floorId, tone: "info", title: `Rev ${change.label} · ${change.change}`, text: `${change.element.element_id}, dashed = Rev ${change.previousLabel}`, target: elementZone(index, change.element) || change.floorId, below: true });
+      list.push({ key: `rev-${change.element.element_id}`, anchor: `${change.floorId}:${change.element.element_id}`, floorId: change.floorId, tone: "info", short: `Rev ${change.label}`, title: `Rev ${change.label} · ${change.change}`, text: `${change.element.element_id}, dashed = Rev ${change.previousLabel}`, target: elementZone(index, change.element) || change.floorId, below: true });
     }
     const floors = new Set((state.flags || []).map((flag) => floorOf(index, flag.zone_id)));
     if (route.floorId) floors.add(route.floorId);
     // One callout per floor: the earliest inspection there whose pass is not confirmed and that has claims to review.
     if (!route.highlight || route.highlight === route.floorId) for (const floorId of floors) {
       const pending = (state.inspections || [])
-        .filter((inspection) => inspection.zone_id === floorId && !inspectionConfirmedPassed(index, inspection, state.evidence))
+        .filter((inspection) => inspection.zone_id === floorId && !inspectionConfirmedPassed(index, inspection, state.evidence, state.plans))
         .map((inspection) => ({ inspection, unconfirmed: (state.evidence || []).filter((record) => record.scope.inspection_id === inspection.id && record.review_status === "unconfirmed").length }))
         .sort((a, b) => b.unconfirmed - a.unconfirmed || a.inspection.scheduled_at.localeCompare(b.inspection.scheduled_at))[0];
       if (!pending) continue;
       const { inspection, unconfirmed } = pending;
-      list.push({ key: `insp-${inspection.id}`, anchor: inspection.zone_id, floorId: inspection.zone_id, tone: "warn", title: `${inspectionKindLabel(inspection.kind)} ${inspection.zone_id} · ${inspection.status}`, text: unconfirmed ? `${unconfirmed} unconfirmed claim${unconfirmed === 1 ? "" : "s"} awaiting review` : "No confirmed pass yet", target: inspection.zone_id });
+      list.push({ key: `insp-${inspection.id}`, anchor: inspection.zone_id, floorId: inspection.zone_id, tone: "warn", short: inspectionKindLabel(inspection.kind), title: `${inspectionKindLabel(inspection.kind)} ${inspection.zone_id} · ${inspection.status}`, text: unconfirmed ? `${unconfirmed} unconfirmed claim${unconfirmed === 1 ? "" : "s"} awaiting review` : "No confirmed pass yet", target: inspection.zone_id });
     }
     return list;
   }, [state, geometry, index, changes, filters.changes, route]);
 
   useEffect(() => {
-    sceneRef.current?.setOverlays(callouts.map((c) => ({ el: calloutRefs.current.get(c.key), anchor: c.anchor, floorId: c.floorId, below: c.below })));
+    sceneRef.current?.setOverlays(callouts.map((c) => ({ el: calloutRefs.current.get(c.key), anchor: c.anchor, floorId: c.floorId, below: c.below, target: c.target, tone: c.tone })));
   }, [callouts, sceneReady]);
 
   // Briefly mark Flags that appeared while the page was open.
@@ -290,9 +306,7 @@ export default function SiteView({ model, initialState, error }) {
     try { await navigator.clipboard.writeText(window.location.href); setCopied(true); setTimeout(() => setCopied(false), 1600); } catch { /* clipboard unavailable */ }
   };
 
-  if (error || !model) {
-    return <Shell live={live}><div className="sv-state"><h1>Site model unavailable</h1><p>{error || "No data"}</p><Link href="/site">Try again</Link></div></Shell>;
-  }
+  if (error || !model) return <Shell live={live}><Unavailable error={error} /></Shell>;
 
   return (
     <Shell live={live}>
@@ -312,7 +326,7 @@ export default function SiteView({ model, initialState, error }) {
               {callouts.map((c) => (
                 <div key={c.key} ref={(el) => (el ? calloutRefs.current.set(c.key, el) : calloutRefs.current.delete(c.key))} className={`callout t-${c.tone}`} style={{ visibility: "hidden" }}>
                   <button type="button" onClick={() => selectZone(c.target)}>
-                    <strong>{c.title}</strong><span>{c.text}</span>
+                    <strong>{c.title}</strong><span>{c.text}</span><em className="pin" aria-hidden="true">{c.short}</em>
                   </button>
                 </div>
               ))}
@@ -393,7 +407,7 @@ export default function SiteView({ model, initialState, error }) {
                 <span><i className="sw sel" />Selected</span>
                 <span><i className="sw ghost" />Previous revision</span>
                 <span><i className="sw pipe" />Drain</span>
-                <p>Building, walls, rooms, door openings, fixtures and drains: imported DXF geometry ({geometry.length} plans). Schematic: fixture sizes, door leaves, swing arcs and lintels. Decorative context, not plan data: crane, scaffold, fence, street, vehicles, materials, trees and neighbouring buildings.</p>
+                <p>Building, walls, rooms, door openings, fixtures and drains: imported DXF geometry ({geometry.length} plans). Schematic: fixture sizes, door leaves, swing arcs, lintels, the slab edge overhang, surface textures (concrete, plaster) and contact shading. Decorative context, not plan data: crane, scaffold, fence, street, vehicles, materials, trees and neighbouring buildings.</p>
               </div>
             </details>
           </div>
@@ -407,7 +421,7 @@ export default function SiteView({ model, initialState, error }) {
             {!panelOpen && <span className="pill-sum">{zoneId || building?.id} · {(state.flags || []).length} open</span>}
           </div>
           {panelOpen && (
-            <div className="side-scroll">
+            <div className="side-scroll" ref={sideRef}>
               {details ? <ZonePanel details={details} timezone={timezone} changes={changes} newFlagIds={newFlagIds} now={live.at} />
                 : <OverviewPanel index={index} state={state} geometry={geometry} changes={changes} />}
               <ZoneBrowser zones={model.zones} index={index} state={state} current={zoneId} />
@@ -416,6 +430,44 @@ export default function SiteView({ model, initialState, error }) {
         </aside>
       </div>
     </Shell>
+  );
+}
+
+const RETRY_S = 10;
+
+// First load failed: keep the product layout (empty stage, panel placeholders) and retry the server render.
+function Unavailable({ error }) {
+  const router = useRouter();
+  const [left, setLeft] = useState(RETRY_S);
+  useEffect(() => {
+    const t = setInterval(() => setLeft((n) => {
+      if (n > 1) return n - 1;
+      router.refresh();
+      return RETRY_S;
+    }), 1000);
+    return () => clearInterval(t);
+  }, [router]);
+  return (
+    <div className="sv-body">
+      <div className="sv-stage sv-offline">
+        <div className="sv-state overlay" role="alert">
+          <p className="crumbs mono">GET /zones · /plans · /geometry</p>
+          <h1>Site model unavailable</h1>
+          <p>{error || "The API returned no site model."} Nothing was changed; the view only reads the site record.</p>
+          <div className="retry-row">
+            <button type="button" className="primary-btn" onClick={() => { setLeft(RETRY_S); router.refresh(); }}>Retry now</button>
+            <span className="meta" aria-live="polite">Retrying automatically in {left} s</span>
+          </div>
+        </div>
+      </div>
+      <aside className="sv-side" aria-label="Zone information">
+        <div className="side-scroll">
+          {["Needs attention", "Floors", "Zones"].map((title) => (
+            <Widget key={title} title={title}><p className="empty">Waiting for the API.</p><div className="skeleton" aria-hidden="true"><i /><i /><i /></div></Widget>
+          ))}
+        </div>
+      </aside>
+    </div>
   );
 }
 

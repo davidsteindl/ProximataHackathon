@@ -3,6 +3,7 @@
 // data; the UI labels it as decorative and every object carries userData.decorative. Repeated parts are
 // instanced, textures are generated on a canvas (no assets, no extra dependencies).
 import * as THREE from "three";
+import { mergeVertices } from "three/addons/utils/BufferGeometryUtils.js";
 
 const mat = (color, extra = {}) => new THREE.MeshStandardMaterial({ color, roughness: 0.9, metalness: 0, ...extra });
 
@@ -13,7 +14,6 @@ function rng(seed) {
 
 const BOX = new THREE.BoxGeometry(1, 1, 1);
 const CYL = new THREE.CylinderGeometry(0.5, 0.5, 1, 12);
-const BLOB = new THREE.IcosahedronGeometry(1, 2);
 const CONE = new THREE.ConeGeometry(1, 1, 8);
 
 /** Instanced copies of one unit geometry from {x,y,z,sx,sy,sz,rx,ry,rz,color} descriptors. */
@@ -46,41 +46,119 @@ function bar(a, b, t) {
 }
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
 
-/** Tileable value-noise texture; `paint` adds marks (tracks, lines) on top. */
-function noiseTexture({ size = 256, base, spread, seed, repeat = 1, paint }) {
+/** Tileable fractal value noise in [0, 1] (smoothstep-interpolated lattice octaves, wrapping at the edges). */
+function fbm(size, seed, octaves = 5, base = 4) {
+  const random = rng(seed);
+  const out = new Float32Array(size * size);
+  let amp = 1;
+  let total = 0;
+  for (let o = 0; o < octaves; o++) {
+    const n = base << o;
+    const lattice = Float32Array.from({ length: n * n }, random);
+    const step = n / size;
+    for (let y = 0; y < size; y++) {
+      const fy = y * step;
+      const y0 = Math.floor(fy);
+      const ty = fy - y0;
+      const sy = ty * ty * (3 - 2 * ty);
+      const y1 = (y0 + 1) % n;
+      for (let x = 0; x < size; x++) {
+        const fx = x * step;
+        const x0 = Math.floor(fx);
+        const tx = fx - x0;
+        const sx = tx * tx * (3 - 2 * tx);
+        const x1 = (x0 + 1) % n;
+        const top = lattice[y0 * n + x0] + (lattice[y0 * n + x1] - lattice[y0 * n + x0]) * sx;
+        const bottom = lattice[y1 * n + x0] + (lattice[y1 * n + x1] - lattice[y1 * n + x0]) * sx;
+        out[y * size + x] += amp * (top + (bottom - top) * sy);
+      }
+    }
+    total += amp;
+    amp *= 0.5;
+  }
+  for (let i = 0; i < out.length; i++) out[i] /= total;
+  return out;
+}
+
+/**
+ * Tileable surface texture: base colour, low-frequency staining (fbm), fine grain, then `paint` marks (joints,
+ * tracks). The red channel doubles as a bump map, so stains and joints also shade under the low sun.
+ */
+export function surfaceTexture({ size = 256, color, stain = 18, grain = 8, seed = 1, octaves = 5, base = 4, repeat = 1, paint }) {
   const canvas = document.createElement("canvas");
   canvas.width = canvas.height = size;
   const ctx = canvas.getContext("2d");
-  const random = rng(seed);
-  const [r, g, b] = base;
+  const random = rng(seed + 101);
+  const noise = fbm(size, seed, octaves, base);
+  const [r, g, b] = color;
   const img = ctx.createImageData(size, size);
   for (let i = 0; i < size * size; i++) {
-    const n = (random() - 0.5) * spread;
+    const n = (noise[i] - 0.5) * 2 * stain + (random() - 0.5) * grain;
     img.data[i * 4] = r + n;
     img.data[i * 4 + 1] = g + n;
-    img.data[i * 4 + 2] = b + n * 0.9;
+    img.data[i * 4 + 2] = b + n * 0.92;
     img.data[i * 4 + 3] = 255;
   }
   ctx.putImageData(img, 0, 0);
-  // Soft blotches break up the uniform noise.
-  for (let i = 0; i < 40; i++) {
-    const x = random() * size;
-    const y = random() * size;
-    const rad = 10 + random() * 40;
-    const grad = ctx.createRadialGradient(x, y, 0, x, y, rad);
-    const shade = random() < 0.5 ? "0,0,0" : "255,255,255";
-    grad.addColorStop(0, `rgba(${shade},${0.05 + random() * 0.06})`);
-    grad.addColorStop(1, `rgba(${shade},0)`);
-    ctx.fillStyle = grad;
-    ctx.fillRect(x - rad, y - rad, rad * 2, rad * 2);
-  }
   paint?.(ctx, size, random);
   const texture = new THREE.CanvasTexture(canvas);
   texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
   texture.repeat.set(repeat, repeat);
   texture.colorSpace = THREE.SRGBColorSpace;
-  texture.anisotropy = 4;
+  texture.anisotropy = 8;
   return texture;
+}
+
+/**
+ * Samples a material's map/bumpMap in world space (metres / `tile`), picking the projection plane from the
+ * world normal. Shared unit boxes are scaled per wall, so their own UVs would stretch the texture; this keeps
+ * the material's detail at true scale on every wall, slab and facade (instanced meshes included).
+ */
+export function worldUV(material, tile) {
+  material.onBeforeCompile = (shader) => {
+    shader.uniforms.uWorldTile = { value: 1 / tile };
+    shader.vertexShader = `varying vec3 vWPos;
+varying vec3 vWNrm;
+${shader.vertexShader.replace("#include <worldpos_vertex>", `#include <worldpos_vertex>
+      mat4 wMat = modelMatrix;
+      #ifdef USE_INSTANCING
+        wMat = modelMatrix * instanceMatrix;
+      #endif
+      vWPos = (wMat * vec4(transformed, 1.0)).xyz;
+      vWNrm = normalize(mat3(wMat) * objectNormal);`)}`;
+    shader.fragmentShader = `uniform float uWorldTile;
+varying vec3 vWPos;
+varying vec3 vWNrm;
+vec2 wUv() { vec3 n = abs(vWNrm); return (n.y > n.x && n.y > n.z ? vWPos.xz : n.x > n.z ? vWPos.zy : vWPos.xy) * uWorldTile; }
+${shader.fragmentShader.replace(/(?<!vec2 )vMapUv/g, "wUv()").replace(/(?<!vec2 )vBumpMapUv/g, "wUv()")}`;
+  };
+  material.customProgramCacheKey = () => `world-uv-${tile}`;
+  return material;
+}
+
+/** Cast-in-place concrete, 3.6 m tile: staining, grain, faint formwork panel joints and tie holes. */
+export function concreteTexture(seed = 21, color = [150, 147, 139]) {
+  return surfaceTexture({
+    size: 512, color, stain: 14, grain: 10, seed, octaves: 6, base: 3,
+    paint(ctx, size, r) {
+      const m = size / 3.6; // px per metre
+      ctx.strokeStyle = "rgba(40,38,34,0.16)";
+      ctx.lineWidth = 1.2;
+      for (let x = 0; x <= 3.6; x += 1.2) { ctx.beginPath(); ctx.moveTo(x * m, 0); ctx.lineTo(x * m, size); ctx.stroke(); }
+      for (const y of [0, 1.8]) { ctx.beginPath(); ctx.moveTo(0, y * m); ctx.lineTo(size, y * m); ctx.stroke(); }
+      ctx.fillStyle = "rgba(30,28,25,0.35)";
+      for (let x = 0.3; x < 3.6; x += 0.6) for (let y = 0.45; y < 3.6; y += 0.9) { ctx.beginPath(); ctx.arc(x * m, y * m, 1.6, 0, Math.PI * 2); ctx.fill(); }
+      // Darker run-off streaks under the joints.
+      for (let i = 0; i < 14; i++) {
+        const x = r() * size;
+        const grad = ctx.createLinearGradient(0, 0, 0, size * 0.5);
+        grad.addColorStop(0, "rgba(60,56,50,0.10)");
+        grad.addColorStop(1, "rgba(60,56,50,0)");
+        ctx.fillStyle = grad;
+        ctx.fillRect(x, 0, 2 + r() * 5, size * 0.5);
+      }
+    },
+  });
 }
 
 /** Radial dark blob: cheap baked contact shadow under objects. */
@@ -112,6 +190,65 @@ function fenceTexture() {
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
   return texture;
+}
+
+/**
+ * Organic foliage clump: a jittered, lobed icosphere with a flattened underside and vertex shading that darkens
+ * toward the bottom (baked self-occlusion). Faceted on purpose: the facets catch the low sun like leaf masses.
+ */
+function crownGeometry(seed) {
+  const random = rng(seed);
+  let g = new THREE.IcosahedronGeometry(1, 2);
+  g.deleteAttribute("normal");
+  g.deleteAttribute("uv");
+  g = mergeVertices(g);
+  const p = g.attributes.position;
+  const lobes = Array.from({ length: 6 }, () => new THREE.Vector3(random() - 0.5, random() * 0.8 - 0.2, random() - 0.5).normalize());
+  const v = new THREE.Vector3();
+  const colors = [];
+  for (let i = 0; i < p.count; i++) {
+    v.fromBufferAttribute(p, i);
+    const lobe = Math.max(...lobes.map((l) => l.dot(v)));
+    v.multiplyScalar(0.78 + 0.3 * Math.max(0, lobe) ** 2 + (random() - 0.5) * 0.18);
+    v.y *= 0.82;
+    if (v.y < -0.3) v.y = -0.3 + (v.y + 0.3) * 0.35;
+    p.setXYZ(i, v.x, v.y, v.z);
+    const shade = 0.42 + 0.58 * THREE.MathUtils.clamp((v.y + 0.45) / 1.2, 0, 1);
+    colors.push(shade, shade, shade);
+  }
+  g.setAttribute("color", new THREE.Float32BufferAttribute(colors, 3));
+  g.computeVertexNormals();
+  return g;
+}
+
+/** Facade tile, 6 m x 6 m (two 3 m storeys, two bays): rendered wall, recessed glazing with a sky sheen, sills. */
+function facadeTexture() {
+  return surfaceTexture({
+    size: 256, color: [206, 203, 195], stain: 8, grain: 6, seed: 31,
+    paint(ctx, size) {
+      const m = size / 6;
+      for (const fy of [0, 3]) {
+        ctx.fillStyle = "rgba(60,58,54,0.10)";
+        ctx.fillRect(0, (fy + 2.95) * m, size, 0.12 * m); // floor joint
+        for (const bx of [0.75, 3.75]) {
+          const x = bx * m;
+          const y = (fy + 0.6) * m;
+          const w = 1.3 * m;
+          const h = 1.4 * m;
+          const glass = ctx.createLinearGradient(0, y, 0, y + h);
+          glass.addColorStop(0, "rgb(128,134,138)");
+          glass.addColorStop(1, "rgb(92,98,104)");
+          ctx.fillStyle = "rgba(40,38,34,0.35)";
+          ctx.fillRect(x - 2, y - 2, w + 4, h + 4); // reveal shadow
+          ctx.fillStyle = glass;
+          ctx.fillRect(x, y, w, h);
+          ctx.fillStyle = "rgba(230,228,220,0.55)";
+          ctx.fillRect(x + w / 2 - 1, y, 2, h); // mullion
+          ctx.fillRect(x - 4, y + h + 2, w + 8, 3); // sill
+        }
+      }
+    },
+  });
 }
 
 /**
@@ -225,34 +362,37 @@ export function buildSiteContext(bounds) {
 
   // ---------- ground ----------
   const pad = { minX: minX - 16, maxX: maxX + 18, minZ: minZ - 13, maxZ: maxZ + 15 };
-  const grass = noiseTexture({ base: [44, 50, 36], spread: 26, seed: 7, repeat: 40 });
-  const ground = new THREE.Mesh(new THREE.PlaneGeometry(700, 700), mat(0xFFFFFF, { map: grass }));
+  // Surroundings: dark charcoal earth with a faint olive cast, so the site and the building lead.
+  const earth = worldUV(mat(0xFFFFFF, { map: surfaceTexture({ color: [48, 49, 43], stain: 9, grain: 5, seed: 7, base: 3 }) }), 34);
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(700, 700), earth);
   ground.rotation.x = -Math.PI / 2;
   ground.position.y = -0.1;
   ground.receiveShadow = true;
-  const gravelMap = noiseTexture({
-    base: [104, 98, 86], spread: 34, seed: 3, repeat: 3,
-    paint(ctx, size, r) { // tyre tracks
-      ctx.strokeStyle = "rgba(40,36,30,0.18)";
-      for (let i = 0; i < 6; i++) {
-        ctx.lineWidth = 3 + r() * 3;
+  const tracks = (alpha, count) => (ctx, size, r) => {
+    for (let i = 0; i < count; i++) { // paired tyre tracks
+      const y = r() * size;
+      const bend = (r() - 0.5) * size * 0.4;
+      for (const off of [0, 9 + r() * 4]) {
+        ctx.strokeStyle = `rgba(34,31,27,${alpha * (0.6 + r() * 0.5)})`;
+        ctx.lineWidth = 2.5 + r() * 2;
         ctx.beginPath();
-        const y = r() * size;
-        ctx.moveTo(0, y);
-        ctx.bezierCurveTo(size * 0.3, y + (r() - 0.5) * 80, size * 0.6, y + (r() - 0.5) * 80, size, y);
+        ctx.moveTo(0, y + off);
+        ctx.bezierCurveTo(size * 0.33, y + off + bend, size * 0.66, y + off - bend, size, y + off);
         ctx.stroke();
       }
-    },
-  });
-  const gravel = new THREE.Mesh(new THREE.PlaneGeometry(pad.maxX - pad.minX, pad.maxZ - pad.minZ), mat(0xFFFFFF, { map: gravelMap }));
+    }
+  };
+  // Compacted site gravel: warm grey, stained, with tyre tracks; its texture also shades as bump.
+  const gravelMap = surfaceTexture({ size: 512, color: [94, 90, 82], stain: 15, grain: 16, seed: 3, base: 3, paint: tracks(0.16, 7) });
+  const gravel = new THREE.Mesh(new THREE.PlaneGeometry(pad.maxX - pad.minX, pad.maxZ - pad.minZ), worldUV(mat(0xFFFFFF, { map: gravelMap, bumpMap: gravelMap, bumpScale: 1.2, roughness: 0.97 }), 16));
   gravel.rotation.x = -Math.PI / 2;
   gravel.position.set((pad.minX + pad.maxX) / 2, -0.05, (pad.minZ + pad.maxZ) / 2); // below the F1 slab top
   gravel.receiveShadow = true;
 
   // Street in front (south), with kerbs, pavement and lane marks; haul road from the gate to the building.
   const roadZ = pad.maxZ + 8;
-  const asphalt = noiseTexture({ base: [46, 47, 44], spread: 18, seed: 11, repeat: 30 });
-  const road = new THREE.Mesh(new THREE.PlaneGeometry(700, 8), mat(0xFFFFFF, { map: asphalt, roughness: 0.95 }));
+  const asphalt = surfaceTexture({ color: [52, 53, 51], stain: 6, grain: 12, seed: 11 });
+  const road = new THREE.Mesh(new THREE.PlaneGeometry(700, 8), worldUV(mat(0xFFFFFF, { map: asphalt, roughness: 0.9 }), 9));
   road.rotation.x = -Math.PI / 2;
   road.position.set(0, -0.06, roadZ);
   road.receiveShadow = true;
@@ -264,8 +404,8 @@ export function buildSiteContext(bounds) {
     kerbs.push({ x: 0, y: -0.01, z: roadZ + side * 5.6, sx: 700, sy: 0.14, sz: 2.8 });
   }
   const gateX = (pad.minX + pad.maxX) / 2 + 9;
-  const haul = noiseTexture({ base: [122, 114, 98], spread: 30, seed: 5, repeat: 2 });
-  const haulRoad = new THREE.Mesh(new THREE.PlaneGeometry(6, pad.maxZ - maxZ + 1), mat(0xFFFFFF, { map: haul }));
+  const haul = surfaceTexture({ color: [108, 102, 90], stain: 12, grain: 14, seed: 5, paint: tracks(0.2, 3) });
+  const haulRoad = new THREE.Mesh(new THREE.PlaneGeometry(6, pad.maxZ - maxZ + 1), worldUV(mat(0xFFFFFF, { map: haul, bumpMap: haul, bumpScale: 1 }), 8));
   haulRoad.rotation.x = -Math.PI / 2;
   haulRoad.position.set(gateX, -0.035, (pad.maxZ + maxZ) / 2 + 0.5);
   haulRoad.receiveShadow = true;
@@ -344,7 +484,7 @@ export function buildSiteContext(bounds) {
     instanced(new THREE.PlaneGeometry(1, 1), nets, netMat, { cast: false, receive: false }));
 
   // ---------- tower crane behind the building; full jib swings over the site ----------
-  const towerCrane = crane({ x: maxX + 5.5, z: minZ - 5.5, height: height + 17, jib: 38, counter: 11, angle: Math.PI * 0.9 }, craneSteel, dark, concrete);
+  const towerCrane = crane({ x: maxX + 5.5, z: minZ - 5.5, height: height + 17, jib: 31, counter: 10, angle: Math.PI * 0.9 }, craneSteel, dark, concrete);
   tall.add(towerCrane.group);
   shadows.push({ x: maxX + 5.5, z: minZ - 5.5, sx: 8, sz: 8 });
 
@@ -434,84 +574,91 @@ export function buildSiteContext(bounds) {
   group.add(sand);
   shadows.push({ x: minX - 6, z: minZ + 2, sx: 4, sz: 7.5 }, { x: maxX + 9.5, z: minZ + 5, sx: 4, sz: 3 });
 
-  // ---------- vegetation: layered deciduous trees, conifers and hedges outside the fence ----------
-  const crowns = [];
+  // ---------- neighbouring blocks: distant, low-contrast, varied massing with a facade texture ----------
+  // Stepped and L-shaped massing breaks the repeated-box read; fog and muted tints keep them behind the site.
+  const neighbours = [
+    { x: -40, z: pad.minZ - 48, sx: 22, sy: 9, sz: 12, color: 0x7E7C76 },
+    { x: -44, z: pad.minZ - 48, sx: 9, sy: 3, sz: 7, base: 9, color: 0x75736D },
+    { x: -8, z: pad.minZ - 58, sx: 16, sy: 14, sz: 11, color: 0x73726D },
+    { x: 26, z: pad.minZ - 50, sx: 24, sy: 9, sz: 11, color: 0x827E76 },
+    { x: 34, z: pad.minZ - 39, sx: 8, sy: 9, sz: 12, color: 0x827E76 },
+    { x: pad.maxX + 44, z: -6, sx: 12, sy: 11, sz: 26, color: 0x7A7873 },
+    { x: pad.minX - 34, z: -6, sx: 11, sy: 6, sz: 18, roof: "pitch", color: 0x8E8980 },
+    { x: pad.minX - 34, z: 22, sx: 11, sy: 6, sz: 14, roof: "pitch", color: 0x878279 },
+  ];
+  const facade = worldUV(mat(0xFFFFFF, { map: facadeTexture(), roughness: 0.92 }), 6);
+  const roofMat = mat(0x5E5C56, { roughness: 0.95 });
+  group.add(instanced(BOX, neighbours.map((b) => ({ x: b.x, y: (b.base || 0) + b.sy / 2, z: b.z, sx: b.sx, sy: b.sy, sz: b.sz, color: b.color })),
+    [facade, facade, roofMat, roofMat, facade, facade]));
+  const flatRoofs = neighbours.filter((b) => b.roof !== "pitch");
+  const parapets = flatRoofs.map((b) => ({ x: b.x, y: (b.base || 0) + b.sy + 0.2, z: b.z, sx: b.sx + 0.25, sy: 0.4, sz: b.sz + 0.25 }));
+  const plant = flatRoofs.filter((b) => b.sx > 12).map((b) => ({ x: b.x + b.sx * 0.22, y: b.sy + 0.75, z: b.z - b.sz * 0.15, sx: 2.6, sy: 1.1, sz: 1.8 }));
+  // Pitched roof: a triangular prism along the block's long (z) axis.
+  const prism = new THREE.CylinderGeometry(0.5, 0.5, 1, 3);
+  prism.rotateX(Math.PI / 2);
+  prism.rotateZ(Math.PI / 2);
+  const pitched = neighbours.filter((b) => b.roof === "pitch").map((b) => ({ x: b.x, y: b.sy + 1.0, z: b.z, sx: b.sx * 1.15, sy: 2.6, sz: b.sz + 0.6 }));
+  group.add(boxes([...parapets, ...plant], mat(0x7D7B75)), instanced(prism, pitched, mat(0x4F4A45, { roughness: 0.85 })));
+  neighbours.forEach((b) => shadows.push({ x: b.x, z: b.z, sx: b.sx + 5, sz: b.sz + 5 }));
+
+  // ---------- vegetation: groves of lobed deciduous crowns, conifers, hedges; dark and desaturated ----------
+  const crownVariants = [crownGeometry(5), crownGeometry(9), crownGeometry(13)];
+  const crowns = crownVariants.map(() => []);
   const trunks = [];
   const conifers = [];
   const shrubs = [];
   const inPad = (x, z, m) => x > pad.minX - m && x < pad.maxX + m && z > pad.minZ - m && z < pad.maxZ + m;
   const onStreet = (z) => Math.abs(z - roadZ) < 7.5;
   const inBlock = (x, z) => neighbours.some((b) => Math.abs(x - b.x) < b.sx / 2 + 3 && Math.abs(z - b.z) < b.sz / 2 + 3);
-  const neighbours = [
-    { x: -34, z: pad.minZ - 30, sx: 22, sy: 12, sz: 13, color: 0x6F6E67 },
-    { x: -2, z: pad.minZ - 34, sx: 18, sy: 15, sz: 12, color: 0x67665F },
-    { x: 32, z: pad.minZ - 30, sx: 24, sy: 12, sz: 14, color: 0x75746C },
-    { x: pad.maxX + 26, z: 4, sx: 14, sy: 12, sz: 24, color: 0x7B7A72 },
-    { x: pad.minX - 26, z: -4, sx: 13, sy: 9, sz: 20, color: 0x6C6B64 },
-  ];
+  const free = (x, z) => !inPad(x, z, 4) && !onStreet(z) && !inBlock(x, z);
+  const foliage = (l) => new THREE.Color().setHSL(0.2 + random() * 0.08, 0.16 + random() * 0.12, l).getHex();
   const tree = (x, z, s) => {
-    trunks.push({ x, y: s * 0.9, z, sx: 0.32 * s, sy: s * 1.8, sz: 0.32 * s });
-    const hue = random();
-    const base = new THREE.Color().setHSL(0.2 + hue * 0.07, 0.22 + random() * 0.12, 0.17 + random() * 0.07);
-    for (let k = 0; k < 4; k++) {
+    trunks.push({ x, y: s * 0.9, z, sx: 0.26 * s, sy: s * 1.8, sz: 0.26 * s });
+    const light = 0.2 + random() * 0.07;
+    const clumps = 3 + Math.floor(random() * 3);
+    for (let k = 0; k < clumps; k++) {
       const a = random() * Math.PI * 2;
-      const rr = k === 0 ? 0 : s * 0.55;
-      const c = base.clone().offsetHSL(0, 0, (random() - 0.4) * 0.06);
-      crowns.push({ x: x + Math.cos(a) * rr, y: s * (2.3 + random() * 0.5 + (k === 0 ? 0.4 : 0)), z: z + Math.sin(a) * rr, sx: s * (0.95 + random() * 0.3), sy: s * (0.85 + random() * 0.25), sz: s * (0.95 + random() * 0.3), color: c.getHex() });
+      const rr = k === 0 ? 0 : s * (0.45 + random() * 0.35);
+      const size = s * (k === 0 ? 1.15 : 0.7 + random() * 0.35);
+      crowns[Math.floor(random() * crowns.length)].push({
+        x: x + Math.cos(a) * rr, y: s * (2.4 + random() * 0.6) + (k === 0 ? s * 0.35 : 0), z: z + Math.sin(a) * rr,
+        sx: size, sy: size * (0.85 + random() * 0.3), sz: size, ry: random() * 6.3, color: foliage(light + (random() - 0.5) * 0.04),
+      });
     }
-    shadows.push({ x: x + 0.6, z: z + 0.4, sx: s * 3.4, sz: s * 3.4 });
+    shadows.push({ x: x + 0.8, z: z + 0.5, sx: s * 3.6, sz: s * 3.6 });
   };
-  for (let i = 0, placed = 0; placed < 70 && i < 3000; i++) {
-    const x = (random() - 0.5) * 190;
-    const z = (random() - 0.5) * 170;
-    if (inPad(x, z, 4) || onStreet(z) || inBlock(x, z)) continue;
-    if (random() < 0.3) {
-      const s = 1.2 + random() * 1.3;
-      conifers.push({ x, y: s * 1.6, z, sx: s * 1.1, sy: s * 3.2, sz: s * 1.1, color: new THREE.Color().setHSL(0.3 + random() * 0.04, 0.2, 0.13 + random() * 0.04).getHex() });
-      conifers.push({ x, y: s * 2.8, z, sx: s * 0.8, sy: s * 2.2, sz: s * 0.8, color: new THREE.Color().setHSL(0.3, 0.2, 0.16).getHex() });
-      shadows.push({ x, z, sx: s * 2.6, sz: s * 2.6 });
-    } else tree(x, z, 1 + random() * 1.1);
-    placed++;
+  const conifer = (x, z, s) => {
+    for (let k = 0; k < 3; k++) conifers.push({ x, y: s * (1.2 + k * 1.05), z, sx: s * (1.15 - k * 0.3), sy: s * 2, sz: s * (1.15 - k * 0.3), ry: random() * 3, color: foliage(0.11 + random() * 0.03) });
+    shadows.push({ x, z, sx: s * 2.6, sz: s * 2.6 });
+  };
+  // Groves: tight clusters read as tree lines and canopy masses, not scattered balls.
+  for (let g = 0, groves = 0; groves < 16 && g < 500; g++) {
+    const gx = (random() - 0.5) * 200;
+    const gz = (random() - 0.5) * 180;
+    if (!free(gx, gz)) continue;
+    groves++;
+    const n = 3 + Math.floor(random() * 6);
+    const pine = random() < 0.3;
+    for (let i = 0; i < n; i++) {
+      const x = gx + (random() - 0.5) * 12;
+      const z = gz + (random() - 0.5) * 10;
+      if (!free(x, z)) continue;
+      if (pine) conifer(x, z, 1.1 + random() * 1.1); else tree(x, z, 1.1 + random() * 1.2);
+    }
   }
-  // Street trees in a regular row on the far pavement.
-  for (let x = -90; x < 90; x += 11) tree(x + random() * 2, roadZ + 6.2, 1.15);
-  // Hedges and shrubs along the outside of the fence.
-  for (let x = pad.minX - 2; x < pad.maxX + 2; x += 1.6) shrubs.push({ x, y: 0.45, z: pad.minZ - 1.4 - random() * 0.6, sx: 1.1 + random() * 0.5, sy: 0.7 + random() * 0.4, sz: 0.9, color: new THREE.Color().setHSL(0.24, 0.25, 0.16 + random() * 0.05).getHex() });
-  for (let z = pad.minZ; z < pad.maxZ; z += 1.7) {
-    shrubs.push({ x: pad.minX - 1.5, y: 0.45, z, sx: 0.9, sy: 0.7 + random() * 0.4, sz: 1.2, color: new THREE.Color().setHSL(0.23, 0.22, 0.15 + random() * 0.05).getHex() });
-    if (random() < 0.6) shrubs.push({ x: pad.maxX + 1.6, y: 0.4, z, sx: 1, sy: 0.6 + random() * 0.3, sz: 1.1, color: new THREE.Color().setHSL(0.25, 0.2, 0.17).getHex() });
+  // Street trees in a loose row on the far pavement.
+  for (let x = -90; x < 90; x += 10 + random() * 4) tree(x + random() * 2, roadZ + 6.2, 1 + random() * 0.4);
+  // Hedges along the outside of the fence.
+  const hedge = (x, z, sx, sz) => shrubs.push({ x, y: 0.4, z, sx, sy: 0.55 + random() * 0.3, sz, ry: random() * 6.3, color: foliage(0.14 + random() * 0.04) });
+  for (let x = pad.minX - 2; x < pad.maxX + 2; x += 1.4) hedge(x, pad.minZ - 1.5 - random() * 0.5, 1 + random() * 0.4, 0.8);
+  for (let z = pad.minZ; z < pad.maxZ; z += 1.5) {
+    hedge(pad.minX - 1.5, z, 0.8, 1 + random() * 0.4);
+    if (random() < 0.6) hedge(pad.maxX + 1.6, z, 0.9, 1);
   }
-  const leaf = mat(0xFFFFFF, { roughness: 1 });
-  group.add(instanced(CYL, trunks, mat(0x4A3F33)), instanced(BLOB, crowns, leaf), instanced(CONE, conifers, leaf), instanced(BLOB, shrubs, leaf, { cast: false }));
-
-  // ---------- neighbouring blocks: facades with window grids, a few lit windows, parapets ----------
-  const facadeItems = [];
-  const windows = [];
-  const lit = [];
-  const parapets = [];
-  neighbours.forEach((b) => {
-    facadeItems.push({ x: b.x, y: b.sy / 2, z: b.z, sx: b.sx, sy: b.sy, sz: b.sz, color: b.color });
-    parapets.push({ x: b.x, y: b.sy + 0.25, z: b.z, sx: b.sx + 0.3, sy: 0.5, sz: b.sz + 0.3 });
-    parapets.push({ x: b.x + b.sx * 0.2, y: b.sy + 0.9, z: b.z, sx: 2.4, sy: 1.3, sz: 1.8 }); // roof plant
-    const faces = [
-      { n: [0, 1], len: b.sx }, { n: [0, -1], len: b.sx }, { n: [1, 0], len: b.sz }, { n: [-1, 0], len: b.sz },
-    ];
-    faces.forEach(({ n, len }) => {
-      for (let y = 1.6; y < b.sy - 1; y += 3) {
-        for (let t = -len / 2 + 1.6; t < len / 2 - 1; t += 2.6) {
-          const w = {
-            x: b.x + (n[0] ? n[0] * (b.sx / 2 + 0.02) : t), y, z: b.z + (n[1] ? n[1] * (b.sz / 2 + 0.02) : t),
-            sx: n[0] ? 0.05 : 1.4, sy: 1.5, sz: n[1] ? 0.05 : 1.4,
-          };
-          (random() < 0.04 ? lit : windows).push(w);
-        }
-      }
-    });
-    shadows.push({ x: b.x, z: b.z, sx: b.sx + 6, sz: b.sz + 6 });
-  });
-  group.add(boxes(facadeItems, mat(0xFFFFFF, { roughness: 0.95 })), boxes(parapets, mat(0x7C7B74)),
-    boxes(windows, mat(0x2B3033, { roughness: 0.3, metalness: 0.2 }), { cast: false }),
-    boxes(lit, mat(0x8A7A5C, { emissive: 0xE8B878, emissiveIntensity: 0.35 }), { cast: false }));
+  const leaf = mat(0xFFFFFF, { roughness: 0.95, vertexColors: true, flatShading: true });
+  const needles = mat(0xFFFFFF, { roughness: 1, flatShading: true });
+  group.add(instanced(CYL, trunks, mat(0x3E352C)), instanced(CONE, conifers, needles), instanced(crownVariants[0], shrubs, leaf, { cast: false }));
+  crownVariants.forEach((geometry, i) => group.add(instanced(geometry, crowns[i], leaf)));
 
   // ---------- baked soft contact shadows (under the building too) ----------
   shadows.push({ x: (minX + maxX) / 2, z: (minZ + maxZ) / 2, sx: maxX - minX + 7, sz: maxZ - minZ + 7 });
@@ -522,5 +669,8 @@ export function buildSiteContext(bounds) {
   group.traverse((object) => { object.userData.decorative = true; });
   const focus = new THREE.Box3(V(minX - 4, 0, minZ - 8), V(maxX + 4, height + 2, maxZ + 6));
   focus.expandByPoint(V(maxX + 5.5, height + 17 + 6, minZ - 5.5));
+  // Jib tip at its initial slew angle, so the overview opens on the complete crane.
+  const slewAngle = Math.PI * 0.9;
+  focus.expandByPoint(V(maxX + 5.5 + Math.cos(slewAngle) * 31, height + 18, minZ - 5.5 - Math.sin(slewAngle) * 31));
   return { group, tall, slew: towerCrane.slew, focus };
 }

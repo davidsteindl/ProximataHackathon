@@ -4,7 +4,7 @@ import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
 import { floorVisible as isFloorVisible } from "../../lib/site-model.mjs";
-import { buildSiteContext } from "./site-context";
+import { buildSiteContext, concreteTexture, surfaceTexture, worldUV } from "./site-context";
 
 const C = {
   bg: 0x1D1F1A,
@@ -29,6 +29,21 @@ function planBounds(geometry) {
   const xs = pts.map((p) => p[0]);
   const ys = pts.map((p) => p[1]);
   return { minX: Math.min(...xs), maxX: Math.max(...xs), minY: Math.min(...ys), maxY: Math.max(...ys) };
+}
+
+/** Alpha gradient, opaque at the wall foot (u = 0) fading out: alpha map for the contact-occlusion strips. */
+function aoTexture() {
+  const canvas = document.createElement("canvas");
+  canvas.width = 64;
+  canvas.height = 4;
+  const ctx = canvas.getContext("2d");
+  const grad = ctx.createLinearGradient(0, 0, 64, 0);
+  grad.addColorStop(0, "#fff");
+  grad.addColorStop(0.35, "#777");
+  grad.addColorStop(1, "#000");
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, 64, 4);
+  return new THREE.CanvasTexture(canvas);
 }
 
 export function createSiteScene(container, { geometry, zones, changes, onHover, onSelect }) {
@@ -80,12 +95,12 @@ export function createSiteScene(container, { geometry, zones, changes, onHover, 
 
   // Lights.
   // Low warm key from the south-west for long shadows, cool sky fill.
-  scene.add(new THREE.HemisphereLight(0xE4EAEE, 0x2E2B22, 0.85));
-  const sun = new THREE.DirectionalLight(0xFFDDB0, 2.9);
-  sun.position.set(-42, 40, 30);
+  scene.add(new THREE.HemisphereLight(0xDCE4EA, 0x26231D, 0.8));
+  const sun = new THREE.DirectionalLight(0xFFD7A6, 3.2);
+  sun.position.set(-50, 36, 34);
   sun.castShadow = true;
   sun.shadow.mapSize.set(2048, 2048);
-  Object.assign(sun.shadow.camera, { left: -60, right: 60, top: 60, bottom: -60, near: 1, far: 170 });
+  Object.assign(sun.shadow.camera, { left: -62, right: 62, top: 62, bottom: -62, near: 1, far: 190 });
   sun.shadow.bias = -0.0004;
   sun.shadow.normalBias = 0.03;
   sun.shadow.radius = 4;
@@ -93,11 +108,16 @@ export function createSiteScene(container, { geometry, zones, changes, onHover, 
 
   // Shared materials.
   const std = (color, extra = {}) => new THREE.MeshStandardMaterial({ color, roughness: 0.85, metalness: 0, ...extra });
+  // Surface detail only (staining, grain, formwork joints, plaster texture): material dressing, not plan data.
+  const concrete = concreteTexture(21);
+  const slabTex = concreteTexture(44, [138, 135, 128]);
+  const plaster = surfaceTexture({ size: 256, color: [236, 232, 222], stain: 6, grain: 5, seed: 17 });
   const M = {
-    wall: std(C.chalk),
-    shell: std(C.shell, { transparent: true, opacity: 0.2, depthWrite: false, roughness: 0.15, metalness: 0.1 }),
-    shellSolid: std(0xE4E0D3),
-    slab: std(C.slab, { roughness: 0.95 }),
+    wall: worldUV(std(0xFFFFFF, { map: plaster, bumpMap: plaster, bumpScale: 0.6, roughness: 0.9 }), 2.5),
+    shell: worldUV(std(0xFFFFFF, { map: concrete, bumpMap: concrete, bumpScale: 1.4, roughness: 0.88 }), 3.6),
+    slab: worldUV(std(0xB4B0A8, { map: slabTex, bumpMap: slabTex, bumpScale: 1.2, roughness: 0.92 }), 3.6),
+    // Contact occlusion strips along wall feet: a baked gradient decal, no post-processing pass.
+    ao: new THREE.MeshBasicMaterial({ color: 0x000000, alphaMap: aoTexture(), transparent: true, opacity: 0.42, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -1 }),
     conflict: std(C.conflict, { emissive: C.conflict, emissiveIntensity: 0.9, roughness: 0.6 }),
     // Flag markers: drawn on top so the flagged element is never hidden behind slabs or scenery.
     xray: new THREE.MeshBasicMaterial({ color: C.conflict, transparent: true, opacity: 0.85, depthTest: false, depthWrite: false }),
@@ -115,7 +135,11 @@ export function createSiteScene(container, { geometry, zones, changes, onHover, 
     threshold: std(0x8E897C),
     ghost: new THREE.MeshBasicMaterial({ color: C.ghost, transparent: true, opacity: 0.34, depthWrite: false }),
     ghostLine: new THREE.LineDashedMaterial({ color: C.ghost, dashSize: 0.22, gapSize: 0.14 }),
-    edges: new THREE.LineBasicMaterial({ color: C.line, transparent: true, opacity: 0.28 }),
+    edges: new THREE.LineBasicMaterial({ color: C.line, transparent: true, opacity: 0.16 }),
+    // Previous-revision overlay drawn above status fills, so the old position reads even over a red wall.
+    ghostTop: new THREE.MeshBasicMaterial({ color: C.ghost, transparent: true, opacity: 0.55, depthTest: false, depthWrite: false }),
+    ghostDash: new THREE.MeshBasicMaterial({ color: 0x0E6E69, depthTest: false, depthWrite: false }),
+    volumeIso: new THREE.MeshBasicMaterial({ color: C.conflict, transparent: true, opacity: 0.16, depthWrite: false, side: THREE.DoubleSide }),
     unitLine: new THREE.LineBasicMaterial({ color: 0x5F5B52, transparent: true, opacity: 0.75 }),
     highlight: new THREE.MeshBasicMaterial({ color: C.selected, polygonOffset: true, polygonOffsetFactor: -2 }),
   };
@@ -160,7 +184,12 @@ export function createSiteScene(container, { geometry, zones, changes, onHover, 
 
   const fixtureSize = { WC: [0.4, 0.42, 0.62], SINK: [0.55, 0.85, 0.42], SHOWER: [0.9, 0.06, 0.9] };
 
+  const aoGeom = new THREE.PlaneGeometry(1, 1);
+  aoGeom.rotateX(-Math.PI / 2);
+  const AO_WIDTH = 0.55;
+  let aoStrips = [];
   for (const plan of floors) {
+    aoStrips = [];
     const group = new THREE.Group();
     const elev = plan.floor_elevation_m;
     const wallHeight = plan.floor_height_m - SLAB;
@@ -169,7 +198,7 @@ export function createSiteScene(container, { geometry, zones, changes, onHover, 
 
     // Slab (from the plan's extent) with the floor top at the floor elevation.
     const slab = new THREE.Mesh(boxGeom, M.slab);
-    slab.scale.set(pb.maxX - pb.minX + 0.5, SLAB, pb.maxY - pb.minY + 0.5);
+    slab.scale.set(pb.maxX - pb.minX + 0.8, SLAB, pb.maxY - pb.minY + 0.8); // schematic slab edge, 0.4 m past the plan
     slab.position.set(0, elev - SLAB / 2, 0);
     slab.castShadow = slab.receiveShadow = true;
     slab.userData.zoneId = plan.floor_id;
@@ -188,7 +217,6 @@ export function createSiteScene(container, { geometry, zones, changes, onHover, 
           const mesh = wallBox(segment, shape.thickness_m || 0.1, elev, wallHeight);
           if (exterior) {
             mesh.material = M.shell;
-            mesh.castShadow = mesh.receiveShadow = false; // thin glass shell: no shadow acne, interiors stay lit
             shellWalls.push(mesh);
           } else {
             pickables.push(mesh);
@@ -199,6 +227,8 @@ export function createSiteScene(container, { geometry, zones, changes, onHover, 
           }
           pushEdges(mesh.geometry, mesh.matrix);
           group.add(mesh);
+          const t = (shape.thickness_m || 0.1) / 2;
+          for (const side of [-1, 1]) aoStrips.push({ mesh, side, t, elev });
         }
         const [a, b] = shape.segments[0];
         anchors.set(key, P((a[0] + b[0]) / 2, (a[1] + b[1]) / 2, elev + wallHeight + 0.1));
@@ -282,6 +312,22 @@ export function createSiteScene(container, { geometry, zones, changes, onHover, 
       }
     }
 
+    // Contact occlusion: a dark gradient strip on the slab along both faces of every wall (one instanced draw).
+    const ao = new THREE.InstancedMesh(aoGeom, M.ao, aoStrips.length || 1);
+    ao.count = aoStrips.length;
+    const aoMatrix = new THREE.Matrix4();
+    const aoQ = new THREE.Quaternion();
+    aoStrips.forEach(({ mesh, side, t, elev: y }, i) => {
+      const along = mesh.rotation.y;
+      const offset = new THREE.Vector3(0, 0, side * (t + AO_WIDTH / 2)).applyAxisAngle(new THREE.Vector3(0, 1, 0), along);
+      // Rotate the strip so its u axis (dark edge at u = 0) points away from the wall.
+      aoQ.setFromAxisAngle(new THREE.Vector3(0, 1, 0), along + (side > 0 ? -Math.PI / 2 : Math.PI / 2));
+      aoMatrix.compose(new THREE.Vector3(mesh.position.x + offset.x, y + 0.012, mesh.position.z + offset.z), aoQ, new THREE.Vector3(AO_WIDTH, 1, mesh.scale.x));
+      ao.setMatrixAt(i, aoMatrix);
+    });
+    ao.renderOrder = 0;
+    group.add(ao);
+
     // Revision ghost: the previous position of changed elements, dashed.
     for (const change of changes.filter((c) => c.floorId === plan.floor_id && c.previous?.kind === "wall")) {
       for (const segment of change.previous.shape.segments) {
@@ -297,6 +343,33 @@ export function createSiteScene(container, { geometry, zones, changes, onHover, 
         foot.position.y = elev + 0.03;
         foot.updateMatrix();
         group.add(ghost, lines, foot);
+        const [ga, gb] = segment;
+        const pa = P(ga[0], ga[1]);
+        const pbb = P(gb[0], gb[1]);
+        const along = new THREE.Vector3().subVectors(pbb, pa).setY(0).normalize();
+        const across = new THREE.Vector3(-along.z, 0, along.x);
+        const len = pa.distanceTo(pbb);
+        const half = (change.previous.shape.thickness_m || 0.1) / 2 + 0.04;
+        const y = elev + wallHeight + 0.12;
+        const mid = pa.clone().add(pbb).multiplyScalar(0.5).setY(y);
+        const top = new THREE.Mesh(boxGeom, M.ghostTop);
+        top.scale.set(len, 0.02, half * 2);
+        top.position.copy(mid);
+        top.rotation.y = -Math.atan2(along.z, along.x);
+        top.renderOrder = 29;
+        group.add(top);
+        // Dashes along both long edges of the previous footprint.
+        for (const sideSign of [-1, 1]) {
+          for (let d = 0; d < len; d += 0.32) {
+            const dash = new THREE.Mesh(boxGeom, M.ghostDash);
+            const l = Math.min(0.2, len - d);
+            dash.scale.set(l, 0.03, 0.05);
+            dash.position.copy(pa).setY(y + 0.01).addScaledVector(along, d + l / 2).addScaledVector(across, sideSign * half);
+            dash.rotation.y = top.rotation.y;
+            dash.renderOrder = 29;
+            group.add(dash);
+          }
+        }
       }
     }
 
@@ -324,6 +397,7 @@ export function createSiteScene(container, { geometry, zones, changes, onHover, 
   let filters = { status: true, context: true, changes: true };
   let hovered = null;
   let overlays = [];
+  let measureDirty = true; // callout sizes per mode are re-measured after the card set or stage size changes
   // `dirty` re-renders; `layoutDirty` also re-places the callouts (camera, stage or card changes only).
   const invalidate = () => { dirty = true; layoutDirty = true; };
   controls.addEventListener("change", invalidate);
@@ -364,11 +438,12 @@ export function createSiteScene(container, { geometry, zones, changes, onHover, 
       const solid = new THREE.ExtrudeGeometry(shape, { depth: wallHeight, bevelEnabled: false });
       solid.rotateX(-Math.PI / 2);
       solid.translate(0, elevation, 0);
-      if (overview) {
-        const fill = new THREE.Mesh(solid, M.volume);
+      // From straight above the volume's top face would only double the room tint, so top-down skips it.
+      if (overview || view.mode !== "top") {
+        const fill = new THREE.Mesh(solid, overview ? M.volume : M.volumeIso);
         fill.renderOrder = 22;
         markerGroup.add(fill);
-      }
+      } else solid.dispose();
       // Edges as thin bars (WebGL lines are 1px): readable at overview distance.
       const edges = new THREE.EdgesGeometry(solid);
       const pos = edges.attributes.position;
@@ -380,12 +455,12 @@ export function createSiteScene(container, { geometry, zones, changes, onHover, 
         const bar = new THREE.Mesh(boxGeom, overview ? M.xray : M.volumeBar);
         bar.position.copy(a).add(b).multiplyScalar(0.5);
         bar.quaternion.setFromUnitVectors(new THREE.Vector3(1, 0, 0), b.clone().sub(a).normalize());
-        bar.scale.set(a.distanceTo(b) + 0.08, 0.08, 0.08);
+        const w = overview ? 0.08 : 0.13;
+        bar.scale.set(a.distanceTo(b) + w, w, w);
         bar.renderOrder = 24;
         markerGroup.add(bar);
       }
       edges.dispose();
-      if (!overview) solid.dispose();
     }
   }
 
@@ -455,7 +530,7 @@ export function createSiteScene(container, { geometry, zones, changes, onHover, 
   function applyMaterials() {
     for (const [floorId, group] of floorGroups) group.visible = floorVisible(floorId);
     const isolated = Boolean(view.floorId);
-    for (const mesh of shellWalls) mesh.material = isolated ? M.shellSolid : M.shell;
+    for (const mesh of shellWalls) if (!zoneWalls.some((w) => w.mesh === mesh)) mesh.material = M.shell;
     context.group.visible = filters.context;
     context.tall.visible = filters.context && view.mode !== "top";
     const selectedUnit = view.highlight && outlines.has(view.highlight) ? view.highlight : null;
@@ -463,7 +538,7 @@ export function createSiteScene(container, { geometry, zones, changes, onHover, 
       const s = filters.status ? status.rooms.get(plate.zoneId) : null;
       let color = C.open;
       let opacity = 0;
-      if (s === "conflict") { color = C.conflict; opacity = 0.14; }
+      if (s === "conflict") { color = C.conflict; opacity = isolated ? 0.26 : 0.14; }
       else if (s === "open") { color = C.open; opacity = 0.12; }
       else if (s === "ok") { color = C.ok; opacity = 0.14; }
       if (plate.zoneId === view.highlight) { color = C.selected; opacity = 0.42; }
@@ -476,10 +551,10 @@ export function createSiteScene(container, { geometry, zones, changes, onHover, 
       const s = filters.status ? status.walls.get(wall.key) : null;
       wall.mesh.material = s === "conflict" ? M.conflict
         : wall.zoneId === view.highlight || wall.zoneId === hovered ? M.selectedWall
-          : wall.base === M.shell ? (isolated ? M.shellSolid : M.shell) : M.wall;
+          : wall.base;
     }
     scene.traverse((o) => {
-      if (o.material === M.ghost || o.material === M.ghostLine) o.visible = filters.changes;
+      if ([M.ghost, M.ghostLine, M.ghostTop, M.ghostDash].includes(o.material)) o.visible = filters.changes;
     });
     rebuildMarkers();
     invalidate();
@@ -505,8 +580,8 @@ export function createSiteScene(container, { geometry, zones, changes, onHover, 
       const vfov = THREE.MathUtils.degToRad(fov / 2);
       const hfov = Math.atan(Math.tan(vfov) * aspect);
       const radius = (sphere.radius / Math.sin(Math.min(vfov, hfov))) * 0.95;
-      const target = sphere.center.clone().setY(topElevation * 0.9);
-      return { target, position: target.clone().add(new THREE.Vector3().setFromSphericalCoords(radius, THREE.MathUtils.degToRad(61), THREE.MathUtils.degToRad(36))), fov };
+      const target = sphere.center.clone().setY(topElevation * 0.75);
+      return { target, position: target.clone().add(new THREE.Vector3().setFromSphericalCoords(radius, THREE.MathUtils.degToRad(55), THREE.MathUtils.degToRad(36))), fov };
     }
     const focused = bounds !== pb;
     // A room or element keeps a modest minimum frame so its neighbours give context and callouts fit beside it.
@@ -603,18 +678,23 @@ export function createSiteScene(container, { geometry, zones, changes, onHover, 
     renderer.setSize(w, h, false);
     camera.aspect = w / h;
     camera.updateProjectionMatrix();
+    measureDirty = true;
     invalidate();
   };
   const ro = new ResizeObserver(resize);
   ro.observe(container);
   resize();
 
-  // Callout layout. Each card stays inside the stage and avoids, in order of weight: the selected subject's
-  // projected bounds (never hidden under an annotation), the floating chrome ([data-reserve]) and cards placed
-  // before it (Flags first). Candidates sit in eight directions at three distances; a leader line joins the
-  // anchor to the nearest point of the card.
+  // Callout layout. Hard constraints: a card stays inside the stage and never overlaps another card or the
+  // floating chrome ([data-reserve]). Within those, it avoids the protected subject (selected room/element, or
+  // the flagged unit) and anchor dots. Cards are placed in priority order (the selected subject's card, then
+  // Flags, then the rest). If no full card fits without covering the subject, the card degrades to a title-only
+  // "compact" card, then to a small "pin" that expands on hover/focus; if even a pin cannot fit, it goes
+  // "offstage" (visually hidden, still in the accessibility tree; the side panel carries the same facts).
+  // Candidates sit in eight directions at four distances; a leader line joins the anchor to the card.
   const v = new THREE.Vector3();
   const EDGE = 8;
+  const MODES = ["full", "compact", "pin"];
   const overlap = (a, b) => Math.max(0, Math.min(a.r, b.r) - Math.max(a.l, b.l)) * Math.max(0, Math.min(a.b, b.b) - Math.max(a.t, b.t));
   const DIRS = [[0, -1], [0.71, -0.71], [-0.71, -0.71], [1, 0], [-1, 0], [0.71, 0.71], [-0.71, 0.71], [0, 1]];
   const DIRS_BELOW = [[0, 1], [0.71, 0.71], [-0.71, 0.71], [1, 0], [-1, 0], [0.71, -0.71], [-0.71, -0.71], [0, -1]];
@@ -660,40 +740,69 @@ export function createSiteScene(container, { geometry, zones, changes, onHover, 
     const subjects = subjectRects(w, h);
     // Exposed for layout checks: callouts must never cover these rects.
     container.dataset.subject = subjects.map((r) => [r.l, r.t, r.r, r.b].map(Math.round).join(",")).join(";");
-    // Read every size first, then write, so the browser lays out once.
-    const items = overlays.filter((o) => o.el && anchors.has(o.anchor)).map((o) => {
+    const live = overlays.filter((o) => o.el && anchors.has(o.anchor));
+    // Card sizes per mode change only with the card set or the stage size: measure them once, not per frame.
+    if (measureDirty) {
+      measureDirty = false;
+      for (const o of live) {
+        o.sizes = {};
+        for (const mode of MODES) {
+          o.el.dataset.mode = mode;
+          o.sizes[mode] = [o.el.firstElementChild.offsetWidth, o.el.firstElementChild.offsetHeight];
+        }
+      }
+    }
+    const items = live.filter((o) => o.sizes).map((o) => {
       v.copy(anchors.get(o.anchor)).project(camera);
       const x = ((v.x + 1) / 2) * w;
       const y = ((1 - v.y) / 2) * h;
-      const button = o.el.firstElementChild;
       const shown = v.z < 1 && x > EDGE && x < w - EDGE && y > EDGE && y < h - EDGE && (!o.floorId || floorVisible(o.floorId));
-      return { o, x, y, button, shown, bw: button.offsetWidth, bh: button.offsetHeight };
+      return { o, x, y, button: o.el.firstElementChild, shown };
     });
+    const rank = (it) => (view.highlight && it.o.target === view.highlight ? 0 : it.o.tone === "crit" ? 1 : 2);
+    items.sort((a, b) => rank(a) - rank(b)); // stable: keeps the given order within a rank
     // Anchor dots are small no-go zones for every card.
     const dots = items.filter((it) => it.shown).map((it) => ({ l: it.x - 9, t: it.y - 9, r: it.x + 9, b: it.y + 9 }));
+    const cards = [];
     for (const it of items) {
-      if (!it.shown) { it.o.el.style.visibility = "hidden"; continue; }
-      let best = null;
-      (it.o.below ? DIRS_BELOW : DIRS).forEach(([dx, dy], order) => {
-        for (const gap of [26, 60, 110]) {
-          const cxr = it.x + dx * (gap + it.bw / 2);
-          const cyr = it.y + dy * (gap + it.bh / 2);
-          const l = THREE.MathUtils.clamp(cxr - it.bw / 2, EDGE, Math.max(EDGE, w - it.bw - EDGE));
-          const t = cyr - it.bh / 2;
-          const rect = { l, t, r: l + it.bw, b: t + it.bh };
-          const outside = Math.max(0, EDGE - rect.t) + Math.max(0, rect.b - (h - EDGE));
-          const cost = outside * 1e5 + subjects.reduce((sum, r) => sum + overlap(rect, r) * 40, 0)
-            + dots.reduce((sum, r) => sum + overlap(rect, r) * 20, 0)
-            + taken.reduce((sum, r) => sum + overlap(rect, r), 0) + gap * 3 + order * 40;
-          if (!best || cost < best.cost) best = { cost, rect };
-        }
-      });
-      taken.push(best.rect);
-      const { rect } = best;
+      const { el } = it.o;
+      if (!it.shown) { el.style.visibility = "hidden"; continue; }
+      let chosen = null;
+      let fallback = null;
+      for (const mode of MODES) {
+        const [bw, bh] = it.o.sizes[mode];
+        let best = null;
+        (it.o.below ? DIRS_BELOW : DIRS).forEach(([dx, dy], order) => {
+          for (const gap of [26, 60, 110, 170]) {
+            const l = THREE.MathUtils.clamp(it.x + dx * (gap + bw / 2) - bw / 2, EDGE, Math.max(EDGE, w - bw - EDGE));
+            const t = it.y + dy * (gap + bh / 2) - bh / 2;
+            const rect = { l, t, r: l + bw, b: t + bh };
+            if (rect.t < EDGE || rect.b > h - EDGE || taken.some((r) => overlap(rect, r) > 0)) continue; // hard
+            const subject = subjects.reduce((sum, r) => sum + overlap(rect, r), 0);
+            // A leader line crossing a placed card reads as clutter: strongly avoided, not forbidden.
+            const lx = THREE.MathUtils.clamp(it.x, rect.l, rect.r);
+            const ly = THREE.MathUtils.clamp(it.y, rect.t, rect.b);
+            const crosses = cards.some((r) => [0.2, 0.4, 0.6, 0.8].some((k) => {
+              const px = it.x + (lx - it.x) * k;
+              const py = it.y + (ly - it.y) * k;
+              return px > r.l && px < r.r && py > r.t && py < r.b;
+            }));
+            const cost = subject * 40 + dots.reduce((sum, r) => sum + overlap(rect, r) * 20, 0) + (crosses ? 4e4 : 0) + gap * 3 + order * 40;
+            if (!best || cost < best.cost) best = { cost, rect, subject, mode };
+          }
+        });
+        if (best && best.subject === 0) { chosen = best; break; }
+        if (best && (!fallback || best.subject < fallback.subject)) fallback = best;
+      }
+      chosen ||= fallback;
+      el.style.visibility = "visible";
+      if (!chosen) { el.dataset.mode = "offstage"; continue; }
+      el.dataset.mode = chosen.mode;
+      const { rect } = chosen;
+      taken.push({ l: rect.l - 4, t: rect.t - 4, r: rect.r + 4, b: rect.b + 4 });
+      cards.push(rect);
       const nx = THREE.MathUtils.clamp(it.x, rect.l, rect.r);
       const ny = THREE.MathUtils.clamp(it.y, rect.t, rect.b);
-      const { el } = it.o;
-      el.style.visibility = "visible";
       el.style.transform = `translate(${it.x}px, ${it.y}px)`;
       el.style.setProperty("--len", `${Math.hypot(nx - it.x, ny - it.y)}px`);
       el.style.setProperty("--ang", `${Math.atan2(ny - it.y, nx - it.x)}rad`);
@@ -733,8 +842,8 @@ export function createSiteScene(container, { geometry, zones, changes, onHover, 
       if (M.halo.opacity !== 0.5) { M.halo.opacity = 0.5; dirty = true; }
     }
     const distance = camera.position.distanceTo(controls.target);
-    scene.fog.near = distance * 1.15;
-    scene.fog.far = distance * 3.2 + 40;
+    scene.fog.near = distance * 0.95;
+    scene.fog.far = distance * 2.4 + 20;
     if (pointer && pointer !== lastPointer && !down) {
       lastPointer = pointer;
       const id = pick(pointer.x, pointer.y);
@@ -764,7 +873,7 @@ export function createSiteScene(container, { geometry, zones, changes, onHover, 
     },
     setStatus(next) { status = next; applyMaterials(); },
     setFilters(next) { filters = next; applyMaterials(); },
-    setOverlays(next) { overlays = next; invalidate(); },
+    setOverlays(next) { overlays = next; measureDirty = true; invalidate(); },
     refresh: invalidate,
     hasAnchor: (key) => anchors.has(key),
     zoom(factor) {

@@ -80,9 +80,13 @@ function validConfirmation(record) {
  * - "review": a confirmed pass exists but an unrejected counterclaim is still open.
  * - "unchecked": the only confirmed passes are extracted statements whose source time (staleness) the API
  *   does not expose here, so the view never calls them a pass.
+ * - "revised": a pass that would otherwise read "confirmed", but the floor's current plan Revision was issued
+ *   after the inspection was scheduled (or the order cannot be established). Inspection Evidence carries no
+ *   revision_id in the API, so the view cannot tell whether the pass covers the current geometry; it says so
+ *   instead of showing a pass. Flags remain the authoritative evaluation.
  * - "none": no valid confirmed pass. The recorded Inspection.status alone never counts.
  */
-export function inspectionPass(index, inspection, evidence) {
+export function inspectionPass(index, inspection, evidence, plans = []) {
   const scope = scopeOf(index, inspection.zone_id);
   const relevant = (evidence || []).filter((record) => record.scope.kind === "inspection" && record.review_status !== "rejected" && (
     record.scope.inspection_id === inspection.id ? record.scope.zone_id === inspection.zone_id
@@ -91,11 +95,47 @@ export function inspectionPass(index, inspection, evidence) {
   if (!positives.length) return "none";
   const counter = relevant.some((record) => record.claim !== "passed" && !(record.origin === "seed_baseline" && record.claim === "pending"));
   if (counter) return "review";
-  return positives.every((record) => record.origin === "llm_statement") ? "unchecked" : "confirmed";
+  if (positives.every((record) => record.origin === "llm_statement")) return "unchecked";
+  const plan = planForZone(index, plans, inspection.zone_id);
+  const issued = Date.parse(plan?.current_revision?.issued_at);
+  const scheduled = Date.parse(inspection.scheduled_at);
+  if (plan?.current_revision && !(issued <= scheduled)) return "revised"; // NaN (unknown order) also lands here
+  return "confirmed";
 }
 
-export function inspectionConfirmedPassed(index, inspection, evidence) {
-  return inspectionPass(index, inspection, evidence) === "confirmed";
+export function inspectionConfirmedPassed(index, inspection, evidence, plans) {
+  return inspectionPass(index, inspection, evidence, plans) === "confirmed";
+}
+
+function planForZone(index, plans, zoneId) {
+  const floorId = floorOf(index, zoneId);
+  return (plans || []).find((plan) => plan.floor_id === floorId) || null;
+}
+
+/**
+ * Crew acknowledgments of the floor plan's current Revision, from Evidence (the plan's acknowledgment list is
+ * only context). Per crew with acknowledgment Evidence in the plan's floor scope:
+ * - "current": a valid confirmed (human, or seed import for a seed baseline) record for exactly the current revision
+ * - "unconfirmed": records for the current revision exist, none validly confirmed
+ * - "stale": only an earlier revision is validly confirmed (`label` names it); not proof for the current one
+ * - "none": nothing validly confirmed for any revision
+ * Rejected records and records outside the floor's zone scope never count.
+ */
+export function revisionAcknowledgments(index, plan, evidence) {
+  if (!plan?.current_revision) return [];
+  const revisions = new Map(plan.revisions.map((revision) => [revision.id, revision]));
+  const scope = new Set([plan.floor_id, ...descendants(index, plan.floor_id)]);
+  const records = (evidence || []).filter((record) => record.scope.kind === "revision_acknowledgment"
+    && revisions.has(record.scope.revision_id) && scope.has(record.scope.zone_id) && record.review_status !== "rejected");
+  return [...new Set(records.map((record) => record.scope.crew_id))].map((crewId) => {
+    const own = records.filter((record) => record.scope.crew_id === crewId);
+    const current = own.filter((record) => record.scope.revision_id === plan.current_revision.id);
+    if (current.some(validConfirmation)) return { crewId, state: "current", label: plan.current_revision.label };
+    if (current.length) return { crewId, state: "unconfirmed", label: plan.current_revision.label };
+    const latest = own.filter(validConfirmation).map((record) => revisions.get(record.scope.revision_id))
+      .sort((a, b) => b.sequence - a.sequence)[0];
+    return latest ? { crewId, state: "stale", label: latest.label } : { crewId, state: "none", label: null };
+  });
 }
 
 /** "conflict" (open Flag) > "open" (an Inspection in scope is not confirmed passed) > "ok". */
@@ -104,7 +144,7 @@ export function zoneStatus(index, state, zoneId) {
   if (flagsForZone(index, state.flags, zoneId).length > 0) return "conflict";
   const chain = new Set(ancestors(index, zoneId));
   const open = (state.inspections || []).some((inspection) => chain.has(inspection.zone_id)
-    && !inspectionConfirmedPassed(index, inspection, state.evidence));
+    && !inspectionConfirmedPassed(index, inspection, state.evidence, state.plans));
   return open ? "open" : "ok";
 }
 
@@ -132,11 +172,11 @@ export function zoneDetails(index, state, zoneId) {
       const records = evidenceFor(evidence, inspection);
       const counts = { confirmed: 0, unconfirmed: 0, rejected: 0 };
       for (const record of records) counts[record.review_status] = (counts[record.review_status] || 0) + 1;
-      return { inspection, evidence: records, counts, pass: inspectionPass(index, inspection, evidence) };
+      return { inspection, evidence: records, counts, pass: inspectionPass(index, inspection, evidence, state.plans) };
     });
   const unresolvedEvidence = evidence.filter((record) => record.scope.kind === "inspection"
     && !record.scope.inspection_id && (!record.scope.zone_id || scope.has(record.scope.zone_id)));
-  const plan = (state.plans || []).find((candidate) => candidate.floor_id === floorId) || null;
+  const plan = planForZone(index, state.plans, zoneId);
   const revisions = plan ? [...plan.revisions].sort((a, b) => b.sequence - a.sequence).map((revision) => ({
     revision,
     acknowledgments: revision.acknowledgments.map((ack) => ({ ...ack, crew: crews[ack.crew_id] || null })),
@@ -155,6 +195,7 @@ export function zoneDetails(index, state, zoneId) {
       .map((task) => ({ ...task, crew: crews[task.crew_id] || null })),
     plan,
     revisions,
+    acknowledgments: revisionAcknowledgments(index, plan, evidence).map((ack) => ({ ...ack, crew: crews[ack.crewId] || null })),
   };
 }
 
