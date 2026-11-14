@@ -351,3 +351,61 @@ def test_confirmed_descendant_claim_cannot_certify_ancestor_inspection(initializ
     flag = initialized.get("/flags").json()[0]
     assert flag["evaluation"] == "unknown"
     assert flag["evidence"][0]["id"] == evidence["id"]
+
+
+@pytest.mark.parametrize("confirm_pending", [False, True])
+def test_later_confirmed_pass_supersedes_earlier_pending_without_changing_history(initialized, engine, confirm_pending):
+    pending = ingest(initialized, external_id="earlier-pending", sender_role="inspector", sender_crew_id=None,
+        text="Abnahme der Rohinstallation im 3. OG auf Tag 4 verschoben.",
+        sent_at="2026-11-14T16:40:00+01:00")["events"][0]["evidence"][0]
+    if confirm_pending:
+        review(engine, pending["id"], "confirmed")
+    ingest(initialized)
+    original = initialized.get("/flags").json()[0]
+    proof = inspection_claim(initialized, sent_at="2026-11-16T15:00:00+01:00")
+    review(engine, proof, "confirmed")
+    updated = initialized.get("/flags").json()[0]
+    assert (updated["id"], updated["state"], updated["evaluation"]) == (
+        original["id"], "detected", "satisfied",
+    )
+    earlier = next(item for item in updated["evidence"] if item["id"] == pending["id"])
+    assert earlier["claim"] == "pending"
+    assert earlier["review_status"] == ("confirmed" if confirm_pending else "unconfirmed")
+    assert len(earlier["history"]) == (2 if confirm_pending else 1)
+    # A subsequent announcement must not invent a new conflict after the pass.
+    ingest(initialized, external_id="after-pass", sent_at="2026-11-16T18:05:00+01:00")
+    assert len(initialized.get("/flags").json()) == 1
+
+
+@pytest.mark.parametrize("pending_time", ["2026-11-16T15:00:00+01:00", "2026-11-16T16:00:00+01:00"])
+def test_newer_or_simultaneous_pending_remains_a_counterclaim(initialized, engine, pending_time):
+    proof = inspection_claim(initialized, sent_at="2026-11-16T15:00:00+01:00")
+    ingest(initialized, external_id="later-pending", sender_role="inspector", sender_crew_id=None,
+        text="Abnahme der Rohinstallation im 3. OG auf Tag 4 verschoben.", sent_at=pending_time)
+    # Reviewing the older positive last must not mask a newer source statement.
+    review(engine, proof, "confirmed")
+    ingest(initialized, sent_at="2026-11-16T18:05:00+01:00")
+    assert initialized.get("/flags").json()[0]["evaluation"] == "contradictory"
+
+
+@pytest.mark.parametrize("zone,claim", [("F3", "failed"), ("3B-BATH", "pending")])
+def test_earlier_failed_or_unresolved_counterclaim_is_not_superseded(initialized, engine, monkeypatch, zone, claim):
+    from unittest.mock import Mock
+    from app import ingestion
+    from app.extraction import ExtractedBatch, ExtractedEvent
+
+    original = ingestion.get_extractor
+    extractor = Mock()
+    extractor.name = "test"
+    extractor.extract.return_value = ExtractedBatch(events=[ExtractedEvent(
+        intent="inspection_result", quote="Synthetic earlier inspection statement.", confidence=1,
+        zones=[zone], inspection_kind="rough_in", claim=claim,
+    )])
+    monkeypatch.setattr(ingestion, "get_extractor", lambda: extractor)
+    ingest(initialized, external_id="earlier-counterclaim", text="Synthetic earlier inspection statement.",
+        sent_at="2026-11-14T16:40:00+01:00")
+    monkeypatch.setattr(ingestion, "get_extractor", original)
+    proof = inspection_claim(initialized, sent_at="2026-11-16T15:00:00+01:00")
+    review(engine, proof, "confirmed")
+    ingest(initialized, sent_at="2026-11-16T18:05:00+01:00")
+    assert initialized.get("/flags").json()[0]["evaluation"] == "contradictory"

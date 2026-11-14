@@ -88,7 +88,7 @@ class InspectionPassed:
         # Exact Evidence scope must match the selected inspection, whose zone
         # may cover the work's descendant zone. Sibling evidence never applies.
         records = inspection_evidence(session, inspection, inspection_evidence_scope(work.zone_id, zones))
-        relevant, confirmed = [], []
+        relevant, confirmed, statement_times = [], [], {}
         for item in records:
             if item.review_status == "rejected":
                 continue
@@ -99,6 +99,7 @@ class InspectionPassed:
                 statement = session.get(models.Event, item.statement_ref)
                 if statement is None or item.source_ref != f"source:{statement.source_message_id}":
                     continue
+                statement_times[item.id] = utc(statement.source.sent_at)
                 # An old success claim cannot certify a later inspection cycle.
                 if item.claim == "passed" and utc(statement.source.sent_at) < utc(inspection.scheduled_at):
                     continue
@@ -110,11 +111,22 @@ class InspectionPassed:
             ):
                 confirmed.append(item)
         positives = [item for item in confirmed if item.claim == "passed"]
-        # Pending is a normal earlier state, not a permanent veto on a later
-        # confirmed pass. Failed counterclaims require explicit human rejection.
-        claims = {item.claim for item in relevant if not (
-            positives and item.origin == "seed_baseline" and item.claim == "pending"
-        )}
+        latest_pass_at = max((statement_times[item.id] for item in positives
+                              if item.id in statement_times), default=None)
+
+        def superseded_pending(item):
+            if item.claim != "pending" or not positives:
+                return False
+            if item.origin == "seed_baseline":
+                return True
+            # Compare source times for the exact same Inspection, not review
+            # times. A late confirmation cannot erase a newer counterclaim.
+            return (item.inspection_id == inspection.id and latest_pass_at is not None
+                    and item.id in statement_times and statement_times[item.id] < latest_pass_at)
+
+        # Normal earlier pending states remain in Evidence/history. Failed,
+        # newer, simultaneous or unresolved-scope counterclaims need review.
+        claims = {item.claim for item in relevant if not superseded_pending(item)}
         if "passed" in claims and claims & {"failed", "pending"}:
             return Evaluation("contradictory", "Inspection statements conflict; review unresolved counterclaims. Unconfirmed claims are not proof.", inspection.id)
         if positives:

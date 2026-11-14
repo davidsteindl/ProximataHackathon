@@ -45,8 +45,12 @@ The Flag details expose the same overlapping scope used by the evaluator.
 - `contradictory`: applicable passed and failed/pending claims disagree,
   including unconfirmed counterclaims. Explicit human rejection resolves a
   counterclaim. An earlier synthetic pending baseline permits a later confirmed
-  pass as the normal inspection progression; a failed claim is never silently
-  superseded.
+  pass as the normal inspection progression. A source-backed pending statement
+  for the exact same Inspection also permits a strictly later human-confirmed
+  pass, comparing message timestamps rather than review timestamps. The earlier
+  statement and its review history remain unchanged. Failed claims, newer or
+  simultaneous pending claims, and unresolved Inspection scopes are never
+  silently superseded.
 
 ## Persistence and integration
 
