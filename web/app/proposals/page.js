@@ -17,7 +17,7 @@ export default async function ProposalsPage() {
   const suggestions = (data?.proposals || []).filter((proposal) => proposal.channel !== "advisor");
   const flagsById = new Map((data?.flags || []).map((flag) => [flag.id, flag]));
   return (
-    <WorkShell current="flags">
+    <WorkShell current="proposals">
       <div className="page-head">
         <h1>Proposals</h1>
         <Chip tone="info">LLM proposal · advisory</Chip>

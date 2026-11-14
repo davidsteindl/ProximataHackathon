@@ -75,7 +75,8 @@ function Dashboard({ data, model, feed }) {
           <div className="value"><span className="num">{flags.length}</span><Link className="link small" href="/flags">inbox →</Link></div></div>
         <div className="panel pad kpi"><p className="label">Awaiting your decision</p>
           <div className="value"><span className="num">{decisions}</span>
-            {decisions > 0 && <Chip tone="warn">{[proposals && `${proposals} proposal${proposals === 1 ? "" : "s"}`, unconfirmed.length && `${unconfirmed.length} evidence`, closable && `${closable} closure`].filter(Boolean).join(" · ")}</Chip>}</div></div>
+            {decisions > 0 && <Chip tone="warn">{[proposals && `${proposals} proposal${proposals === 1 ? "" : "s"}`, unconfirmed.length && `${unconfirmed.length} evidence`, closable && `${closable} closure`].filter(Boolean).join(" · ")}</Chip>}
+            {proposals > 0 && <Link className="link small" href="/proposals">proposals →</Link>}</div></div>
         <div className="panel pad kpi" style={{ display: "flex", alignItems: "center", gap: 14 }}>
           <Ring value={next.length ? clear / next.length : 0} />
           <div><p className="label" style={{ marginBottom: 2 }}>Next 48 h without open Flag</p><span className="num" style={{ fontSize: 24 }}>{clear} / {next.length}</span></div>

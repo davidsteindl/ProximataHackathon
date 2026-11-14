@@ -20,11 +20,11 @@ async function loadComponent(name) {
     module: { type: "commonjs" },
   });
   const stubs = {
-    "next/link": { __esModule: true, default: ({ href, children }) => React.createElement("a", { href }, children) },
+    "next/link": { __esModule: true, default: ({ href, children, ...rest }) => React.createElement("a", { href, ...rest }, children) },
     "../lib/site.mjs": await import("../lib/site.mjs"),
     "./actions/review": { submitReview: async () => ({}) },
     // Demo role from the app shell; tests switch it through `viewer`.
-    "./app-context": { useApp: () => viewer },
+    "./app-context": { useApp: () => viewer, RoleSwitch: () => null, ScenarioClock: () => null },
     "./site-view/zone-panel": { Chip: ({ children }) => React.createElement("span", null, children), reviewTone: () => "ok" },
   };
   const component = { exports: {} };
@@ -110,4 +110,12 @@ test("Proposal decisions: Superintendent only, approval only after acknowledgmen
   } finally {
     viewer = { role: "superintendent", actor: "synthetic-superintendent" };
   }
+});
+
+test("the work-view sidebar exposes Proposals and marks it as the current page there", async () => {
+  const { WorkShell } = await loadComponent("shell");
+  const html = renderToStaticMarkup(React.createElement(WorkShell, { current: "proposals" }, "content"));
+  assert.match(html, /href="\/proposals"/);
+  assert.match(html, /<a href="\/proposals" class="nav-item cur" aria-current="page">/);
+  assert.equal((html.match(/aria-current="page"/g) || []).length, 1, "only the current page is marked");
 });

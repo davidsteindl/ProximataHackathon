@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { label, scenarioTime } from "../lib/site.mjs";
 import { ProposalDecision } from "./decisions";
 import { Chip, reviewTone } from "./site-view/zone-panel";
@@ -46,6 +47,7 @@ export default function Advice({ flag, site }) {
       <div className="panel-head">
         <h2 id={`advice-h-${flag.id}`}>Advisor</h2>
         <Chip tone="info">LLM proposal · advisory</Chip>
+        <Link className="link small" href="/proposals">All proposals →</Link>
       </div>
       <div className="pad stack">
         {!advice ? (
