@@ -389,6 +389,15 @@ def preserve_flag_audit(_mapper, _connection, _record):
     raise ValueError("Flag audit is append-only; use explicit seed reset to clear demo data")
 
 
+class SiteKnowledge(Base):
+    __tablename__ = "site_knowledge"
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    feedback_id: Mapped[int] = mapped_column(ForeignKey("flag_audit.id"), unique=True)
+    correction_event_id: Mapped[str | None] = mapped_column(ForeignKey("events.id"))
+    feedback: Mapped[FlagAudit] = relationship(lazy="selectin")
+    correction_event: Mapped[Event | None] = relationship(lazy="selectin")
+
+
 class PlanGeometry(Base):
     __tablename__ = "plan_geometry"
     revision_id: Mapped[str] = mapped_column(ForeignKey("revisions.id", ondelete="CASCADE"), primary_key=True)
