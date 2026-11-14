@@ -6,6 +6,7 @@ from fastapi import APIRouter, HTTPException
 from sqlalchemy import case, select
 
 from app import models
+from app.outbox import OutboxView
 from app.ingestion_schemas import EventView
 from app.ingestion import event_views
 from app.schemas import EvidenceView, Identifier, Record, Timestamp
@@ -48,22 +49,31 @@ class FlagView(Record):
     state: Literal["detected", "notified", "acknowledged", "in_progress", "resolved", "false_alarm"]
     evaluation: Literal["satisfied", "not_satisfied", "unknown", "contradictory"]
     explanation: str
+    context: dict
     created_at: Timestamp
     updated_at: Timestamp
     sources: list[EventView]
     evidence: list[EvidenceView]
     audit: list[AuditView]
     awaiting_human_closure: bool
+    notifications: list[OutboxView]
 
 
 def flag_view(session, flag):
     inspection = session.get(models.Inspection, flag.inspection_id) if flag.inspection_id else None
     zones = {zone.id: zone for zone in session.scalars(select(models.Zone))} if inspection else {}
+    evidence = inspection_evidence(session, inspection, inspection_evidence_scope(flag.zone_id, zones)) if inspection else []
+    if flag.type == "B":
+        from app.revision_rules import receipt_evidence
+        zones = {zone.id: zone for zone in session.scalars(select(models.Zone))}
+        revision = session.get(models.Revision, flag.context["revision_id"])
+        evidence = receipt_evidence(session, flag.zone_id, flag.context["crew_id"], revision, zones)
     return FlagView.model_validate({
-        **{key: getattr(flag, key) for key in FlagView.model_fields if key not in {"sources", "evidence", "awaiting_human_closure"}},
+        **{key: getattr(flag, key) for key in FlagView.model_fields if key not in {"sources", "evidence", "awaiting_human_closure", "notifications"}},
         "awaiting_human_closure": flag.evaluation == "satisfied" and flag.state not in {"resolved", "false_alarm"},
+        "notifications": session.scalars(select(models.OutboxMessage).where(models.OutboxMessage.flag_id == flag.id)).all(),
         "sources": event_views(session, [link.event for link in flag.sources]),
-        "evidence": inspection_evidence(session, inspection, inspection_evidence_scope(flag.zone_id, zones)) if inspection else [],
+        "evidence": evidence,
     })
 
 

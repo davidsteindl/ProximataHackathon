@@ -88,13 +88,14 @@ export default function SiteOverview({ data, filters }) {
 
       <section aria-labelledby="plans-title">
         <h2 id="plans-title">Plans and revisions</h2>
+        <p>Revision-note zones are unconfirmed. Importing a drawing does not confirm them.</p>
         {plans.map((plan) => (
           <article key={plan.id}>
             <h3>{plan.id} · {plan.name} · {plan.floor_id}</h3>
             <p>Current revision: {plan.current_revision?.label || "None"}</p>
             <ul>{plan.revisions.map((revision) => (
               <li key={revision.id}>
-                Rev {revision.label} · {revision.file_name} · zones: {revision.zone_ids.join(", ")}
+                Rev {revision.label} · {revision.file_name || "Unconfirmed revision note — no drawing imported"} · zones: {revision.zone_ids.join(", ")}
                 <ul>{revision.acknowledgments.map((ack) => (
                   <li key={ack.crew_id}>{crewNames[ack.crew_id]} acknowledged {formatTime(ack.acknowledged_at, site.timezone)}</li>
                 ))}</ul>

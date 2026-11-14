@@ -243,3 +243,26 @@ def test_closed_flag_does_not_claim_it_is_waiting_for_closure(initialized, engin
     assert closed["state"] == "false_alarm"
     assert not closed["awaiting_human_closure"]
     assert "awaiting" not in closed["explanation"]
+
+
+def test_lifecycle_migration_follows_outbox_and_round_trips(engine):
+    from alembic import command
+    from alembic.autogenerate import compare_metadata
+    from alembic.config import Config
+    from alembic.migration import MigrationContext
+    from alembic.script import ScriptDirectory
+    from sqlalchemy import inspect
+    from conftest import BACKEND
+
+    config = Config(str(BACKEND / "alembic.ini"))
+    assert ScriptDirectory.from_config(config).get_heads() == ["0008"]
+    with engine.begin() as connection:
+        config.attributes["connection"] = connection
+        command.downgrade(config, "0007")
+        inspector = inspect(connection)
+        assert "outbox_messages" in inspector.get_table_names()
+        assert "context" in {column["name"] for column in inspector.get_columns("flags")}
+        assert "feedback" not in {column["name"] for column in inspector.get_columns("flag_audit")}
+        assert "reason" not in {column["name"] for column in inspector.get_columns("evidence_reviews")}
+        command.upgrade(config, "head")
+        assert compare_metadata(MigrationContext.configure(connection), models.Base.metadata) == []

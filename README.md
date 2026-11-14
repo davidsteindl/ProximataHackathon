@@ -39,6 +39,15 @@ In PowerShell statt `cp`: `Copy-Item .env.example .env`. Beim ersten Start baut 
   `/geometry?zone_id=3B&revision_id=A-103-D`. API-/Importvertrag und 3D-Koordinaten:
   [docs/CAD-PIPELINE.md](docs/CAD-PIPELINE.md). Ein Seed-Reset entfernt auch die
   daraus abgeleitete Geometrie; danach den CAD-Import erneut ausführen.
+- 3D-Baustellenansicht (#16): http://localhost:3000/site, Raumansicht unter
+  `/zones/<zoneId>` (z. B. `/zones/3B-BATH`, teilbarer Link). Braucht Seed,
+  CAD-Import und für Flag A die Hero-Nachricht unten. Das Gebäude wird nur aus
+  `/geometry` erzeugt (Wände auf Geschosshöhe extrudiert, Räume, Türen, Sanitär,
+  Abwasser); Kräne, Gerüst, Zaun, Bäume und Container sind als dekorativer
+  Kontext gekennzeichnet. Status kommt aus `/flags`, `/inspections`, `/evidence`
+  und wird alle 3 s über `web` (`/api/site-state`) nachgeladen, ohne Reload.
+  Die Ansicht liest nur; Evidence-Prüfung und Flag-Abschluss bleiben getrennte
+  menschliche Aktionen. Flag-Detail (lesend): `/flags/<id>`.
 - OpenAPI: http://localhost:8000/openapi.json, interaktive Dokumentation unter `/docs`.
 - MCP: http://localhost:8001/mcp – startbarer Streamable-HTTP-Server ohne Tools.
 - `docker compose logs worker mcp` zeigt den erfolgreichen API-Zugriff beider Dienste.
@@ -55,9 +64,10 @@ Stoppen: `docker compose down`. Die Daten bleiben im Volume `db-data` erhalten.
 
 Enthalten sind Infrastruktur, Health-Prüfungen, der statische Site Record aus
 Issue #5, Nachrichten-Ingestion, Event-Extraktion und Timeline aus #6 sowie
-DXF-Extraktion und Geometrie-API aus #15, Conflict A und Flag-Inbox aus #7
-sowie Gmail-Eingang aus #11. 3D-Ansicht, Plan-Diff,
-Telegram-Adapter, Gmail-Versand, MCP-Tools, Authentifizierung
+DXF-Extraktion und Geometrie-API aus #15, Conflict A und Flag-Inbox aus #7,
+Conflict B aus Revisionsnotizen (#8), Gmail-Eingang aus #11,
+Outbox-/Gmail-Versand aus #10 sowie die 3D-Ansicht aus #16. Plan-Diff,
+Telegram-Adapter, MCP-Tools, Authentifizierung
 und Hosting folgen in ihren eigenen Issues.
 
 ### Nachricht → Event → Timeline (Issue #6)
@@ -88,7 +98,7 @@ in `.env` setzen und `api` neu erstellen. Nur `api` erhält den LLM-Key.
 Abnahme-, Task-Abschluss- und Revisionsbestätigungen aus Nachrichten werden immer
 als **unbestätigte Evidence** mit Quelle/Zitat gespeichert. Sie überschreiben keine
 vorhandene Bestätigung und geben keine Arbeit frei. Die menschliche Prüfung folgt
-in #9, Conflict B in #8. Conflict A wird bereits deterministisch geprüft.
+in #9. Conflict A und B werden bereits deterministisch geprüft.
 Der Seed-Befehl setzt auch die neuen Nachrichten
 und Events zurück. REST-Vertrag, Cache-Inhalte, Fehler-/Retry-Verhalten und
 Datenschutzgrenzen: [docs/INGESTION.md](docs/INGESTION.md).
@@ -125,6 +135,40 @@ Proposal-Freigabe und Abschluss bleiben getrennt. Der Rollenumschalter verwendet
 synthetische Identitäten und ist keine produktionsreife Authentifizierung.
 MCP/Chat-Kanäle dürfen diese Aktionen nicht ausführen. REST-Payloads,
 Übergänge, Rollen und Integrationsgrenzen: [docs/FLAGS.md](docs/FLAGS.md#lifecycle-and-evidence-review-9).
+### Conflict B aus Revisionsnotizen (Issue #8)
+
+Nach dem Seed dieselbe Ingestion mit `backend/demo/revision-note.json` aufrufen
+(gleicher curl-Befehl wie oben, mit diesem Dateinamen). Die Hero-Notiz von Tag 1,
+10:15 Uhr, registriert A-103 Rev D auch ohne CAD-Import und erzeugt Flag B für
+die Sanitär-Crew in 3B: bestätigter Empfang C, erforderlich D. Ebenfalls betroffene
+geplante Arbeiten werden geprüft. Die Inbox zeigt Crew, Revisionen, Quellen und
+den **unbestätigten** Zonenbezug aus der Notiz. Danach die Closing-Work-Nachricht
+senden: Für die Trockenbau-Arbeit in 3B erscheinen A und B.
+
+Eine spezifische Empfangsmeldung bleibt unbestätigte Evidence. „Warnung gesehen“
+bestätigt keinen Revisionsempfang; auch bestätigter Empfang belegt keine Umsetzung.
+Migration `0006` erlaubt `file_name: null` für reine Notizrevisionen und ergänzt
+`Flag.context` mit Crew, Plan sowie erforderlicher und bestätigter Revision.
+CAD-Import kann die vorläufigen Metadaten derselben Revision vervollständigen;
+dabei entstehen weder geometrische Änderungszonen noch Empfangsbestätigungen.
+Details und Tests: [docs/FLAGS.md](docs/FLAGS.md).
+
+### Outbox-Vertrag (Issue #10)
+
+Migration `0007` ergänzt optionale `crew_leads.email` (auch im Seed-/Crew-REST-Vertrag)
+und eine transaktionale Outbox: genau eine faktische Gmail-Warnung pro neuem Flag.
+`GET /outbox?flag_id=…` zeigt Status und Versuche. Der Worker reserviert über
+`POST /outbox/claim` eine Nachricht für fünf Minuten und meldet mit Lease-Token
+über `POST /outbox/{id}/result` Erfolg oder Fehler. Fehler werden mit Backoff
+(60 Sekunden bis eine Stunde) erneut versucht. Nur bestätigter Versand setzt
+einen noch `detected` Flag auf `notified`; menschliche Zustände bleiben erhalten.
+Versandversuche und Ergebnisse stehen im Flag-Audit. Der Demo-Reset leert die Outbox.
+
+Versand aktivieren: Crew-Lead-Testadresse im Seed hinterlegen, OAuth mit
+`python -m app.gmail_auth --send` erneut autorisieren und `GMAIL_SEND_ENABLED=true`
+setzen. Fehlende Adressen werden als Versandfehler sichtbar. Einrichtung, Hero-Test
+und Grenzen (Gmail-Annahme, mögliche Duplikate bei unklarem Versandresultat):
+[docs/GMAIL.md](docs/GMAIL.md#factual-flag-warnings-outbox).
 
 ### Gmail-Eingang (Issue #11)
 

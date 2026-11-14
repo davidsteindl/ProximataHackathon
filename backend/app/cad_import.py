@@ -24,6 +24,7 @@ def import_plan(session: Session, source: bytes, filename: str, metadata: cad_sc
         raise InvalidPlan("A DXF filename of at most 200 characters is required")
     digest = hashlib.sha256(source).hexdigest()
     with session.begin():
+        session.scalar(select(models.Site).with_for_update())
         plan = session.get(models.Plan, metadata.plan_id)
         floor = session.get(models.Zone, metadata.floor_id)
         if plan is None or floor is None or floor.kind != "floor" or plan.floor_id != floor.id:
@@ -35,7 +36,16 @@ def import_plan(session: Session, source: bytes, filename: str, metadata: cad_sc
             issued_at = revision.issued_at
             if issued_at.tzinfo is None:
                 issued_at = issued_at.replace(tzinfo=UTC)
-            if (revision.plan_id, revision.label, revision.sequence, issued_at) != (
+            if revision.file_name is None and (revision.plan_id, revision.label) == (metadata.plan_id, metadata.label):
+                collision = session.scalar(select(models.Revision).where(
+                    models.Revision.plan_id == plan.id, models.Revision.sequence == metadata.sequence,
+                    models.Revision.id != revision.id,
+                ))
+                if collision is not None:
+                    raise ImportConflict("CAD sequence conflicts with another revision")
+                revision.sequence, revision.issued_at = metadata.sequence, metadata.issued_at
+                revision.file_name = filename
+            elif (revision.plan_id, revision.label, revision.sequence, issued_at) != (
                 metadata.plan_id, metadata.label, metadata.sequence, metadata.issued_at,
             ):
                 raise ImportConflict("Revision metadata conflicts with the stored revision")
@@ -82,6 +92,9 @@ def import_plan(session: Session, source: bytes, filename: str, metadata: cad_sc
                 layer=element.layer, shape=element.shape.model_dump(mode="json"),
                 zones=[by_id[key] for key in element.zone_ids],
             ))
+        from app.rules import evaluate_site
+        session.flush()
+        evaluate_site(session, source_ref=f"cad:{revision.id}")
     return cad_schemas.ImportResult(
         revision_id=metadata.revision_id, element_count=len(elements),
         source_sha256=digest, ignored_layers=ignored,

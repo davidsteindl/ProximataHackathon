@@ -8,6 +8,7 @@ from google.auth.exceptions import GoogleAuthError
 from app.api_client import check_api
 from app.gmail import GmailClient, GmailError, GmailSettings
 from app.gmail_polling import poll_gmail
+from app.outbox_delivery import deliver_outbox
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +32,11 @@ def main() -> None:
                     check_api("worker")
             except (httpx.HTTPError, GoogleAuthError, GmailError, OSError, ValueError, LookupError, TypeError) as error:
                 logger.warning("Worker poll failed (%s); retry next interval", type(error).__name__)
+            if settings and settings.send_enabled:
+                try:
+                    deliver_outbox(GmailClient(settings, gmail_http), api)
+                except (httpx.HTTPError, GoogleAuthError, GmailError, OSError, ValueError, LookupError, TypeError) as error:
+                    logger.warning("Outbox delivery failed (%s); retry next interval", type(error).__name__)
             time.sleep(interval)
 
 

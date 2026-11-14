@@ -56,6 +56,7 @@ class ZoneNode(Zone):
 class CrewLead(Record):
     id: Identifier
     name: Name
+    email: Annotated[str, Field(max_length=254, pattern=r"^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$")] | None = None
 
 
 class Crew(Record):
@@ -92,6 +93,8 @@ class RevisionAcknowledgment(Record):
 
 
 class RevisionView(Revision):
+    # Note-only revisions have no imported drawing.
+    file_name: Name | None
     # A newly registered CAD revision has no affected-zone result until #17.
     zone_ids: list[Identifier]
     acknowledgments: list[RevisionAcknowledgment]
