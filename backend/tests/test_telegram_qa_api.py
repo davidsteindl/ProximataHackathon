@@ -134,3 +134,29 @@ def test_nonquestion_does_not_queue_a_reply(question_api, monkeypatch):
     mock_answer(monkeypatch, "not_a_question", text="")
     assert request(question_api, original["id"]).json()["handled"] is False
     assert question_api.get("/outbox").json() == []
+
+
+@pytest.mark.parametrize("channel", ["gmail", "telegram"])
+def test_erasure_invalidates_leases_for_both_question_copies(question_api, monkeypatch, channel):
+    original = source(question_api)
+    mock_answer(monkeypatch, "decision_request")
+    request(question_api, original["id"]).raise_for_status()
+    claimed = question_api.post("/outbox/claim", params={"channel": channel}).json()
+    assert claimed is not None
+    assert command(question_api, "delete_my_data").status_code == 200
+    result = question_api.post(f"/outbox/{claimed['id']}/result", json={
+        "lease_token": claimed["lease_token"], "status": "sent", "provider_message_id": "too-late",
+    })
+    assert result.status_code == 409
+
+
+def test_long_question_asks_for_shorter_input_without_calling_router(question_api, monkeypatch):
+    original = question_api.post("/ingestion/messages", json={
+        "channel": "telegram", "source_key": "123", "external_id": "long",
+        "sender_id": "123", "sender_role": "crew_lead", "sent_at": datetime.now(UTC).isoformat(),
+        "text": "?" * 4001,
+    }).json()["source"]
+    stub = mock_answer(monkeypatch)
+    assert request(question_api, original["id"]).status_code == 200
+    assert "at most 4000" in question_api.get("/outbox").json()[0]["content"]
+    stub.assert_not_awaited()

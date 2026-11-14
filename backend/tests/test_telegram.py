@@ -1,6 +1,6 @@
 import json
 from datetime import UTC, datetime, timedelta
-from unittest.mock import Mock
+from unittest.mock import AsyncMock, Mock
 
 import httpx
 import pytest
@@ -96,7 +96,11 @@ def test_hero_ingestion_warning_and_retry_are_source_backed(telegram_api):
 
 @pytest.mark.parametrize("text,intent", [("Warnung gesehen", "observation"),
     ("Abnahme dürfte passen", "inspection_result"), ("welcher plan gilt für 3B?", "question")])
-def test_other_hero_messages_remain_advisory(telegram_api, text, intent):
+def test_other_hero_messages_remain_advisory(telegram_api, monkeypatch, text, intent):
+    from app import qa
+    from test_qa import routing
+    monkeypatch.setattr(qa, "ask", AsyncMock(return_value=qa.Answer(
+        kind="answer", text="Synthetic record answer [revision:A-103-C]", routing=routing("revision_in_force", "3B"))))
     telegram, http, _ = bot([message(text)])
     with http:
         poll_telegram(telegram, telegram_api)
