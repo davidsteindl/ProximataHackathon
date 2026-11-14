@@ -10,7 +10,8 @@ TRANSITIONS = {
     "action_approved": ({"acknowledged"}, "in_progress", "human"),
     "resolved": ({"in_progress"}, "resolved", "human"),
     "false_alarm": ({"notified", "acknowledged", "in_progress"}, "false_alarm", "human"),
-    "escalated": ({"notified"}, "notified", "system"),
+    # Escalation informs the next level; it keeps the current state (None).
+    "escalated": ({"detected", "notified"}, None, "system"),
 }
 
 
@@ -30,6 +31,7 @@ def transition_flag(session, flag, *, action, actor, actor_type, channel, source
     if spec is None:
         raise InvalidTransition("Unknown Flag action")
     allowed, target, required_actor = spec
+    target = target or flag.state
     if flag.state not in allowed or actor_type != required_actor:
         raise InvalidTransition(f"Cannot {action} a {flag.state} Flag as {actor_type}")
     expected_feedback = {"acknowledge": "confirmed", "resolved": "resolved", "false_alarm": "false_alarm"}.get(action)

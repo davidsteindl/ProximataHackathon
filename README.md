@@ -257,6 +257,24 @@ zeigt den Fallback samt Fehlergrund. Ein erfolgreicher Diff ersetzt keine
 menschlich bestätigte Empfangs-Evidence. Dateinamen, Metadaten, Herkunft und
 Fehlerverhalten: [CAD-PIPELINE.md](docs/CAD-PIPELINE.md#plan-diff-17).
 
+### Morgen-Scan und Eskalation (Issue #14)
+
+Der `worker` löst beide Jobs per REST aus; die Logik liegt in `api`. Der
+**Morgen-Scan** (`MORNING_SCAN_TIME`, Ortszeit der Site, einmal pro Tag) prüft
+Tasks, die bis zum Ende des Tages in `SCAN_LOOKAHEAD_DAYS` Tagen beginnen, nur
+anhand des Terminplans, mit derselben Nachweisregel wie bei Events. Die
+**Eskalation** schickt einen Flag ohne menschliche Reaktion nach
+`ESCALATION_HOURS` genau einmal über die Outbox an `SUPERINTENDENT_EMAIL` und
+schreibt das ins Audit. Für das Replay lassen sich beide Jobs mit simulierter Uhr
+direkt auslösen:
+
+```sh
+curl -X POST localhost:8000/jobs/morning-scan -H 'Content-Type: application/json' -d '{"as_of":"2026-11-14T05:00:00Z"}'
+curl -X POST localhost:8000/jobs/escalation -H 'Content-Type: application/json' -d '{"as_of":"2026-11-15T05:00:00Z"}'
+```
+
+Details: [docs/FLAGS.md](docs/FLAGS.md#morning-scan-and-escalation-14).
+
 ### Gmail-Eingang (Issue #11)
 
 Der optionale Worker-Adapter liest ein verifiziertes Projekt-Testpostfach/Label

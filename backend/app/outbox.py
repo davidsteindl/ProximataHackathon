@@ -21,6 +21,7 @@ router = APIRouter(tags=["Outbox"])
 class OutboxView(Record):
     id: Identifier
     flag_id: Identifier | None
+    kind: Literal["warning", "escalation"]
     recipient: str | None
     channel: Literal["gmail", "telegram"]
     subject: str
@@ -45,26 +46,57 @@ class DeliveryResult(Record):
     error_code: Literal["gmail_error", "telegram_error", "missing_recipient"] | None = None
 
 
-def enqueue_flag_warning(session, flag, statement, crew, now):
+def dashboard_link(flag):
+    base = os.environ.get("DASHBOARD_BASE_URL", "http://localhost:3000").rstrip("/")
+    return f"{base}/#flag-{flag.id}"
+
+
+def enqueue_flag_warning(session, flag, statement, crew, now, task=None):
+    """Queue the factual warning; ``statement`` is None for schedule-only scan Flags."""
     lead = session.get(models.CrewLead, crew.lead_id) if crew else None
     telegram_recipient = json.loads(os.environ.get("TELEGRAM_CREW_LEADS_JSON") or "{}").get(lead.id) if lead else None
-    message_id = uuid4().hex
-    base = os.environ.get("DASHBOARD_BASE_URL", "http://localhost:3000").rstrip("/")
+    if statement is not None:
+        source = (f"Source: {statement.source.channel}, source:{statement.source_message_id}.\n"
+                  f"Work announcement (unconfirmed statement): {statement.quote}\n")
+    else:
+        source = (f"Source: morning scan of the site schedule, {task.id} "
+                  f"starts {task.starts_at.isoformat()} (no message received).\n")
     content = (
         f"Flag {flag.type}: {flag.activity} in Zone {flag.zone_id}.\n"
         f"Task: {flag.task_id or 'unresolved'}.\n"
         f"Required Precondition: {flag.precondition}; Inspection: {flag.inspection_id or 'unresolved'}.\n"
         f"Evaluation at detection: {flag.evaluation}. {flag.explanation}\n"
-        f"Source: {statement.source.channel}, source:{statement.source_message_id}.\n"
-        f"Work announcement (unconfirmed statement): {statement.quote}\n"
-        f"Current details: {base}/#flag-{flag.id}\n"
+        f"{source}"
+        f"Current details: {dashboard_link(flag)}\n"
         "This warning conveys facts only. Work decisions require the Superintendent."
     )
     session.add(models.OutboxMessage(
-        id=message_id, flag=flag, recipient=str(telegram_recipient) if telegram_recipient else lead.email if lead else None,
+        id=uuid4().hex, flag=flag, kind="warning",
+        recipient=str(telegram_recipient) if telegram_recipient else lead.email if lead else None,
         channel="telegram" if telegram_recipient else "gmail", subject=f"SiteMind Flag {flag.type} — Zone {flag.zone_id}",
         content=content, status="pending", attempts=0, available_at=now, created_at=now,
     ))
+
+
+def enqueue_escalation(session, flag, hours, now):
+    """Queue the factual escalation to the Superintendent (next level, PLAN §3.3)."""
+    message = models.OutboxMessage(
+        id=uuid4().hex, flag=flag, kind="escalation",
+        recipient=os.environ.get("SUPERINTENDENT_EMAIL") or None, channel="gmail",
+        subject=f"SiteMind escalation: Flag {flag.type} — Zone {flag.zone_id}",
+        content=(
+            f"Flag {flag.type}: {flag.activity} in Zone {flag.zone_id} has had no human reaction "
+            f"for {hours:g} hours since detection.\n"
+            f"Task: {flag.task_id or 'unresolved'}. State: {flag.state}. "
+            f"Responsible Crew Lead: {flag.responsible.name if flag.responsible else 'unassigned'}.\n"
+            f"Required Precondition: {flag.precondition}; current evaluation: {flag.evaluation}. {flag.explanation}\n"
+            f"Current details: {dashboard_link(flag)}\n"
+            "This escalation conveys facts only; it does not change, approve or close anything."
+        ),
+        status="pending", attempts=0, available_at=now, created_at=now,
+    )
+    session.add(message)
+    return message
 
 
 def audit(session, message, action, now):
@@ -128,7 +160,8 @@ def delivery_result(message_id: str, result: DeliveryResult, session: Database):
         if result.status == "sent":
             message.sent_at = now
             flag = session.scalar(select(models.Flag).where(models.Flag.id == message.flag_id).with_for_update())
-            if flag is not None and flag.state == "detected":
+            # Only the Crew Lead warning notifies; an escalation is not that notification.
+            if flag is not None and message.kind == "warning" and flag.state == "detected":
                 transition_flag(session, flag, action="notified", actor="worker",
                                 actor_type="system", channel=message.channel,
                                 source_ref=f"outbox:{message.id}")

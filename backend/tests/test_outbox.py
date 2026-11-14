@@ -16,7 +16,7 @@ from test_rules import initialized, ingest
 
 def test_outbox_migration_extends_revision_notes_and_round_trips(engine):
     config = Config(str(BACKEND / "alembic.ini"))
-    assert ScriptDirectory.from_config(config).get_heads() == ["0010"]
+    assert ScriptDirectory.from_config(config).get_heads() == ["0011"]
     with engine.begin() as connection:
         config.attributes["connection"] = connection
         command.downgrade(config, "0006")
@@ -153,8 +153,8 @@ def test_invalid_delivery_report_and_reset(initialized, seed):
 def test_flag_and_outbox_rollback_together(initialized, engine, monkeypatch):
     from app import outbox
     original = outbox.enqueue_flag_warning
-    def fail(*args):
-        original(*args)
+    def fail(*args, **kwargs):
+        original(*args, **kwargs)
         raise RuntimeError('synthetic transaction failure')
     monkeypatch.setattr(outbox, 'enqueue_flag_warning', fail)
     with pytest.raises(RuntimeError, match='synthetic'):

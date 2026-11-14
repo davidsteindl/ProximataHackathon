@@ -335,7 +335,8 @@ class Proposal(Base):
 class OutboxMessage(Base):
     __tablename__ = "outbox_messages"
     __table_args__ = (
-        UniqueConstraint("flag_id", name="outbox_flag_notification"),
+        UniqueConstraint("flag_id", "kind", name="outbox_flag_notification"),
+        CheckConstraint("kind IN ('warning','escalation')", name="outbox_kind"),
         CheckConstraint("status IN ('pending','sending','sent','failed','cancelled')", name="outbox_status"),
         CheckConstraint("channel IN ('gmail','telegram')", name="outbox_channel"),
         CheckConstraint("attempts >= 0", name="outbox_attempts"),
@@ -343,6 +344,7 @@ class OutboxMessage(Base):
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
     flag_id: Mapped[str | None] = mapped_column(ForeignKey("flags.id"))
     flag: Mapped[Flag | None] = relationship()
+    kind: Mapped[str] = mapped_column(String(20), server_default="warning")
     recipient: Mapped[str | None] = mapped_column(String(254))
     channel: Mapped[str] = mapped_column(String(32))
     subject: Mapped[str] = mapped_column(String(200))
