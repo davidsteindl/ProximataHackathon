@@ -365,8 +365,10 @@ def test_worker_keeps_retention_running_with_bot_disabled(monkeypatch):
     monkeypatch.setattr(worker.time, "sleep", Mock(side_effect=StopIteration))
     with pytest.raises(StopIteration):
         worker.main()
-    assert len(calls) == 1 and calls[0].url.path == "/telegram/retention"
-    assert calls[0].headers["X-Telegram-Compliance-Key"] == "synthetic-worker-key"
+    # Scheduled jobs (#14) also call the API; exactly one retention call is made.
+    retention = [call for call in calls if call.url.path == "/telegram/retention"]
+    assert len(retention) == 1
+    assert retention[0].headers["X-Telegram-Compliance-Key"] == "synthetic-worker-key"
 
 
 def test_seed_reset_replays_sources_without_confirming_evidence(telegram_api, seed):
