@@ -251,6 +251,26 @@ export function zoneBounds(geometry, zoneId) {
   return { minX: Math.min(...xs), maxX: Math.max(...xs), minY: Math.min(...ys), maxY: Math.max(...ys) };
 }
 
+/**
+ * Strips of `width` plan metres just inside each edge of a polygon outline, as quads [a, b, b', a'].
+ * The 3D view uses them as hit surfaces along a unit's boundary, so a unit is selectable while the rooms
+ * that tile its interior keep the clicks inside them.
+ */
+export function insetEdgeStrips(outline, width) {
+  const area = outline.reduce((sum, [x1, y1], i) => {
+    const [x2, y2] = outline[(i + 1) % outline.length];
+    return sum + x1 * y2 - x2 * y1;
+  }, 0);
+  const side = area > 0 ? 1 : -1; // counter-clockwise: the interior is to the left of each edge
+  return outline.map(([ax, ay], i) => {
+    const [bx, by] = outline[(i + 1) % outline.length];
+    const len = Math.hypot(bx - ax, by - ay) || 1;
+    const nx = (-(by - ay) / len) * side * width;
+    const ny = ((bx - ax) / len) * side * width;
+    return [[ax, ay], [bx, by], [bx + nx, by + ny], [ax + nx, ay + ny]];
+  });
+}
+
 /** Camera focus: an element (e.g. a wall) is framed together with its parent room, so it has context. */
 export function focusBounds(index, geometry, zoneId) {
   const own = zoneBounds(geometry, zoneId);
