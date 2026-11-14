@@ -248,9 +248,10 @@ def test_agent_suggestions_stay_unapproved_alongside_advisor_proposals(initializ
     })
     assert response.status_code == 201, response.text
     agent = response.json()
-    proposal = advise(initialized, flag).json()["proposals"][0]
+    proposals = advise(initialized, flag).json()["proposals"]
+    proposal = proposals[0]
     records = initialized.get("/proposals", params={"flag_id": flag["id"]}).json()
-    assert {item["id"] for item in records} == {agent["id"], proposal["id"]}
+    assert {item["id"] for item in records} == {agent["id"], *[item["id"] for item in proposals]}
     assert initialized.get(f"/proposals/{agent['id']}").json() == agent
     assert initialized.get(f"/proposals/{proposal['id']}").json()["channel"] == "advisor"
     flag = acknowledged(initialized, engine, flag)

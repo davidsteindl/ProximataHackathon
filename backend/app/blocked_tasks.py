@@ -4,7 +4,7 @@ import json
 import os
 import re
 from collections import defaultdict
-from datetime import UTC, datetime
+from datetime import UTC
 
 from sqlalchemy import select
 
@@ -51,7 +51,9 @@ def detect_blocked_tasks(flag, tasks, zones, as_of):
 def blocked_tasks(session, flag, as_of=None):
     # Replay follows the source clock, not the wall clock of the demo machine.
     if as_of is None:
-        as_of = min((utc((link.event or session.get(models.Event, link.event_id)).source.sent_at) for link in flag.sources), default=utc(flag.created_at))
+        reference = flag.audit[0].source_ref
+        source = session.get(models.SourceMessage, reference.removeprefix("source:")) if reference.startswith("source:") else None
+        as_of = source.sent_at if source else flag.created_at
     return detect_blocked_tasks(flag, session.scalars(select(models.Task)).all(),
                                 session.scalars(select(models.Zone)).all(), as_of)
 

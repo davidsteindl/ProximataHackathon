@@ -52,7 +52,9 @@ def test_scan_finds_hero_conflict_from_schedule_alone(initialized):
     assert flag["sources"] == []
     assert flag["audit"][0] == {**flag["audit"][0], "action": "detected", "actor": "morning_scan",
                                 "channel": "system", "source_ref": "schedule:drywall-F3@2026-11-15T06:00:00+00:00"}
-    [warning] = flag["notifications"]
+    # The floor-scoped conflict also informs the upcoming insulation Crew (#38).
+    assert len(flag["notifications"]) == 2
+    [warning] = [row for row in flag["notifications"] if "morning scan of the site schedule" in row["content"]]
     assert warning["kind"] == "warning"
     assert "morning scan of the site schedule" in warning["content"]
     assert "drywall-F3" in warning["content"]
@@ -68,6 +70,7 @@ def test_scan_uses_confirmed_seed_baseline_without_inventing_proof(client, seed)
 
 def test_scan_is_idempotent_and_dedups_with_later_announcement(initialized):
     first = scan(initialized)
+    notices = initialized.get("/outbox").json()
     flag = drywall_f3(initialized)
     again = scan(initialized)
     assert again["created_flag_ids"] == [] and again["updated_flag_ids"] == []
@@ -78,7 +81,8 @@ def test_scan_is_idempotent_and_dedups_with_later_announcement(initialized):
     assert joined["id"] == flag["id"] and joined["zone_id"] == "F3"
     assert [source["id"] for source in joined["sources"]] == [result["events"][0]["id"]]
     assert len(initialized.get("/flags").json()) == len(first["created_flag_ids"])
-    assert len(initialized.get("/outbox").json()) == len(first["created_flag_ids"])
+    assert initialized.get("/outbox").json() == notices
+    assert len(notices) == 2 * len(first["created_flag_ids"])
 
 
 def test_scan_after_announcement_attaches_once_without_new_flag(initialized):

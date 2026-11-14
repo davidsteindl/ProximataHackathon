@@ -11,9 +11,10 @@ from sqlalchemy import select
 
 from app import models
 from app.advisor import advice_facts, get_advisor, validate_advice
+from app.blocked_tasks import HOLD_ACTION, HOLD_MESSAGE, blocked_tasks, crew_routes
 from app.extraction import ExtractionError
 from app.lifecycle import transition_flag
-from app.outbox import enqueue, flag_link, lead_route
+from app.outbox import enqueue, flag_link
 from app.review_api import HumanAction, Reason, validate_person
 from app.schemas import Identifier, Record, Timestamp
 from app.site_api import Database
@@ -107,11 +108,22 @@ def create_advice(flag_id: str, session: Database):
                                    source_refs=list(dict.fromkeys([f"flag:{flag.id}", *[refs[handle] for handle in cited]])),
                                    **item.model_dump()) for number, item in enumerate(advice.proposals)],
     )
+    tasks = blocked_tasks(session, flag)
+    if tasks:
+        record.proposals.append(models.Proposal(
+            id=uuid4().hex, flag_id=flag.id, ordinal=len(record.proposals), status="proposed",
+            channel="advisor", created_at=now, source_refs=[f"flag:{flag.id}"],
+            action=HOLD_ACTION, rationale=f"Open Precondition {flag.precondition}: {flag.evaluation}.",
+            affected_tasks=[task.id for task in tasks],
+            affected_crews=sorted({task.crew_id for task in tasks}),
+            affected_zones=sorted({task.zone_id for task in tasks} | {flag.zone_id}),
+            message=HOLD_MESSAGE,
+        ))
     session.add(record)
     flag.audit.append(models.FlagAudit(action="advice_generated", actor="advisor", channel="system",
                                        source_ref=f"advice:{record.id}", recorded_at=now))
     if record.proposals:
-        lines = [f"{item.ordinal + 1}. {item.action}\n   Affected: {parties(item)}" for item in record.proposals]
+        lines = [f"{item.ordinal + 1}. {item.action}\n   Affected: {parties(item)}\n   Proposed message: {item.message}" for item in record.proposals]
         enqueue(session, flag, "approval_request", f"approval:{record.id}",
                 os.environ.get("SUPERINTENDENT_EMAIL", "").strip() or None,
                 f"SiteMind approval request — Flag {flag.type}, Zone {flag.zone_id}",
@@ -160,9 +172,20 @@ def decide_proposal(proposal_id: str, decision: ProposalDecision, session: Datab
             transition_flag(session, flag, action="action_approved", actor=decision.actor, actor_type="human",
                             role=decision.role, channel=decision.channel, source_ref=source_ref)
         crews = [session.get(models.Crew, crew_id) for crew_id in proposal.affected_crews]
-        for lead in {crew.lead_id: crew.lead for crew in crews if crew}.values():
-            channel, recipient = lead_route(lead)
-            enqueue(session, flag, "proposal_followup", f"followup:{proposal.id}:{lead.id}", recipient,
+        # The hold Proposal has a fixed, reviewable schedule snapshot. Other
+        # advisor measures retain their existing Crew Lead delivery contract.
+        routes = {}
+        for crew in crews:
+            if crew is None:
+                continue
+            targets = list(crew_routes(crew))
+            for route, channel, recipient in targets:
+                if route == "group" and proposal.action != HOLD_ACTION:
+                    continue
+                key = crew.lead_id if route == "lead" else f"group:{crew.id}"
+                routes[key] = (channel, recipient)
+        for key, (channel, recipient) in routes.items():
+            enqueue(session, flag, "proposal_followup", f"followup:{proposal.id}:{key}", recipient,
                     f"SiteMind: approved measure — Zone {flag.zone_id}",
                     f"The Superintendent approved this measure for Flag {flag.type} in Zone {flag.zone_id}:\n"
                     f"{proposal.action}\n\n{proposal.message}\n\n"

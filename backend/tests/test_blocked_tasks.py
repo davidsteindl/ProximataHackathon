@@ -75,3 +75,46 @@ def test_positive_group_contact_is_never_used(initialized, monkeypatch):
     monkeypatch.setenv("TELEGRAM_CREW_GROUPS_JSON", '{"drywall":"123"}')
     ingest(initialized)
     assert len(initialized.get("/outbox").json()) == 1
+
+
+def test_hold_proposal_requires_its_own_superintendent_approval(initialized, engine, monkeypatch):
+    from test_proposals import acknowledged, advise, decide
+    from app.blocked_tasks import HOLD_ACTION, HOLD_MESSAGE
+
+    monkeypatch.setenv("TELEGRAM_CREW_GROUPS_JSON", '{"drywall":"-123", "insulation":"-456"}')
+    add_successor(engine)
+    ingest(initialized)
+    flag = initialized.get("/flags").json()[0]
+    advice = advise(initialized, flag).json()
+    hold = next(item for item in advice["proposals"] if item["action"] == HOLD_ACTION)
+    assert hold["message"] == HOLD_MESSAGE
+    assert set(hold["affected_tasks"]) == {"drywall-F3", "finish-3A"}
+    assert set(hold["affected_crews"]) == {"drywall", "insulation"}
+    assert not any(row["kind"] == "proposal_followup" for row in initialized.get("/outbox").json())
+    assert decide(initialized, hold["id"], "approved").status_code == 409
+    flag = acknowledged(initialized, engine, flag)
+    assert decide(initialized, hold["id"], "approved", role="crew_lead", actor="lead-drywall").status_code == 403
+    # Approving a different measure cannot send the hold instruction.
+    ordinary = advice["proposals"][0]
+    assert decide(initialized, ordinary["id"], "approved").status_code == 200
+    assert not any(HOLD_MESSAGE in row["content"] for row in initialized.get("/outbox").json()
+                   if row["kind"] == "proposal_followup")
+    assert decide(initialized, hold["id"], "approved").status_code == 200
+    notices = [row for row in initialized.get("/outbox").json()
+               if row["kind"] == "proposal_followup" and HOLD_MESSAGE in row["content"]]
+    assert len(notices) == 4
+    assert {row["recipient"] for row in notices if row["channel"] == "telegram"} == {"-123", "-456"}
+    assert decide(initialized, hold["id"], "approved").status_code == 409
+    updated = initialized.get(f"/flags/{flag['id']}").json()
+    assert updated["state"] == "in_progress" and updated["evaluation"] == "unknown"
+
+
+def test_rejected_hold_proposal_sends_no_instruction(initialized, engine):
+    from test_proposals import advise, decide
+    from app.blocked_tasks import HOLD_ACTION
+
+    ingest(initialized)
+    flag = initialized.get("/flags").json()[0]
+    hold = next(item for item in advise(initialized, flag).json()["proposals"] if item["action"] == HOLD_ACTION)
+    assert decide(initialized, hold["id"], "rejected").status_code == 200
+    assert not any(row["kind"] == "proposal_followup" for row in initialized.get("/outbox").json())
