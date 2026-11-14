@@ -184,6 +184,33 @@ def test_caption_free_photo_uses_photo_placeholder_quote(api, monkeypatch):
     assert hero_flags(api) == []  # No zone: nothing is guessed from the image.
 
 
+def test_zones_read_from_the_image_are_dropped(api, monkeypatch):
+    use_vision(monkeypatch, {"findings": [{"finding": "Closed wall, door sign 3B, 4C.", "confidence": 0.9,
+                                           "zones": ["3B", "4C"], "work_state": "closed"}]})
+    [event] = photo(api, "").json()["events"]
+    assert event["zone_ids"] == [] and event["unresolved_zones"] == []
+    assert open_flags(api) == []  # No Flag or warning from a zone guessed from the image.
+    [event] = photo(api, "3B ist schon zu", number="p2").json()["events"]
+    assert event["zone_ids"] == ["3B"]
+
+
+def test_photo_from_sender_without_crew_attaches_via_visible_trade(api, monkeypatch):
+    announce(api)
+    [flag] = hero_flags(api)
+    use_vision(monkeypatch, {"findings": [{"finding": "Wall boarded with gypsum panels.", "confidence": 0.9,
+                                           "zones": ["3B"], "quote": "3B", "work_state": "closed",
+                                           "trade": "drywall"}]})
+    response = api.post("/ingestion/messages", json={
+        "channel": "telegram", "source_key": "-100", "external_id": "p9", "sender_id": "999",
+        "sender_role": "superintendent", "sent_at": AFTER_INSPECTION, "text": "3B ist schon zu",
+        "attachments": [{"file_name": "wall.png", "media_type": "image/png",
+                         "content_base64": base64.b64encode(PHOTO).decode()}],
+    })
+    [event] = response.json()["events"]
+    assert [item["id"] for item in open_flags(api)] == [flag["id"]]
+    assert event["id"] in {source["id"] for source in api.get(f"/flags/{flag['id']}").json()["sources"]}
+
+
 def test_images_from_other_channels_are_not_sent_to_vision(api, monkeypatch):
     fake = use_vision(monkeypatch, {"findings": []})
     photo(api, "Logo im Anhang", channel="replay")

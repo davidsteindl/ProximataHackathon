@@ -16,6 +16,7 @@ from typing import Annotated, Literal
 import httpx
 from pydantic import Field
 
+from app.event_mapping import normalized
 from app.extraction import (
     ExtractedEvent, ExtractionError, ExtractionRecord, OpenAICompatibleExtractor, redact_text,
 )
@@ -31,6 +32,7 @@ class VisualFinding(ExtractionRecord):
     zones: list[Annotated[str, Field(min_length=1, max_length=200)]] = Field(default_factory=list, max_length=20)
     quote: Annotated[str, Field(min_length=1, max_length=2000)] | None = None
     work_state: Literal["closed", "open", "unclear"] = "unclear"
+    trade: Annotated[str, Field(max_length=64)] | None = None
     inspection_kind: Annotated[str, Field(max_length=64)] | None = None
     inspection_claim: Literal["passed", "failed", "pending"] | None = None
 
@@ -48,7 +50,9 @@ describe, identify or count people, faces, clothing, vehicles or license plates;
 only set people_visible=true if people appear. Take zones only from the caption;
 do not infer a zone from image content. quote is a verbatim caption excerpt
 naming the zone, or null. work_state=closed only for visibly closed/boarded
-walls or ceilings. Set inspection_claim only for a clearly readable inspection
+walls or ceilings. trade is the trade whose work is visible (drywall for gypsum
+boarding, plumbing for installation, insulation for Dämmung) or null; it names
+work, never a person. Set inspection_claim only for a clearly readable inspection
 tag; it is an unconfirmed claim. Never confirm evidence, decide clearance,
 create flags or approve work. Return zero findings for irrelevant photos.
 JSON schema:
@@ -145,7 +149,11 @@ def photo_statements(batch, redacted, original, attachment_id):
             if position < 0:
                 raise ExtractionError("invalid_quote")
             quote = original[position:position + len(finding.quote)]
-        common = dict(quote=quote, confidence=finding.confidence, zones=finding.zones)
+        # Zones only from the caption (#26): a label the model read or guessed
+        # from the image must not scope a deterministic check.
+        caption = normalized(redacted)
+        zones = [zone for zone in finding.zones if normalized(zone) and normalized(zone) in caption]
+        common = dict(quote=quote, confidence=finding.confidence, zones=zones, trade=finding.trade)
         if finding.inspection_claim is not None:
             statement = ExtractedEvent(intent="inspection_result", claim=finding.inspection_claim,
                                        inspection_kind=finding.inspection_kind, **common)

@@ -51,4 +51,7 @@ parties. Builds on the Telegram transport and retention of [TELEGRAM.md](TELEGRA
 - A readable inspection tag becomes an *unconfirmed* inspection Evidence claim.
   It counts only after a human confirms it in the dashboard Evidence review (#9);
   counterclaims still need their own review. Zones come only from the caption,
-  never guessed from the image.
+  never guessed from the image: the API drops zone labels not found in it.
+- The model may name the visible trade (e.g. drywall for gypsum boarding) so a
+  photo from a sender without Crew mapping matches the right Task; it names
+  work, never a person.
