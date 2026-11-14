@@ -6,23 +6,15 @@
       "text": "Können wir morgen früh 3B zumachen?",
       "sender_role": "crew_lead",
       "result": {
-        "events": [
-          {
-            "quote": "Können wir morgen früh 3B zumachen?",
-            "confidence": 0.98,
-            "intent": "planned_work",
-            "zones": [
-              "3B"
-            ],
-            "activity": "closing_work",
-            "trade": "drywall",
-            "time": {
-              "expression": "morgen früh",
-              "day_offset": 1,
-              "part_of_day": "morning"
-            }
-          }
-        ]
+        "events": [{
+          "quote": "Können wir morgen früh 3B zumachen?",
+          "confidence": 0.98,
+          "intent": "planned_work",
+          "zones": ["3B"],
+          "activity": "closing_work",
+          "trade": "drywall",
+          "time": {"expression": "morgen früh", "day_offset": 1, "part_of_day": "morning"}
+        }]
       }
     },
     {
@@ -199,9 +191,7 @@
             "quote": "wie ist der Stand im Bad 3B?",
             "confidence": 0.95,
             "intent": "question",
-            "zones": [
-              "Bad 3B"
-            ],
+            "zones": ["Bad 3B"],
             "activity": "zone_status_question"
           }
         ]
@@ -328,6 +318,29 @@
             ],
             "inspection_kind": "rough_in",
             "claim": "passed"
+          }
+        ]
+      }
+    },
+    {
+      "text": "heute früh machen wir 3B zu, platten sind da",
+      "sender_role": "crew_lead",
+      "result": {
+        "events": [
+          {
+            "quote": "heute früh machen wir 3B zu, platten sind da",
+            "confidence": 0.95,
+            "intent": "planned_work",
+            "zones": [
+              "3B"
+            ],
+            "activity": "closing_work",
+            "trade": "drywall",
+            "time": {
+              "expression": "heute früh",
+              "day_offset": 0,
+              "part_of_day": "morning"
+            }
           }
         ]
       }

@@ -10,3 +10,6 @@ node_modules/
 
 # Local Gmail OAuth client and refresh token (worker only).
 /.gmail/
+
+# Local replay transcripts and synthetic outbox deliveries.
+/.replay/

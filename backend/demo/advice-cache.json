@@ -122,6 +122,541 @@
           }
         ]
       }
+    },
+    {
+      "match": {
+        "type": "A",
+        "zone_id": "3B",
+        "task_id": "drywall-F3",
+        "precondition": "inspection_passed",
+        "evaluation": "contradictory"
+      },
+      "evidence_match": [
+        {
+          "handle": "E1",
+          "origin": "llm_statement",
+          "kind": "inspection",
+          "claim": "pending",
+          "scope": {
+            "kind": "inspection",
+            "zone_id": "F3",
+            "inspection_id": "rough-in-F3",
+            "task_id": null,
+            "crew_id": null,
+            "revision_id": null
+          },
+          "review_status": "unconfirmed"
+        },
+        {
+          "handle": "E2",
+          "origin": "seed_baseline",
+          "kind": "inspection",
+          "claim": "pending",
+          "scope": {
+            "kind": "inspection",
+            "zone_id": "F3",
+            "inspection_id": "rough-in-F3",
+            "task_id": null,
+            "crew_id": null,
+            "revision_id": null
+          },
+          "review_status": "confirmed"
+        },
+        {
+          "handle": "E3",
+          "origin": "seed_statement",
+          "kind": "inspection",
+          "claim": "passed",
+          "scope": {
+            "kind": "inspection",
+            "zone_id": "F3",
+            "inspection_id": "rough-in-F3",
+            "task_id": null,
+            "crew_id": null,
+            "revision_id": null
+          },
+          "review_status": "unconfirmed"
+        },
+        {
+          "handle": "E4",
+          "origin": "seed_statement",
+          "kind": "inspection",
+          "claim": "failed",
+          "scope": {
+            "kind": "inspection",
+            "zone_id": "F3",
+            "inspection_id": "rough-in-F3",
+            "task_id": null,
+            "crew_id": null,
+            "revision_id": null
+          },
+          "review_status": "unconfirmed"
+        },
+        {
+          "handle": "E5",
+          "origin": "seed_statement",
+          "kind": "inspection",
+          "claim": "passed",
+          "scope": {
+            "kind": "inspection",
+            "zone_id": "F3",
+            "inspection_id": "rough-in-F3",
+            "task_id": null,
+            "crew_id": null,
+            "revision_id": null
+          },
+          "review_status": "unconfirmed"
+        }
+      ],
+      "result": {
+        "explanation": "The recorded work extraction for 3B triggered this Flag [S1] [flag]. Source statements remain unconfirmed; the rule evaluation reports unresolved inspection contradictions [flag]. Closing 3B requires the rough-in inspection for F3 [inspection:rough-in-F3]. The scheduled drywall task covers F3 [task:drywall-F3].",
+        "proposals": [
+          {
+            "action": "Postpone drywall closing in 3B; move the drywall crew to 3A/3C for non-closing work until the rough-in inspection is confirmed",
+            "rationale": "Postpone closing in 3B while the required inspection remains unresolved [flag] [inspection:rough-in-F3]. The affected scheduled task is drywall F3 [task:drywall-F3].",
+            "affected_crews": [
+              "drywall"
+            ],
+            "affected_tasks": [
+              "drywall-F3"
+            ],
+            "affected_zones": [
+              "3B",
+              "3A",
+              "3C"
+            ],
+            "message": "Superintendent decision: do not close walls in 3B for now. Drywall in 3B is postponed until the rough-in inspection is confirmed. Continue in 3A/3C with non-closing work only (for example framing). Do not resume closing in 3B without the Superintendent."
+          }
+        ]
+      }
+    },
+    {
+      "match": {
+        "type": "A",
+        "zone_id": "3B",
+        "task_id": "drywall-F3",
+        "precondition": "inspection_passed",
+        "evaluation": "contradictory"
+      },
+      "evidence_match": [
+        {
+          "handle": "E1",
+          "origin": "seed_baseline",
+          "kind": "inspection",
+          "claim": "pending",
+          "scope": {
+            "kind": "inspection",
+            "zone_id": "F3",
+            "inspection_id": "rough-in-F3",
+            "task_id": null,
+            "crew_id": null,
+            "revision_id": null
+          },
+          "review_status": "confirmed"
+        },
+        {
+          "handle": "E2",
+          "origin": "llm_statement",
+          "kind": "inspection",
+          "claim": "pending",
+          "scope": {
+            "kind": "inspection",
+            "zone_id": "F3",
+            "inspection_id": "rough-in-F3",
+            "task_id": null,
+            "crew_id": null,
+            "revision_id": null
+          },
+          "review_status": "unconfirmed"
+        },
+        {
+          "handle": "E3",
+          "origin": "seed_statement",
+          "kind": "inspection",
+          "claim": "passed",
+          "scope": {
+            "kind": "inspection",
+            "zone_id": "F3",
+            "inspection_id": "rough-in-F3",
+            "task_id": null,
+            "crew_id": null,
+            "revision_id": null
+          },
+          "review_status": "unconfirmed"
+        },
+        {
+          "handle": "E4",
+          "origin": "seed_statement",
+          "kind": "inspection",
+          "claim": "failed",
+          "scope": {
+            "kind": "inspection",
+            "zone_id": "F3",
+            "inspection_id": "rough-in-F3",
+            "task_id": null,
+            "crew_id": null,
+            "revision_id": null
+          },
+          "review_status": "unconfirmed"
+        },
+        {
+          "handle": "E5",
+          "origin": "seed_statement",
+          "kind": "inspection",
+          "claim": "passed",
+          "scope": {
+            "kind": "inspection",
+            "zone_id": "F3",
+            "inspection_id": "rough-in-F3",
+            "task_id": null,
+            "crew_id": null,
+            "revision_id": null
+          },
+          "review_status": "unconfirmed"
+        }
+      ],
+      "result": {
+        "explanation": "The recorded work extraction for 3B triggered this Flag [S1] [flag]. Source statements remain unconfirmed; the rule evaluation reports unresolved inspection contradictions [flag]. Closing 3B requires the rough-in inspection for F3 [inspection:rough-in-F3]. The scheduled drywall task covers F3 [task:drywall-F3].",
+        "proposals": [
+          {
+            "action": "Postpone drywall closing in 3B; move the drywall crew to 3A/3C for non-closing work until the rough-in inspection is confirmed",
+            "rationale": "Postpone closing in 3B while the required inspection remains unresolved [flag] [inspection:rough-in-F3]. The affected scheduled task is drywall F3 [task:drywall-F3].",
+            "affected_crews": [
+              "drywall"
+            ],
+            "affected_tasks": [
+              "drywall-F3"
+            ],
+            "affected_zones": [
+              "3B",
+              "3A",
+              "3C"
+            ],
+            "message": "Superintendent decision: do not close walls in 3B for now. Drywall in 3B is postponed until the rough-in inspection is confirmed. Continue in 3A/3C with non-closing work only (for example framing). Do not resume closing in 3B without the Superintendent."
+          }
+        ]
+      }
+    },
+    {
+      "match": {
+        "type": "A",
+        "zone_id": "3B",
+        "task_id": "drywall-F3",
+        "precondition": "inspection_passed",
+        "evaluation": "contradictory"
+      },
+      "evidence_match": [
+        {
+          "handle": "E1",
+          "origin": "seed_baseline",
+          "kind": "inspection",
+          "claim": "pending",
+          "scope": {
+            "kind": "inspection",
+            "zone_id": "F3",
+            "inspection_id": "rough-in-F3",
+            "task_id": null,
+            "crew_id": null,
+            "revision_id": null
+          },
+          "review_status": "confirmed"
+        },
+        {
+          "handle": "E2",
+          "origin": "seed_statement",
+          "kind": "inspection",
+          "claim": "passed",
+          "scope": {
+            "kind": "inspection",
+            "zone_id": "F3",
+            "inspection_id": "rough-in-F3",
+            "task_id": null,
+            "crew_id": null,
+            "revision_id": null
+          },
+          "review_status": "unconfirmed"
+        },
+        {
+          "handle": "E3",
+          "origin": "llm_statement",
+          "kind": "inspection",
+          "claim": "pending",
+          "scope": {
+            "kind": "inspection",
+            "zone_id": "F3",
+            "inspection_id": "rough-in-F3",
+            "task_id": null,
+            "crew_id": null,
+            "revision_id": null
+          },
+          "review_status": "unconfirmed"
+        },
+        {
+          "handle": "E4",
+          "origin": "seed_statement",
+          "kind": "inspection",
+          "claim": "failed",
+          "scope": {
+            "kind": "inspection",
+            "zone_id": "F3",
+            "inspection_id": "rough-in-F3",
+            "task_id": null,
+            "crew_id": null,
+            "revision_id": null
+          },
+          "review_status": "unconfirmed"
+        },
+        {
+          "handle": "E5",
+          "origin": "seed_statement",
+          "kind": "inspection",
+          "claim": "passed",
+          "scope": {
+            "kind": "inspection",
+            "zone_id": "F3",
+            "inspection_id": "rough-in-F3",
+            "task_id": null,
+            "crew_id": null,
+            "revision_id": null
+          },
+          "review_status": "unconfirmed"
+        }
+      ],
+      "result": {
+        "explanation": "The recorded work extraction for 3B triggered this Flag [S1] [flag]. Source statements remain unconfirmed; the rule evaluation reports unresolved inspection contradictions [flag]. Closing 3B requires the rough-in inspection for F3 [inspection:rough-in-F3]. The scheduled drywall task covers F3 [task:drywall-F3].",
+        "proposals": [
+          {
+            "action": "Postpone drywall closing in 3B; move the drywall crew to 3A/3C for non-closing work until the rough-in inspection is confirmed",
+            "rationale": "Postpone closing in 3B while the required inspection remains unresolved [flag] [inspection:rough-in-F3]. The affected scheduled task is drywall F3 [task:drywall-F3].",
+            "affected_crews": [
+              "drywall"
+            ],
+            "affected_tasks": [
+              "drywall-F3"
+            ],
+            "affected_zones": [
+              "3B",
+              "3A",
+              "3C"
+            ],
+            "message": "Superintendent decision: do not close walls in 3B for now. Drywall in 3B is postponed until the rough-in inspection is confirmed. Continue in 3A/3C with non-closing work only (for example framing). Do not resume closing in 3B without the Superintendent."
+          }
+        ]
+      }
+    },
+    {
+      "match": {
+        "type": "A",
+        "zone_id": "3B",
+        "task_id": "drywall-F3",
+        "precondition": "inspection_passed",
+        "evaluation": "contradictory"
+      },
+      "evidence_match": [
+        {
+          "handle": "E1",
+          "origin": "seed_baseline",
+          "kind": "inspection",
+          "claim": "pending",
+          "scope": {
+            "kind": "inspection",
+            "zone_id": "F3",
+            "inspection_id": "rough-in-F3",
+            "task_id": null,
+            "crew_id": null,
+            "revision_id": null
+          },
+          "review_status": "confirmed"
+        },
+        {
+          "handle": "E2",
+          "origin": "seed_statement",
+          "kind": "inspection",
+          "claim": "passed",
+          "scope": {
+            "kind": "inspection",
+            "zone_id": "F3",
+            "inspection_id": "rough-in-F3",
+            "task_id": null,
+            "crew_id": null,
+            "revision_id": null
+          },
+          "review_status": "unconfirmed"
+        },
+        {
+          "handle": "E3",
+          "origin": "seed_statement",
+          "kind": "inspection",
+          "claim": "failed",
+          "scope": {
+            "kind": "inspection",
+            "zone_id": "F3",
+            "inspection_id": "rough-in-F3",
+            "task_id": null,
+            "crew_id": null,
+            "revision_id": null
+          },
+          "review_status": "unconfirmed"
+        },
+        {
+          "handle": "E4",
+          "origin": "llm_statement",
+          "kind": "inspection",
+          "claim": "pending",
+          "scope": {
+            "kind": "inspection",
+            "zone_id": "F3",
+            "inspection_id": "rough-in-F3",
+            "task_id": null,
+            "crew_id": null,
+            "revision_id": null
+          },
+          "review_status": "unconfirmed"
+        },
+        {
+          "handle": "E5",
+          "origin": "seed_statement",
+          "kind": "inspection",
+          "claim": "passed",
+          "scope": {
+            "kind": "inspection",
+            "zone_id": "F3",
+            "inspection_id": "rough-in-F3",
+            "task_id": null,
+            "crew_id": null,
+            "revision_id": null
+          },
+          "review_status": "unconfirmed"
+        }
+      ],
+      "result": {
+        "explanation": "The recorded work extraction for 3B triggered this Flag [S1] [flag]. Source statements remain unconfirmed; the rule evaluation reports unresolved inspection contradictions [flag]. Closing 3B requires the rough-in inspection for F3 [inspection:rough-in-F3]. The scheduled drywall task covers F3 [task:drywall-F3].",
+        "proposals": [
+          {
+            "action": "Postpone drywall closing in 3B; move the drywall crew to 3A/3C for non-closing work until the rough-in inspection is confirmed",
+            "rationale": "Postpone closing in 3B while the required inspection remains unresolved [flag] [inspection:rough-in-F3]. The affected scheduled task is drywall F3 [task:drywall-F3].",
+            "affected_crews": [
+              "drywall"
+            ],
+            "affected_tasks": [
+              "drywall-F3"
+            ],
+            "affected_zones": [
+              "3B",
+              "3A",
+              "3C"
+            ],
+            "message": "Superintendent decision: do not close walls in 3B for now. Drywall in 3B is postponed until the rough-in inspection is confirmed. Continue in 3A/3C with non-closing work only (for example framing). Do not resume closing in 3B without the Superintendent."
+          }
+        ]
+      }
+    },
+    {
+      "match": {
+        "type": "A",
+        "zone_id": "3B",
+        "task_id": "drywall-F3",
+        "precondition": "inspection_passed",
+        "evaluation": "contradictory"
+      },
+      "evidence_match": [
+        {
+          "handle": "E1",
+          "origin": "seed_baseline",
+          "kind": "inspection",
+          "claim": "pending",
+          "scope": {
+            "kind": "inspection",
+            "zone_id": "F3",
+            "inspection_id": "rough-in-F3",
+            "task_id": null,
+            "crew_id": null,
+            "revision_id": null
+          },
+          "review_status": "confirmed"
+        },
+        {
+          "handle": "E2",
+          "origin": "seed_statement",
+          "kind": "inspection",
+          "claim": "passed",
+          "scope": {
+            "kind": "inspection",
+            "zone_id": "F3",
+            "inspection_id": "rough-in-F3",
+            "task_id": null,
+            "crew_id": null,
+            "revision_id": null
+          },
+          "review_status": "unconfirmed"
+        },
+        {
+          "handle": "E3",
+          "origin": "seed_statement",
+          "kind": "inspection",
+          "claim": "failed",
+          "scope": {
+            "kind": "inspection",
+            "zone_id": "F3",
+            "inspection_id": "rough-in-F3",
+            "task_id": null,
+            "crew_id": null,
+            "revision_id": null
+          },
+          "review_status": "unconfirmed"
+        },
+        {
+          "handle": "E4",
+          "origin": "seed_statement",
+          "kind": "inspection",
+          "claim": "passed",
+          "scope": {
+            "kind": "inspection",
+            "zone_id": "F3",
+            "inspection_id": "rough-in-F3",
+            "task_id": null,
+            "crew_id": null,
+            "revision_id": null
+          },
+          "review_status": "unconfirmed"
+        },
+        {
+          "handle": "E5",
+          "origin": "llm_statement",
+          "kind": "inspection",
+          "claim": "pending",
+          "scope": {
+            "kind": "inspection",
+            "zone_id": "F3",
+            "inspection_id": "rough-in-F3",
+            "task_id": null,
+            "crew_id": null,
+            "revision_id": null
+          },
+          "review_status": "unconfirmed"
+        }
+      ],
+      "result": {
+        "explanation": "The recorded work extraction for 3B triggered this Flag [S1] [flag]. Source statements remain unconfirmed; the rule evaluation reports unresolved inspection contradictions [flag]. Closing 3B requires the rough-in inspection for F3 [inspection:rough-in-F3]. The scheduled drywall task covers F3 [task:drywall-F3].",
+        "proposals": [
+          {
+            "action": "Postpone drywall closing in 3B; move the drywall crew to 3A/3C for non-closing work until the rough-in inspection is confirmed",
+            "rationale": "Postpone closing in 3B while the required inspection remains unresolved [flag] [inspection:rough-in-F3]. The affected scheduled task is drywall F3 [task:drywall-F3].",
+            "affected_crews": [
+              "drywall"
+            ],
+            "affected_tasks": [
+              "drywall-F3"
+            ],
+            "affected_zones": [
+              "3B",
+              "3A",
+              "3C"
+            ],
+            "message": "Superintendent decision: do not close walls in 3B for now. Drywall in 3B is postponed until the rough-in inspection is confirmed. Continue in 3A/3C with non-closing work only (for example framing). Do not resume closing in 3B without the Superintendent."
+          }
+        ]
+      }
     }
   ]
 }
