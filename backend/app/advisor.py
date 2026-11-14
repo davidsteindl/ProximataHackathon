@@ -140,7 +140,7 @@ JSON schema:
 
 
 class CachedAdvisor:
-    """Offline demo advice keyed by the Flag's deterministic identity."""
+    """Offline demo advice bound to Flag identity and declared Evidence facts."""
     name = "cached:v1"
 
     def __init__(self, path=CACHE):
@@ -150,8 +150,13 @@ class CachedAdvisor:
         flag = facts["flag"]
         try:
             cache = json.loads(self.path.read_text(encoding="utf-8"))
+            evidence = [{key: item[key] for key in (
+                "handle", "origin", "kind", "claim", "scope", "review_status",
+            )} for item in facts["evidence"]]
             for entry in cache["entries"]:
                 if all(flag.get(key) == value for key, value in entry["match"].items()):
+                    if "evidence_match" in entry and entry["evidence_match"] != evidence:
+                        continue
                     return Advice.model_validate(entry["result"])
         except (OSError, ValueError, KeyError, TypeError) as error:
             raise ExtractionError("invalid_cache") from error

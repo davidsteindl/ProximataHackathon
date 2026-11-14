@@ -71,6 +71,11 @@ With `LLM_PROVIDER=cached`, advice comes from `backend/demo/advice-cache.json`, 
 by Flag type, zone, task and Precondition. The hero Flag A entry proposes postponing
 closing work in 3B and moving the drywall crew to 3A/3C for non-closing work. Other
 Flags return `cache_miss` (502), the worker logs it and retries on the next pass.
+The contradictory hero entry also matches the Evidence snapshot (citation handles,
+origins, kinds, claims, scopes and review statuses). A human review or an additional
+statement changes that snapshot: incompatible cached wording returns `cache_miss`,
+without storing advice or queuing an approval request. Generic entries that cite
+no individual Evidence continue to use the deterministic Flag evaluation.
 With `openai_compatible`, the same provider settings as extraction are used.
 
 Hero check: import the seed, ingest `backend/demo/closing-work.json`, wait for the

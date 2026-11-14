@@ -39,6 +39,68 @@
         "precondition": "inspection_passed",
         "evaluation": "contradictory"
       },
+      "evidence_match": [
+        {
+          "handle": "E1",
+          "origin": "seed_baseline",
+          "kind": "inspection",
+          "claim": "pending",
+          "scope": {
+            "kind": "inspection",
+            "zone_id": "F3",
+            "inspection_id": "rough-in-F3",
+            "task_id": null,
+            "crew_id": null,
+            "revision_id": null
+          },
+          "review_status": "confirmed"
+        },
+        {
+          "handle": "E2",
+          "origin": "seed_statement",
+          "kind": "inspection",
+          "claim": "passed",
+          "scope": {
+            "kind": "inspection",
+            "zone_id": "F3",
+            "inspection_id": "rough-in-F3",
+            "task_id": null,
+            "crew_id": null,
+            "revision_id": null
+          },
+          "review_status": "unconfirmed"
+        },
+        {
+          "handle": "E3",
+          "origin": "seed_statement",
+          "kind": "inspection",
+          "claim": "failed",
+          "scope": {
+            "kind": "inspection",
+            "zone_id": "F3",
+            "inspection_id": "rough-in-F3",
+            "task_id": null,
+            "crew_id": null,
+            "revision_id": null
+          },
+          "review_status": "unconfirmed"
+        },
+        {
+          "handle": "E4",
+          "origin": "seed_statement",
+          "kind": "inspection",
+          "claim": "passed",
+          "scope": {
+            "kind": "inspection",
+            "zone_id": "F3",
+            "inspection_id": "rough-in-F3",
+            "task_id": null,
+            "crew_id": null,
+            "revision_id": null
+          },
+          "review_status": "unconfirmed"
+        }
+      ],
       "result": {
         "explanation": "The drywall crew reports that it will close 3B tomorrow morning [S1]; this is an unconfirmed announcement, not a recorded fact. Closing work in 3B requires the passed rough-in inspection for F3 [inspection:rough-in-F3]. The only confirmed record says this inspection is still pending [E1]. Unconfirmed statements claim it passed [E2] [E4] and that it failed [E3]; these claims conflict and are unresolved, so the rule check rates the Precondition contradictory, not satisfied [flag]. Drywall for F3 is scheduled as one task [task:drywall-F3].",
         "proposals": [

@@ -313,3 +313,36 @@ def test_full_seed_hero_advice_names_the_unresolved_contradiction(client, seed):
     assert "unresolved" in advice["explanation"] and "not satisfied" in advice["explanation"]
     statuses = {item["handle"]: item["review_status"] for item in advice["citations"]}
     assert statuses["E1"] == "confirmed" and statuses["E3"] == statuses["E4"] == "unconfirmed"
+
+
+@pytest.mark.parametrize("evidence_id,decision", [
+    ("baseline-rough-in-F3", "rejected"),
+    ("example-ambiguous", "confirmed"),
+])
+def test_fresh_cached_advice_rejects_changed_evidence_reviews(client, seed, monkeypatch, evidence_id, decision):
+    monkeypatch.setenv("LLM_PROVIDER", "cached")
+    assert client.post("/seed/import", json=seed.model_dump(mode="json")).status_code == 200
+    flag = hero_flag(client)
+    reviewed = client.post(f"/evidence/{evidence_id}/reviews", json={
+        **HUMAN, "decision": decision, "expected_sequence": 1,
+        "reason": "Synthetic Evidence review before the first advice request",
+    })
+    assert reviewed.status_code == 200, reviewed.text
+    assert reviewed.json()["review_status"] == decision
+    assert client.get(f"/flags/{flag['id']}").json()["evaluation"] == "contradictory"
+    response = advise(client, flag)
+    assert (response.status_code, response.json().get("detail")) == (502, "cache_miss")
+    assert client.get(f"/flags/{flag['id']}").json()["advice"] is None
+    assert outbox(client, "approval_request") == []
+
+
+def test_cached_advice_rejects_an_additional_evidence_statement(client, seed, monkeypatch):
+    monkeypatch.setenv("LLM_PROVIDER", "cached")
+    assert client.post("/seed/import", json=seed.model_dump(mode="json")).status_code == 200
+    flag = hero_flag(client)
+    inspection_claim(client)
+    assert client.get(f"/flags/{flag['id']}").json()["evaluation"] == "contradictory"
+    response = advise(client, flag)
+    assert (response.status_code, response.json().get("detail")) == (502, "cache_miss")
+    assert client.get(f"/flags/{flag['id']}").json()["advice"] is None
+    assert outbox(client, "approval_request") == []
