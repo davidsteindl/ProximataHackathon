@@ -14,6 +14,7 @@ from app.review_api import router as review_router
 from app.outbox import router as outbox_router
 from app.telegram_compliance import router as telegram_router
 from app.context_api import router as context_router
+from app.proposal_api import router as proposal_router
 
 app = FastAPI(title="SiteMind API")
 app.include_router(router)
@@ -24,6 +25,7 @@ app.include_router(review_router)
 app.include_router(outbox_router)
 app.include_router(telegram_router)
 app.include_router(context_router)
+app.include_router(proposal_router)
 
 
 @app.middleware("http")
