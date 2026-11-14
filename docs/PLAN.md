@@ -377,3 +377,18 @@ Schlaf in Schichten, sodass nachts immer jemand reviewen und mergen kann.
 - [x] DWG-Konverter gewählt: LibreDWG als separater Prozess; Details in docs/CAD-CONVERTER.md. Lizenz und Plattformen dokumentiert.
 - [x] Layer-Konvention für die synthetischen Pläne festgelegt und in §3.5 eingetragen (Details: `cad/README.md`)
 - [ ] Mentor fragen: Wie liegen Pläne bei Talonas Kunden typischerweise vor (DWG, PDF, beides)?
+
+### Blockierte Tasks (#38)
+
+`GET /flags` und `GET /flags/{id}` ergänzen `blocked_tasks` (Task-Objekte): Tasks
+in der Flag-Zone samt Unterzonen, der zugeordnete Task (auch bei Etagen-Scope)
+und transitive Nachfolger. Historische Tasks werden anhand des Quellzeitpunkts
+bzw. der Scan-Uhr ausgefiltert (`ends_at > as_of`); Zyklen enden über besuchte IDs.
+Erfüllte Preconditions und geschlossene Flags liefern keine blockierten Tasks.
+Pro Flag/Crew geht einmal ein faktischer Hinweis an den Crew Lead und die
+konfigurierte Telegram-Gruppe über die bestehende Outbox (`kind=warning`). Die
+bisherige Warnung übernimmt den Hinweis für den verantwortlichen Crew Lead.
+`TELEGRAM_CREW_GROUPS_JSON` ordnet Crew-IDs negativen Gruppen-Chat-IDs zu;
+der Worker verlangt weiterhin die Chat-Allowlist. Fehlende Gruppenzuordnungen
+werden ausgelassen, fehlende Lead-Adressen bleiben sichtbare Versandfehler.
+Die Task-Termine und Evidence werden dabei nicht geändert.

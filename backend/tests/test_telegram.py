@@ -412,3 +412,15 @@ def test_revoked_private_user_never_receives_pending_export(telegram_api):
         deliver_telegram_outbox(telegram, telegram_api)
     assert calls == []
     assert telegram_api.get("/outbox").json()[0]["status"] == "failed"
+
+
+def test_flag_notice_to_crew_group_uses_chat_allowlist(telegram_api, monkeypatch):
+    monkeypatch.setenv("TELEGRAM_CREW_GROUPS_JSON", '{"drywall":"-100"}')
+    telegram, http, calls = bot([message()])
+    with http:
+        poll_telegram(telegram, telegram_api)
+        deliver_telegram_outbox(telegram, telegram_api)
+        deliver_telegram_outbox(telegram, telegram_api)
+    sends = [payload for method, payload in calls if method == "sendMessage"]
+    assert {item["chat_id"] for item in sends} == {"123", "-100"}
+    assert all(row["status"] == "sent" for row in telegram_api.get("/outbox").json())
