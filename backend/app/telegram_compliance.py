@@ -139,7 +139,7 @@ def privacy_command(command: PrivacyCommand, session: Database):
             now = datetime.now(UTC)
             content = f"Teil {index + 1}/{len(chunks)}\n{chunk}" if len(chunks) > 1 else chunk
             session.add(models.OutboxMessage(
-                id=f"tg-{identity}-{index}", channel="telegram", recipient=command.chat_id,
+                id=f"tg-{identity}-{index}", kind="compliance_reply", channel="telegram", recipient=command.chat_id,
                 subject="SiteMind compliance", content=content, status="pending",
                 attempts=0, created_at=now, available_at=now,
             ))

@@ -69,6 +69,17 @@ def inspection_evidence(session, inspection, zone_ids):
     return result
 
 
+def flag_evidence(session, flag):
+    """Exact proof and open counterclaims relevant to one Flag, for display and advice."""
+    zones = {zone.id: zone for zone in session.scalars(select(models.Zone))}
+    if flag.type == "B":
+        from app.revision_rules import receipt_evidence
+        revision = session.get(models.Revision, flag.context["revision_id"])
+        return receipt_evidence(session, flag.zone_id, flag.context["crew_id"], revision, zones)
+    inspection = session.get(models.Inspection, flag.inspection_id) if flag.inspection_id else None
+    return inspection_evidence(session, inspection, inspection_evidence_scope(flag.zone_id, zones)) if inspection else []
+
+
 class InspectionPassed:
     type = "A"
     name = "inspection_passed"

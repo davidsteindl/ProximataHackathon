@@ -1,5 +1,5 @@
 export async function postHumanAction(baseUrl, kind, id, formData) {
-  if (!["flag", "evidence"].includes(kind)) return { error: "Unknown review action." };
+  if (!["flag", "evidence", "proposal"].includes(kind)) return { error: "Unknown review action." };
   const payload = {
     actor: formData.get("actor"),
     role: formData.get("role"),
@@ -21,6 +21,11 @@ export async function postHumanAction(baseUrl, kind, id, formData) {
       payload.correction_event_id = formData.get("correction_event_id");
     }
     path = `/flags/${encodeURIComponent(id)}/actions`;
+  } else if (kind === "proposal") {
+    const decision = formData.get("decision");
+    if (!["approved", "rejected"].includes(decision)) return { error: "Unknown Proposal decision." };
+    payload.decision = decision;
+    path = `/proposals/${encodeURIComponent(id)}/decisions`;
   } else {
     Object.assign(payload, {
       decision: formData.get("decision"),

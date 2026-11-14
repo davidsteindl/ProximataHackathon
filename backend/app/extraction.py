@@ -158,7 +158,10 @@ class OpenAICompatibleExtractor:
         self.name = f"openai_compatible:{model}"
 
     def extract(self, text, sender_role):
-        text = redact_text(text)
+        return self.complete(_PROMPT, {"text": redact_text(text), "sender_role": sender_role}, ExtractedBatch)
+
+    def complete(self, prompt, user, schema):
+        """JSON-mode completion validated against a schema; also used by the advisor."""
         try:
             with httpx.Client(timeout=self.timeout) as client:
                 response = client.post(
@@ -167,8 +170,8 @@ class OpenAICompatibleExtractor:
                     json={
                         "model": self.model,
                         "messages": [
-                            {"role": "system", "content": _PROMPT + json.dumps(ExtractedBatch.model_json_schema())},
-                            {"role": "user", "content": json.dumps({"text": text, "sender_role": sender_role}, ensure_ascii=False)},
+                            {"role": "system", "content": prompt + json.dumps(schema.model_json_schema())},
+                            {"role": "user", "content": json.dumps(user, ensure_ascii=False)},
                         ],
                         "response_format": {"type": "json_object"},
                     },
@@ -178,7 +181,7 @@ class OpenAICompatibleExtractor:
                 choice = payload["choices"][0]
                 if choice.get("finish_reason") != "stop" or choice["message"].get("refusal"):
                     raise ExtractionError("invalid_extraction")
-                return ExtractedBatch.model_validate_json(choice["message"]["content"])
+                return schema.model_validate_json(choice["message"]["content"])
         except (httpx.HTTPError, httpx.InvalidURL) as error:
             raise ExtractionError("provider_unavailable") from error
         except (ValueError, KeyError, IndexError, TypeError) as error:

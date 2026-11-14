@@ -11,7 +11,8 @@ from app.ingestion_schemas import EventView
 from app.ingestion import event_views
 from app.schemas import EvidenceView, Identifier, Record, Timestamp
 from app.site_api import Database
-from app.rules import inspection_evidence, inspection_evidence_scope
+from app.rules import flag_evidence
+from app.proposal_api import AdviceView, advice_view
 from app.lifecycle import InvalidTransition, transition_flag
 from app.review_api import HumanAction, Reason, validate_person
 from app.learning import record_knowledge, validate_correction
@@ -58,23 +59,17 @@ class FlagView(Record):
     audit: list[AuditView]
     awaiting_human_closure: bool
     notifications: list[OutboxView]
+    advice: AdviceView | None
 
 
 def flag_view(session, flag):
-    inspection = session.get(models.Inspection, flag.inspection_id) if flag.inspection_id else None
-    zones = {zone.id: zone for zone in session.scalars(select(models.Zone))} if inspection else {}
-    evidence = inspection_evidence(session, inspection, inspection_evidence_scope(flag.zone_id, zones)) if inspection else []
-    if flag.type == "B":
-        from app.revision_rules import receipt_evidence
-        zones = {zone.id: zone for zone in session.scalars(select(models.Zone))}
-        revision = session.get(models.Revision, flag.context["revision_id"])
-        evidence = receipt_evidence(session, flag.zone_id, flag.context["crew_id"], revision, zones)
     return FlagView.model_validate({
-        **{key: getattr(flag, key) for key in FlagView.model_fields if key not in {"sources", "evidence", "awaiting_human_closure", "notifications"}},
+        **{key: getattr(flag, key) for key in FlagView.model_fields if key not in {"sources", "evidence", "awaiting_human_closure", "notifications", "advice"}},
+        "advice": advice_view(session, flag),
         "awaiting_human_closure": flag.evaluation == "satisfied" and flag.state not in {"resolved", "false_alarm"},
         "notifications": session.scalars(select(models.OutboxMessage).where(models.OutboxMessage.flag_id == flag.id)).all(),
         "sources": event_views(session, [link.event for link in flag.sources]),
-        "evidence": evidence,
+        "evidence": flag_evidence(session, flag),
     })
 
 

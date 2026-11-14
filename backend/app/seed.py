@@ -37,9 +37,7 @@ def import_seed(session: Session, seed: schemas.Seed) -> schemas.ImportResult:
     # the old or the new snapshot, never a partly imported hierarchy.
     with session.begin():
         for table in (
-            models.Proposal.__table__,
-            models.SiteKnowledge.__table__,
-            models.OutboxMessage.__table__, models.FlagAudit.__table__, models.FlagSource.__table__, models.Flag.__table__,
+            models.SiteKnowledge.__table__, models.OutboxMessage.__table__, models.Proposal.__table__, models.FlagAdvice.__table__, models.FlagAudit.__table__, models.FlagSource.__table__, models.Flag.__table__,
             models.EvidenceReview.__table__, models.Evidence.__table__,
             models.event_zones, models.Event.__table__,
             models.SourceAttachment.__table__, models.SourceMessage.__table__,

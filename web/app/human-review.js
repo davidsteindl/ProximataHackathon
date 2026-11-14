@@ -79,6 +79,25 @@ export function FlagActions({ flag }) {
   );
 }
 
+export function ProposalActions({ flag, proposal }) {
+  const reviewer = useContext(Reviewer);
+  if (proposal.status !== "proposed" || ["resolved", "false_alarm"].includes(flag.state)) return null;
+  if (reviewer.role !== "superintendent") return <p>Only the Superintendent decides on Proposals.</p>;
+  const canApprove = ["acknowledged", "in_progress"].includes(flag.state);
+  return (
+    <ReviewForm kind="proposal" record={proposal} label="Superintendent decision">
+      <p>Approval sends the follow-up to the affected Crew Leads. It neither confirms Evidence nor closes the Flag.</p>
+      {!canApprove && <p>Acknowledge the Flag before approving a measure.</p>}
+      <label>Decision
+        <select name="decision" key={flag.state} defaultValue={canApprove ? "approved" : "rejected"}>
+          {canApprove && <option value="approved">Approve and send follow-up</option>}
+          <option value="rejected">Reject · nothing is sent</option>
+        </select>
+      </label>
+    </ReviewForm>
+  );
+}
+
 export function EvidenceActions({ evidence, crews, tasks }) {
   const reviewer = useContext(Reviewer);
   const task = tasks.find((item) => item.id === evidence.scope.task_id);

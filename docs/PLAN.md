@@ -204,6 +204,7 @@ Grundsätze:
 - **Alle Quellen laufen über denselben Ingestion-Eingang.** Ein neuer Kanal ist nur ein neuer Adapter.
 - **Ingestion-Vertrag (#6):** `Source Message` speichert Kanal, Quellkonto/Chat, externe ID, Zeit, Text und Originalanhänge. `(channel, source_key, external_id)` ist eindeutig. Extrahierte `Event`s verweisen mit Zitat auf diese Quelle; erfüllungsrelevante Aussagen verweisen auf separate, zunächst unbestätigte `Evidence`. Tabellen und REST-Vertrag sind in [INGESTION.md](INGESTION.md) dokumentiert.
 - **Gmail inbound (#11):** Der `worker` liest nur das verifizierte Projektkonto/Label mit `gmail.readonly` und übergibt Betreff, Text und Originalanhänge an die Ingestion. Die exakte Quellenabfrage (`GET /source-messages`) überspringt verarbeitete Quellen ohne Worker-DB-Zugriff. Vertrag: [INGESTION.md](INGESTION.md#gmail-adapter-identity-lookup-11); Setup: [GMAIL.md](GMAIL.md).
+- **Proposals (#13):** Der Advisor erklärt einen Flag mit Zitaten aus dem Record und schlägt Maßnahmen vor; nur der Superintendent gibt sie im Dashboard frei oder lehnt sie ab. Freigabe → Folge-Nachricht an die betroffenen Crew Leads über die Outbox, Flag `acknowledged` → `in_progress`; keine Nachweisbestätigung, kein Flag-Abschluss. Vertrag: [PROPOSALS.md](PROPOSALS.md).
 - **Ausgehende Nachrichten laufen über eine Outbox:** `api` legt jede Nachricht an, `worker` versendet sie und meldet den Status zurück. Keine Benachrichtigung geht verloren, jede steht im Audit-Trail.
 - **Der Q&A-Kern (#19) lebt in `api` als MCP-Client** des eigenen `mcp`-Servers und nutzt dieselben Tools wie externe Agents. Die Frage wird per [OpenAI Decisions API](https://developers.openai.com/api/docs/guides/decisions) (`POST /v1/decisions`, `gpt-6-luna`) nur klassifiziert: Fragetyp und Zone aus einer festen Auswahl, mit Wahrscheinlichkeiten. Den Antworttext setzt `api` deterministisch aus den MCP-Ergebnissen samt Quellen zusammen; das LLM formuliert keine Antwort.
   *Begründung:* Das Routing ist eine geschlossene Auswahl, und genau dafür ist die Decisions API gebaut (kein Output-Text, laut OpenAI etwa 10× schneller als die Responses API). Ohne frei formulierten Text kann keine Antwort eine Freigabe behaupten, die der Record nicht hergibt (§3.2). Unter einer Konfidenzschwelle fragt der Bot nach, statt zu raten. Extraktion (#6) und Proposals (#13) brauchen Zitate, Zeitangaben bzw. Begründungstext und bleiben beim `openai_compatible`-Provider. Offline und in CI kommt das Routing aus einem Cache.
@@ -307,10 +308,13 @@ Evidence-Prüfstatus bleiben sichtbar. `X-SiteMind-Client: mcp|chat|agent` sperr
 in der API alle Mutationen außer `POST /agent/proposals`; insbesondere auch
 indirekte Nachweisänderungen über Seed/Import/Ingestion. Dies ist eine MVP-
 Zugangskonvention, keine Produktionsauthentifizierung. Die neue Tabelle
-`proposals` (Migration `0010`) speichert nur `proposed`, Flag-Bezug, Handlung,
+`proposals` (Migration `0010`) speichert Agent-Vorschläge als `proposed`, Flag-Bezug, Handlung,
 Begründung, Kanal, Zeitpunkt und serverseitige Quellen. Kein Versand, keine
 Freigabe und kein Flag-/Evidence-Übergang entstehen daraus; die menschliche
-Approval-Integration bleibt #13. Seed-Reset löscht auch diese Vorschläge.
+Approval-Integration für ausgearbeitete Advisor-Proposals liegt in #13. Migration
+`0014` erweitert dieselbe Tabelle um den optionalen Advice-Bezug und menschliche
+Entscheidungen; bestehende Agent-Vorschläge bleiben unverändert. Seed-Reset
+löscht beide Arten von Vorschlägen.
 
 **Sofort parallel zu WP0/WP1 (keine Code-Abhängigkeit):** WP15 (synthetische DXF-Pläne), Google-Cloud-Projekt und Gmail-OAuth einrichten (OAuth-Testmodus: Test-User eintragen; Refresh-Tokens laufen nach 7 Tagen ab), Telegram-Bot anlegen (Privacy Mode aus), LLM-Key besorgen, Seed-Inhalte schreiben, 3D-Prototyp, Research und Mentor-Interview.
 

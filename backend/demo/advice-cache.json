@@ -1,0 +1,127 @@
+{
+  "version": 1,
+  "entries": [
+    {
+      "match": {
+        "type": "A",
+        "zone_id": "3B",
+        "task_id": "drywall-F3",
+        "precondition": "inspection_passed",
+        "evaluation": "unknown"
+      },
+      "result": {
+        "explanation": "The drywall crew reports that it will close 3B tomorrow morning [S1]; this is an unconfirmed announcement, not a recorded fact. Closing work in 3B requires the passed rough-in inspection for F3 [inspection:rough-in-F3]. The rule check found no valid confirmed proof that this inspection passed, so the Precondition is not satisfied and remains open [flag]. Drywall for F3 is scheduled as one task [task:drywall-F3].",
+        "proposals": [
+          {
+            "action": "Postpone drywall closing in 3B; move the drywall crew to 3A/3C for non-closing work until the rough-in inspection is confirmed",
+            "rationale": "Closing 3B now would cover installations before the rough-in inspection [inspection:rough-in-F3] has confirmed proof [flag], which risks rework. The F3 drywall task [task:drywall-F3] can continue in other units with work that does not close walls.",
+            "affected_crews": [
+              "drywall"
+            ],
+            "affected_tasks": [
+              "drywall-F3"
+            ],
+            "affected_zones": [
+              "3B",
+              "3A",
+              "3C"
+            ],
+            "message": "Superintendent decision: do not close walls in 3B for now. Drywall in 3B is postponed until the rough-in inspection is confirmed. Continue in 3A/3C with non-closing work only (for example framing). Do not resume closing in 3B without the Superintendent."
+          }
+        ]
+      }
+    },
+    {
+      "match": {
+        "type": "A",
+        "zone_id": "3B",
+        "task_id": "drywall-F3",
+        "precondition": "inspection_passed",
+        "evaluation": "contradictory"
+      },
+      "evidence_match": [
+        {
+          "handle": "E1",
+          "origin": "seed_baseline",
+          "kind": "inspection",
+          "claim": "pending",
+          "scope": {
+            "kind": "inspection",
+            "zone_id": "F3",
+            "inspection_id": "rough-in-F3",
+            "task_id": null,
+            "crew_id": null,
+            "revision_id": null
+          },
+          "review_status": "confirmed"
+        },
+        {
+          "handle": "E2",
+          "origin": "seed_statement",
+          "kind": "inspection",
+          "claim": "passed",
+          "scope": {
+            "kind": "inspection",
+            "zone_id": "F3",
+            "inspection_id": "rough-in-F3",
+            "task_id": null,
+            "crew_id": null,
+            "revision_id": null
+          },
+          "review_status": "unconfirmed"
+        },
+        {
+          "handle": "E3",
+          "origin": "seed_statement",
+          "kind": "inspection",
+          "claim": "failed",
+          "scope": {
+            "kind": "inspection",
+            "zone_id": "F3",
+            "inspection_id": "rough-in-F3",
+            "task_id": null,
+            "crew_id": null,
+            "revision_id": null
+          },
+          "review_status": "unconfirmed"
+        },
+        {
+          "handle": "E4",
+          "origin": "seed_statement",
+          "kind": "inspection",
+          "claim": "passed",
+          "scope": {
+            "kind": "inspection",
+            "zone_id": "F3",
+            "inspection_id": "rough-in-F3",
+            "task_id": null,
+            "crew_id": null,
+            "revision_id": null
+          },
+          "review_status": "unconfirmed"
+        }
+      ],
+      "result": {
+        "explanation": "The drywall crew reports that it will close 3B tomorrow morning [S1]; this is an unconfirmed announcement, not a recorded fact. Closing work in 3B requires the passed rough-in inspection for F3 [inspection:rough-in-F3]. The only confirmed record says this inspection is still pending [E1]. Unconfirmed statements claim it passed [E2] [E4] and that it failed [E3]; these claims conflict and are unresolved, so the rule check rates the Precondition contradictory, not satisfied [flag]. Drywall for F3 is scheduled as one task [task:drywall-F3].",
+        "proposals": [
+          {
+            "action": "Postpone drywall closing in 3B; move the drywall crew to 3A/3C for non-closing work until the rough-in inspection is confirmed",
+            "rationale": "Closing 3B now would cover installations while the rough-in inspection result [inspection:rough-in-F3] is unresolved [flag]; the only confirmed record still shows it pending [E1]. The F3 drywall task [task:drywall-F3] can continue in other units with work that does not close walls.",
+            "affected_crews": [
+              "drywall"
+            ],
+            "affected_tasks": [
+              "drywall-F3"
+            ],
+            "affected_zones": [
+              "3B",
+              "3A",
+              "3C"
+            ],
+            "message": "Superintendent decision: do not close walls in 3B for now. Drywall in 3B is postponed until the rough-in inspection is confirmed. Continue in 3A/3C with non-closing work only (for example framing). Do not resume closing in 3B without the Superintendent."
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -15,6 +15,18 @@ from app.telegram import TelegramClient, TelegramError, TelegramSettings, delive
 logger = logging.getLogger(__name__)
 
 
+def request_advice(api):
+    """Ask the API once per open Flag for advice; the LLM key stays in the API."""
+    response = api.get("/flags")
+    response.raise_for_status()
+    for flag in response.json():
+        if flag["advice"] is None:
+            result = api.post(f"/flags/{flag['id']}/advice")
+            if result.is_error:
+                # ponytail: retried every pass; add backoff if live LLM failures get costly.
+                logger.warning("Advice for Flag %s deferred (HTTP %s)", flag["id"], result.status_code)
+
+
 def main() -> None:
     logging.basicConfig(level=logging.INFO)
     logging.getLogger("httpx").setLevel(logging.WARNING)
@@ -46,6 +58,10 @@ def main() -> None:
                 run_due_jobs(schedule, api)
             except (httpx.HTTPError, OSError, ValueError, LookupError, TypeError) as error:
                 logger.warning("Scheduled job failed (%s); retry next interval", type(error).__name__)
+            try:
+                request_advice(api)
+            except (httpx.HTTPError, ValueError, LookupError, TypeError) as error:
+                logger.warning("Advice request failed (%s); retry next interval", type(error).__name__)
             if settings and settings.send_enabled:
                 try:
                     deliver_outbox(GmailClient(settings, gmail_http), api)

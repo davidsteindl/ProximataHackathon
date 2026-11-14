@@ -61,13 +61,28 @@ test("Evidence review sends a decision and sequence, independent of any Flag act
   assert.equal(request.payload.feedback, undefined);
 });
 
-test("system signals and Proposal approvals cannot be sent through the dashboard adapter", async () => {
+test("system signals and undecided Proposals cannot be sent through the dashboard adapter", async () => {
   const fetchMock = mock.method(globalThis, "fetch", async () => { throw new Error("unexpected request"); });
   for (const action of ["action_approved", "notified", "escalated"]) {
     assert.ok((await postHumanAction("http://api:8000", "flag", "flag-1", form({ ...human, action }))).error);
   }
   assert.ok((await postHumanAction("http://api:8000", "proposal", "proposal-1", form(human))).error);
+  assert.ok((await postHumanAction("http://api:8000", "proposal", "proposal-1", form({ ...human, decision: "confirmed" }))).error);
   assert.equal(fetchMock.mock.callCount(), 0);
+});
+
+test("Proposal decisions go to the decision endpoint via the dashboard channel only", async () => {
+  let request;
+  mock.method(globalThis, "fetch", async (url, options) => {
+    request = { url, payload: JSON.parse(options.body) };
+    return Response.json({});
+  });
+  const result = await postHumanAction("http://api:8000", "proposal", "proposal-1", form({
+    ...human, decision: "approved", channel: "mcp",
+  }));
+  assert.equal(result.error, null);
+  assert.equal(request.url.pathname, "/proposals/proposal-1/decisions");
+  assert.deepEqual(request.payload, { ...human, channel: "dashboard", decision: "approved" });
 });
 
 test("rejected or failed writes remain visible and never report success", async () => {

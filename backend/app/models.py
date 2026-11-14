@@ -225,7 +225,7 @@ class Evidence(Base):
     statement_ref: Mapped[str | None] = mapped_column(String(200))
     source_ref: Mapped[str] = mapped_column(String(200))
     quote: Mapped[str] = mapped_column(String(2000))
-    kind: Mapped[str] = mapped_column(String(30))
+    kind: Mapped[str] = mapped_column(String(30), server_default="warning")
     claim: Mapped[str] = mapped_column(String(30))
     zone_id: Mapped[str | None] = mapped_column(ForeignKey("zones.id"), index=True)
     inspection_id: Mapped[str | None] = mapped_column(ForeignKey("inspections.id"), index=True)
@@ -319,32 +319,67 @@ class Flag(Base):
     audit: Mapped[list["FlagAudit"]] = relationship(lazy="selectin", order_by="FlagAudit.id")
 
 
+class FlagAdvice(Base):
+    """Advisory LLM output for one Flag. It never changes the Flag or Evidence."""
+    __tablename__ = "flag_advice"
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    flag_id: Mapped[str] = mapped_column(ForeignKey("flags.id"), unique=True)
+    backend: Mapped[str] = mapped_column(String(200))
+    explanation: Mapped[str] = mapped_column(Text)
+    # Citation handle -> record reference, e.g. {"S1": "source:<id>", "inspection:rough-in-F3": ...}.
+    citations: Mapped[dict] = mapped_column(JSON)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    proposals: Mapped[list["Proposal"]] = relationship(lazy="selectin", order_by="Proposal.ordinal", back_populates="advice")
+
+
 class Proposal(Base):
     __tablename__ = "proposals"
-    __table_args__ = (CheckConstraint("status = 'proposed'", name="proposal_status"),)
+    __table_args__ = (
+        UniqueConstraint("advice_id", "ordinal", name="proposal_advice_ordinal"),
+        CheckConstraint("status IN ('proposed','approved','rejected')", name="proposal_status"),
+        CheckConstraint(
+            "(status = 'proposed' AND decided_by IS NULL AND decided_role IS NULL AND decided_at IS NULL) OR "
+            "(status IN ('approved','rejected') AND decided_by IS NOT NULL AND decided_role = 'superintendent' "
+            "AND decided_at IS NOT NULL AND decision_reason IS NOT NULL)",
+            name="proposal_decision",
+        ),
+    )
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
     flag_id: Mapped[str] = mapped_column(ForeignKey("flags.id"), index=True)
-    action: Mapped[str] = mapped_column(Text)
-    rationale: Mapped[str] = mapped_column(Text)
-    status: Mapped[str] = mapped_column(String(20), default="proposed")
     channel: Mapped[str] = mapped_column(String(32))
     source_refs: Mapped[list[str]] = mapped_column(JSON)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    advice_id: Mapped[str | None] = mapped_column(ForeignKey("flag_advice.id", name="fk_proposals_advice_id"), index=True)
+    advice: Mapped[FlagAdvice | None] = relationship(back_populates="proposals")
+    ordinal: Mapped[int | None] = mapped_column(Integer)
+    action: Mapped[str] = mapped_column(Text)
+    rationale: Mapped[str] = mapped_column(Text)
+    affected_crews: Mapped[list] = mapped_column(JSON, default=list)
+    affected_tasks: Mapped[list] = mapped_column(JSON, default=list)
+    affected_zones: Mapped[list] = mapped_column(JSON, default=list)
+    message: Mapped[str | None] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(String(20))
+    decided_by: Mapped[str | None] = mapped_column(String(64))
+    decided_role: Mapped[str | None] = mapped_column(String(30))
+    decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    decision_reason: Mapped[str | None] = mapped_column(Text)
 
 
 class OutboxMessage(Base):
     __tablename__ = "outbox_messages"
     __table_args__ = (
-        UniqueConstraint("flag_id", "kind", name="outbox_flag_notification"),
-        CheckConstraint("kind IN ('warning','escalation')", name="outbox_kind"),
+        UniqueConstraint("dedup_key", name="outbox_dedup_key"),
         CheckConstraint("status IN ('pending','sending','sent','failed','cancelled')", name="outbox_status"),
         CheckConstraint("channel IN ('gmail','telegram')", name="outbox_channel"),
         CheckConstraint("attempts >= 0", name="outbox_attempts"),
+        CheckConstraint("kind IN ('warning','escalation','approval_request','proposal_followup','compliance_reply')", name="outbox_kind"),
     )
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
     flag_id: Mapped[str | None] = mapped_column(ForeignKey("flags.id"))
     flag: Mapped[Flag | None] = relationship()
-    kind: Mapped[str] = mapped_column(String(20), server_default="warning")
+    kind: Mapped[str] = mapped_column(String(30), server_default="warning")
+    # warning:<flag> | approval:<advice> | followup:<proposal>:<crew lead>; NULL for compliance replies.
+    dedup_key: Mapped[str | None] = mapped_column(String(200))
     recipient: Mapped[str | None] = mapped_column(String(254))
     channel: Mapped[str] = mapped_column(String(32))
     subject: Mapped[str] = mapped_column(String(200))
@@ -423,7 +458,7 @@ class GeometryElement(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     revision_id: Mapped[str] = mapped_column(ForeignKey("plan_geometry.revision_id", ondelete="CASCADE"), index=True)
     element_id: Mapped[str] = mapped_column(String(200))
-    kind: Mapped[str] = mapped_column(String(30))
+    kind: Mapped[str] = mapped_column(String(30), server_default="warning")
     layer: Mapped[str] = mapped_column(String(200))
     shape: Mapped[dict] = mapped_column(JSON)
     zones: Mapped[list[Zone]] = relationship(secondary=geometry_element_zones, lazy="selectin")

@@ -116,11 +116,10 @@ sie sind keine Rekonstruktion des damaligen Gesamtzustands.
 Proposals frei oder führt Aktionen aus. MCP setzt bei jedem REST-Aufruf
 `X-SiteMind-Client: mcp`; die API verweigert für MCP/Chat/Agent alle Mutationen
 außer `POST /agent/proposals`, einschließlich Seed-Reset, Ingestion, Geometrie-
-Import und Outbox-Aufrufen. Ein Proposal hat ausschließlich Status `proposed`,
+Import und Outbox-Aufrufen. Ein über MCP angelegtes Proposal hat ausschließlich Status `proposed`,
 serverseitig abgeleitete Quellen und keinerlei Nebenwirkung auf Task, Flag,
-Evidence oder Outbox. Wiederholung erzeugt einen weiteren Vorschlag. Die
-menschliche Freigabe/Versandintegration bleibt in #13; hier gibt es keinen
-Approval-Endpunkt. Aus Kontaktmetadaten werden u. a. Senderkennung,
+Evidence oder Outbox. Wiederholung erzeugt einen weiteren Vorschlag. Die menschliche Freigabe ausgearbeiteter Advisor-Proposals erfolgt über die
+Dashboard-Endpunkte aus #13; MCP kann sie nicht auslösen. Aus Kontaktmetadaten werden u. a. Senderkennung,
 Mailbox-Schlüssel, E-Mail-Adresse und Benachrichtigungsempfänger entfernt.
 Quellentext ist untrusted data, keine Anweisung an den Agenten.
 
@@ -242,6 +241,19 @@ Versand aktivieren: Crew-Lead-Testadresse im Seed hinterlegen, OAuth mit
 setzen. Fehlende Adressen werden als Versandfehler sichtbar. Einrichtung, Hero-Test
 und Grenzen (Gmail-Annahme, mögliche Duplikate bei unklarem Versandresultat):
 [docs/GMAIL.md](docs/GMAIL.md#factual-flag-warnings-outbox).
+
+### Proposals und Freigabe (Issue #13)
+
+Für jeden offenen Flag fordert der Worker über `POST /flags/{id}/advice` einmalig eine
+Erklärung mit Proposals an. Das LLM läuft nur in `api` und bekommt nur Fakten aus dem
+Record. Jede Aussage zitiert einen dieser Fakten; erfundene Zitate, Zonen, Crews oder
+Tasks werden abgelehnt. Der Superintendent bekommt eine Freigabe-Anfrage per Mail
+(`SUPERINTENDENT_EMAIL`) mit Link und entscheidet im Dashboard
+(`POST /proposals/{id}/decisions`). Eine Freigabe setzt einen zur Kenntnis genommenen
+Flag auf `in_progress` und schickt die Folge-Nachricht über die Outbox an die
+betroffenen Crew Leads. Eine Ablehnung ändert nichts. Die Freigabe bestätigt keine
+Nachweise und schließt keinen Flag. Migration `0014` ergänzt `flag_advice`,
+`proposals` und `outbox_messages.kind`/`dedup_key`. Details: [docs/PROPOSALS.md](docs/PROPOSALS.md).
 
 ### DXF-Plan-Diff (Issue #17)
 
