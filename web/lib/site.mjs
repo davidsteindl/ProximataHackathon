@@ -96,3 +96,23 @@ export const FLAG_STATE = {
   resolved: { text: "Closed · resolved", tone: "unk" },
   false_alarm: { text: "Closed · false alarm", tone: "unk" },
 };
+
+/** Outbox message kinds (#10, #13, #14) as shown in Flag timelines. */
+export const NOTIFICATION = {
+  warning: "Warning",
+  escalation: "Escalation to Superintendent",
+  approval_request: "Approval request",
+  proposal_followup: "Approved follow-up",
+  compliance_reply: "Compliance reply",
+};
+
+export const isEscalated = (flag) => (flag.audit || []).some((entry) => entry.action === "escalated");
+
+/** Morning-scan sources (#14): audit refs "schedule:<task>@<start>", one per scheduled occurrence. */
+export function scheduleSources(flag) {
+  const refs = new Set((flag.audit || []).map((entry) => entry.source_ref).filter((ref) => ref?.startsWith("schedule:")));
+  return [...refs].map((ref) => {
+    const [taskId, startsAt] = ref.slice("schedule:".length).split("@");
+    return { ref, taskId, startsAt };
+  });
+}

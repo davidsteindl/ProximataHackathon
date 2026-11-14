@@ -12,3 +12,17 @@ export default function AutoRefresh({ ms = 5000 }) {
   }, [router, ms]);
   return null;
 }
+
+/**
+ * Outbox messages link to `/#flag-<id>` (and learning notes to `/#knowledge-<id>`), anchors of the former
+ * single-page dashboard. Forward them to the dedicated pages so existing mails and Telegram links keep working.
+ */
+export function HashRedirect() {
+  useEffect(() => {
+    const [, kind, id] = window.location.hash.match(/^#(flag|knowledge)-(.+)$/) || [];
+    // Full navigation: these are one-off entry links, and the target page should load with its anchor in place.
+    if (kind === "flag") window.location.replace(`/flags/${id}`);
+    if (kind === "knowledge") window.location.replace(`/activity#knowledge-${id}`);
+  }, []);
+  return null;
+}

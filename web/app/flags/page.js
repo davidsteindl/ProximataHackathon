@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { fetchAll } from "../../lib/site-data.mjs";
-import { FLAG_STATE, SEVERITY, flagTitle, scenarioTime } from "../../lib/site.mjs";
+import { FLAG_STATE, SEVERITY, flagTitle, isEscalated, scenarioTime } from "../../lib/site.mjs";
 import { StatePanel, WorkShell } from "../shell";
 import { Chip, EVALUATION } from "../site-view/zone-panel";
 
@@ -64,8 +64,9 @@ export default async function FlagsPage({ searchParams }) {
                           <Link href={`/flags/${flag.id}`} className={isClosed(flag) ? "muted" : undefined}><strong>{flagTitle(flag)}</strong></Link>
                           <span className="mono muted" style={{ display: "block" }}>Flag {flag.type} · {scenarioTime(flag.created_at, data.site) || flag.created_at}</span>
                           {flag.awaiting_human_closure && <span className="small muted" style={{ display: "block" }}>Precondition satisfied. Stays open until a person closes it.</span>}
+                          {flag.advice?.proposals.some((proposal) => proposal.status === "proposed") && <span className="small" style={{ display: "block", color: "var(--accent-text)" }}>Advisor proposal awaits a Superintendent decision</span>}
                         </td>
-                        <td><Chip tone={isClosed(flag) ? "unk" : severity.tone}>{severity.text}</Chip></td>
+                        <td><Chip tone={isClosed(flag) ? "unk" : severity.tone}>{severity.text}</Chip>{isEscalated(flag) && !isClosed(flag) && <> <Chip tone="warn">Escalated</Chip></>}</td>
                         <td className="mono">{flag.zone_id}</td>
                         <td><Chip tone={evaluation.tone} glyph>{evaluation.text}</Chip></td>
                         <td><Chip tone={state.tone}>{state.text}</Chip></td>

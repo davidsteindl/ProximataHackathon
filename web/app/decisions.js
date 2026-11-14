@@ -76,6 +76,17 @@ export function FlagDecisions({ flag }) {
                       <label className="field-row"><input type="radio" name="action" value="false_alarm" required /> False alarm</label>
                     </div>
                     <Reason id={`close-reason-${flag.id}`} />
+                    {flag.sources.some((event) => event.intent === "planned_work") && (
+                      <label className="field">Optional extraction correction · applied only when closing as false alarm
+                        <select name="correction_event_id" defaultValue="">
+                          <option value="">No extraction correction</option>
+                          {flag.sources.filter((event) => event.intent === "planned_work").map((event) => (
+                            <option key={event.id} value={event.id}>Question, not planned work: {event.quote}</option>
+                          ))}
+                        </select>
+                        <span className="form-note">Applies only to an exact replay of this message, sender role and Crew. Never confirms Evidence or changes safety rules.</span>
+                      </label>
+                    )}
                     <button type="submit" className="btn btn-crit">Close flag</button>
                   </ReviewForm>
                 )}
@@ -114,3 +125,21 @@ export function EvidenceDecision({ evidence, crews, tasks }) {
   );
 }
 
+/** Superintendent approve/reject for one advisor Proposal. Approval needs an acknowledged Flag first. */
+export function ProposalDecision({ flag, proposal }) {
+  const { role } = useApp();
+  if (proposal.status !== "proposed" || ["resolved", "false_alarm"].includes(flag.state)) return null;
+  if (role !== "superintendent") return <p className="form-note">Only the Superintendent decides on Proposals.</p>;
+  const canApprove = ["acknowledged", "in_progress"].includes(flag.state);
+  return (
+    <ReviewForm kind="proposal" record={proposal}>
+      {!canApprove && <p className="form-note">Acknowledge the Flag before approving a measure. Rejecting is possible now.</p>}
+      <Reason id={`proposal-reason-${proposal.id}`} />
+      <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+        {canApprove && <button type="submit" name="decision" value="approved" className="btn btn-acc">Approve and send follow-up</button>}
+        <button type="submit" name="decision" value="rejected" className="btn">Reject · nothing is sent</button>
+      </div>
+      <p className="form-note">Approval sends the follow-up to the affected Crew Leads. It neither confirms Evidence nor closes the Flag.</p>
+    </ReviewForm>
+  );
+}

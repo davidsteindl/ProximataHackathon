@@ -2,7 +2,7 @@ import Link from "next/link";
 import { fetchAll, getSiteModel } from "../lib/site-data.mjs";
 import { floorOf, indexZones, upcoming } from "../lib/site-model.mjs";
 import { SEVERITY, flagTitle, label, scenarioTime } from "../lib/site.mjs";
-import AutoRefresh from "./auto-refresh";
+import AutoRefresh, { HashRedirect } from "./auto-refresh";
 import { StatePanel, WorkShell } from "./shell";
 import ModelPreview from "./site-view/model-preview";
 import { Chip, EVALUATION } from "./site-view/zone-panel";
@@ -22,6 +22,7 @@ export default async function Home() {
     return (
       <WorkShell current="overview">
         <AutoRefresh ms={10000} />
+        <HashRedirect />
         <section className="panel">
           <StatePanel kind={records.error ? "error" : "empty"} heading="h1" title={records.error ? "Site data unavailable" : "No site data loaded yet"}
             action={<Link className="btn btn-acc" href="/">Retry</Link>}>
@@ -45,15 +46,21 @@ function Dashboard({ data, model }) {
   const newToday = critical.filter((flag) => scenarioTime(flag.created_at, site)?.startsWith(`${today} `)).length;
   const unconfirmed = evidence.filter((record) => record.review_status === "unconfirmed");
   const closable = flags.filter((flag) => flag.awaiting_human_closure).length;
+  const proposals = flags.flatMap((flag) => flag.advice?.proposals || []).filter((proposal) => proposal.status === "proposed").length;
+  const decisions = unconfirmed.length + closable + proposals;
   const next = upcoming(data, index, now);
   const clear = next.filter((item) => item.chip.tone !== "crit").length;
-  const lead = flags[0];
+  // Lead card: the most severe Flag, preferring one whose advisor Proposal awaits a decision.
+  const pending = (flag) => flag.advice?.proposals.some((proposal) => proposal.status === "proposed");
+  const lead = flags.find((flag) => flag.severity === flags[0]?.severity && pending(flag)) || flags[0];
+  const others = flags.filter((flag) => flag !== lead);
   const focusFloor = (lead && floorOf(index, lead.zone_id)) || model.data?.geometry?.[0]?.floor_id || null;
   const recent = [...events].sort((a, b) => b.source.sent_at.localeCompare(a.source.sent_at)).slice(0, 6);
 
   return (
     <WorkShell current="overview">
       <AutoRefresh />
+      <HashRedirect />
       <div className="page-head">
         <h1>{site.name}{building ? ` — ${building.id}` : ""}</h1>
         <Chip tone="info">Live · {today}</Chip>
@@ -66,8 +73,8 @@ function Dashboard({ data, model }) {
         <div className="panel pad kpi"><p className="label">Open flags</p>
           <div className="value"><span className="num">{flags.length}</span><Link className="link small" href="/flags">inbox →</Link></div></div>
         <div className="panel pad kpi"><p className="label">Awaiting your decision</p>
-          <div className="value"><span className="num">{unconfirmed.length + closable}</span>
-            {(unconfirmed.length + closable) > 0 && <Chip tone="warn">{unconfirmed.length} evidence{closable ? ` · ${closable} closure` : ""}</Chip>}</div></div>
+          <div className="value"><span className="num">{decisions}</span>
+            {decisions > 0 && <Chip tone="warn">{[proposals && `${proposals} proposal${proposals === 1 ? "" : "s"}`, unconfirmed.length && `${unconfirmed.length} evidence`, closable && `${closable} closure`].filter(Boolean).join(" · ")}</Chip>}</div></div>
         <div className="panel pad kpi" style={{ display: "flex", alignItems: "center", gap: 14 }}>
           <Ring value={next.length ? clear / next.length : 0} />
           <div><p className="label" style={{ marginBottom: 2 }}>Next 48 h without open Flag</p><span className="num" style={{ fontSize: 24 }}>{clear} / {next.length}</span></div>
@@ -87,9 +94,10 @@ function Dashboard({ data, model }) {
             )}
             <div className="stack small" style={{ gap: 9 }}>
               {unconfirmed.length > 0 && <Link href="/evidence"><Chip tone="unk">Review</Chip>&ensp;{unconfirmed.length} Evidence item{unconfirmed.length === 1 ? "" : "s"} await review →</Link>}
-              {flags.slice(1).map((flag) => (
+              {others.slice(0, 4).map((flag) => (
                 <Link key={flag.id} href={`/flags/${flag.id}`}><Chip tone={SEVERITY[flag.severity].tone}>{SEVERITY[flag.severity].text}</Chip>&ensp;{flagTitle(flag)} →</Link>
               ))}
+              {flags.length > 5 && <Link className="link" href="/flags">All {flags.length} open flags →</Link>}
             </div>
           </div>
         </section>
@@ -133,6 +141,7 @@ function LeadFlag({ flag, site }) {
   const severity = SEVERITY[flag.severity];
   const evaluation = EVALUATION[flag.evaluation];
   const source = flag.sources[0];
+  const proposal = flag.advice?.proposals.find((item) => item.status === "proposed");
   return (
     <div className="lead-flag">
       <p style={{ margin: "0 0 8px" }}><Chip tone={severity.tone}>{severity.text}</Chip></p>
@@ -143,9 +152,15 @@ function LeadFlag({ flag, site }) {
         {flag.type === "B" && <span><span className="mono muted">rev</span> confirmed Rev {flag.context.acknowledged_revision || "none"}, required Rev {flag.context.current_revision}</span>}
         {source && <span><span className="mono" style={{ color: "var(--crit-fg)" }}>{scenarioTime(source.source.sent_at, site)}</span> “{source.quote}” — {source.source.channel}</span>}
       </div>
+      {proposal && (
+        <div className="advisory small">
+          <Chip tone="info">LLM proposal · advisory</Chip>
+          <p style={{ margin: "6px 0 0" }}>{proposal.action}</p>
+        </div>
+      )}
       <div style={{ display: "flex", gap: 8, marginTop: 12, flexWrap: "wrap" }}>
         <Link href={`/flags/${flag.id}`} className="btn btn-acc">Open flag</Link>
-        <Link href="/proposals" className="btn">Decide proposal</Link>
+        {proposal && <Link href={`/flags/${flag.id}#advice-h-${flag.id}`} className="btn">Decide proposal</Link>}
       </div>
     </div>
   );

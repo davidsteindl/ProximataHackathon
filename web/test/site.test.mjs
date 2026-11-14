@@ -73,3 +73,15 @@ test("Flag titles, severity and lifecycle steps", async () => {
   assert.equal(lifecycleStep("false_alarm"), 4);
   assert.equal(lifecycleStep("resolved"), lifecycleStep("false_alarm"));
 });
+
+test("morning-scan sources come from schedule audit refs; escalation is read from the audit", async () => {
+  const { isEscalated, scheduleSources } = await import("../lib/site.mjs");
+  const audit = [
+    { action: "detected", source_ref: "schedule:drywall-F3@2026-11-15T06:00:00+00:00" },
+    { action: "morning_scan", source_ref: "schedule:drywall-F3@2026-11-15T06:00:00+00:00" },
+    { action: "escalated", source_ref: "outbox:abc" },
+  ];
+  assert.deepEqual(scheduleSources({ audit }), [{ ref: "schedule:drywall-F3@2026-11-15T06:00:00+00:00", taskId: "drywall-F3", startsAt: "2026-11-15T06:00:00+00:00" }]);
+  assert.equal(isEscalated({ audit }), true);
+  assert.equal(isEscalated({ audit: audit.slice(0, 2) }), false);
+});

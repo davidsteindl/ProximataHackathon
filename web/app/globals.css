@@ -125,7 +125,9 @@ table.t tr:last-child td { border-bottom: 0; }
 .ev-link:hover { background: var(--surface-2); }
 .ev-link.sel { background: var(--info-bg); box-shadow: inset 3px 0 0 var(--blue); }
 .lead-flag { border: 1px solid var(--crit-bd); background: #1D1114; border-radius: 12px; padding: 13px 14px; }
+.advisory { margin-top: 12px; padding: 10px 12px; border: 1px solid var(--info-bd); background: var(--info-bg); border-radius: 10px; color: var(--text-2); }
 .lead-flag a { text-decoration: none; }
+.plain { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; overflow-wrap: anywhere; }
 .facts { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 6px 14px; margin: 0; }
 .facts dt { color: var(--muted); }
 .facts dd { margin: 0; overflow-wrap: anywhere; }

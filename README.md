@@ -20,8 +20,10 @@ In PowerShell statt `cp`: `Copy-Item .env.example .env`. Beim ersten Start baut 
   3D-Modell, „Needs your attention“, Activity und den nächsten 48 h; aktualisiert
   sich alle 5 s. Dunkle Arbeitsansichten: `/flags` (Inbox), `/flags/<id>`
   (Detail mit getrennten Karten für Kenntnisnahme und Abschluss), `/evidence`
-  (Prüfung, auch ohne Flag), `/activity` (Timeline, Terminplan mit Filtern,
-  Pläne, Inspections, API-/DB-Status). `/chat` und `/proposals` zeigen bis #19/#13
+  (Prüfung, auch ohne Flag), `/proposals` (Advisor-Proposals mit Freigabe/Ablehnung
+  durch den Superintendent, #13), `/activity` (Timeline, Terminplan mit Filtern, Site
+  Knowledge und Feedback-Kennzahl aus #21, Pläne, Inspections, API-/DB-Status). Links
+  aus Warnungen (`/#flag-<id>`) leiten auf `/flags/<id>` weiter. `/chat` zeigt bis #19
   ausdrücklich „nicht verfügbar“. Der Demo-Rollenumschalter sitzt in der
   Navigation und gilt seitenübergreifend (keine Authentifizierung). Gestaltung:
   [design/HANDOFF.md](design/HANDOFF.md).

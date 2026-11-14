@@ -2,6 +2,7 @@ import Link from "next/link";
 import { getHealth } from "../../lib/health.mjs";
 import { flattenZones, getSiteOverview, label, scenarioTime } from "../../lib/site.mjs";
 import EventTimeline from "../event-timeline";
+import SiteKnowledge from "../site-knowledge";
 import { StatePanel, WorkShell } from "../shell";
 
 export const dynamic = "force-dynamic";
@@ -64,6 +65,8 @@ function Activity({ data, filters }) {
           ))}
         </section>
       </div>
+
+      <SiteKnowledge knowledge={data.knowledge} metric={data.feedbackMetric} timezone={site.timezone} />
 
       <div className="grid-main">
         <section className="panel" aria-labelledby="plans-title">

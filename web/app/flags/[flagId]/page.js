@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { fetchAll } from "../../../lib/site-data.mjs";
-import { FLAG_STATE, LIFECYCLE, SEVERITY, flagTitle, formatTime, label, lifecycleStep, scenarioTime } from "../../../lib/site.mjs";
+import { FLAG_STATE, LIFECYCLE, NOTIFICATION, SEVERITY, flagTitle, formatTime, isEscalated, label, lifecycleStep, scenarioTime, scheduleSources } from "../../../lib/site.mjs";
+import Advice from "../../advice";
 import { FlagDecisions } from "../../decisions";
 import { StatePanel, WorkShell } from "../../shell";
 import { Chip, EVALUATION, EvidenceItem } from "../../site-view/zone-panel";
@@ -61,6 +62,7 @@ function FlagDetail({ flag, site }) {
       <p className="crumbs mono"><Link href="/flags">Flags</Link> / Flag {flag.type} · {flag.id.slice(0, 8)}</p>
       <div className="page-head" style={{ alignItems: "flex-start", marginBottom: 8 }}>
         <Chip tone={severity.tone}>{severity.text}</Chip>
+        {isEscalated(flag) && <Chip tone="warn">Escalated</Chip>}
         <h1 style={{ fontSize: 21, maxWidth: 720 }}>{flagTitle(flag)}</h1>
       </div>
       <div className="small muted" style={{ display: "flex", gap: 18, flexWrap: "wrap", marginBottom: 14 }}>
@@ -102,10 +104,18 @@ function FlagDetail({ flag, site }) {
             </div>
           </section>
 
+          <Advice flag={flag} site={site} />
+
           <section className="panel" aria-labelledby="src-h">
-            <h2 id="src-h">Sources <span className="muted small" style={{ marginLeft: "auto" }}>{flag.sources.length}</span></h2>
+            <h2 id="src-h">Sources <span className="muted small" style={{ marginLeft: "auto" }}>{flag.sources.length + scheduleSources(flag).length}</span></h2>
             <div className="pad stack">
-              {flag.sources.length === 0 && <p className="small muted" style={{ margin: 0 }}>No source message linked.</p>}
+              {scheduleSources(flag).map((source) => (
+                <div key={source.ref} className="small">
+                  <span className="mono" style={{ color: "var(--accent-text)" }}>morning scan · schedule</span>
+                  <p style={{ margin: "4px 0 0" }}>Task <span className="mono">{source.taskId}</span> starts {scenarioTime(source.startsAt, site) || source.startsAt}. No message was received; the rule checked the scheduled work itself.</p>
+                </div>
+              ))}
+              {flag.sources.length === 0 && scheduleSources(flag).length === 0 && <p className="small muted" style={{ margin: 0 }}>No source message linked.</p>}
               {flag.sources.map((event) => (
                 <div key={event.id} className="small">
                   <span className="mono" style={{ color: "var(--accent-text)" }}>{scenarioTime(event.source.sent_at, site)} · {event.source.channel} · {label(event.source.sender_role)}</span>
@@ -145,7 +155,7 @@ function FlagDetail({ flag, site }) {
               {(flag.notifications || []).map((message) => (
                 <li key={message.id} role={message.status === "failed" ? "alert" : undefined}>
                   <span className="when">outbox</span>
-                  <span>Gmail warning: {message.status} · attempts {message.attempts}
+                  <span>{NOTIFICATION[message.kind] || label(message.kind)} ({message.channel}): {message.status} · attempts {message.attempts}
                     {message.status === "failed" && message.error_code ? ` · ${label(message.error_code)} · retry scheduled` : ""}</span>
                 </li>
               ))}
@@ -155,13 +165,7 @@ function FlagDetail({ flag, site }) {
 
         <div className="aside">
           <FlagDecisions flag={flag} />
-          <section className="panel" aria-labelledby="prop-h">
-            <h2 id="prop-h">Proposal</h2>
-            <div className="pad stack">
-              <p className="small muted" style={{ margin: 0 }}><Chip tone="unk">Not available</Chip> Advisory LLM proposals are not connected yet (#13). Nothing is approved here.</p>
-              <Link className="btn" href={zoneHref}>Show {flag.zone_id} in the site model</Link>
-            </div>
-          </section>
+          <Link className="btn" href={zoneHref}>Show {flag.zone_id} in the site model</Link>
         </div>
       </div>
     </>
