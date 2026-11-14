@@ -3,6 +3,21 @@
 ## Frontend Design-Mockup
 [https://claude.ai/artifact/3MjWimC7hjDSDSK9RqtxxN#page-dcb81aee8d83](https://claude.ai/artifact/3MjWimC7hjDSDSK9RqtxxN#page-dcb81aee8d83)
 
+## Hero-Replay und Reset (Issue #22)
+
+Ein gefuehrter Aufruf setzt den synthetischen Demo-Stand zurueck und spielt das
+Hero-Szenario mit Dashboard-Pausen. Nach dem Start von API/DB/Web und dem Build
+des Worker-Images den normalen Worker stoppen, dann:
+
+```sh
+docker compose run --rm --no-deps -v ./cad:/cad:ro -v ./.replay:/replay-output worker python -m app.replay --mode offline --speed 3600 --output /replay-output/hero.jsonl
+```
+
+Die API muss `LLM_PROVIDER=cached` verwenden. Der Reset ersetzt die Demo-Daten.
+Online-Modus, echte Testnutzer, Kanal-Konfiguration, Reset-only und Checkpoints:
+[Replay-Anleitung](docs/REPLAY.md). Die beiden Hero-Fragen werden bereits eingelesen;
+echte Telegram-Antworten sind noch von #20 abhaengig und werden nicht simuliert.
+
 ## Lokal starten (Issue #2)
 
 Voraussetzung: Docker mit Compose v2 und laufender Docker Engine (Linux-Container).
