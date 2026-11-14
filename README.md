@@ -1,611 +1,367 @@
-# Puntimata
+# SiteMind
 
-## Frontend Design-Mockup
-[https://claude.ai/artifact/3MjWimC7hjDSDSK9RqtxxN#page-dcb81aee8d83](https://claude.ai/artifact/3MjWimC7hjDSDSK9RqtxxN#page-dcb81aee8d83)
+**A context engine for construction sites: turn messages and plan revisions into
+a shared Site Record, detect conflicts, and keep each Flag visible until a
+responsible human closes it.**
 
-## Hero-Replay und Reset (Issue #22)
+Proximata Hackathon '26 · Talona track. The dashboard carries the GroundIQ visual
+identity. The engine is the product; our Telegram agent and external MCP clients
+use the same context tools.
 
-Ein gefuehrter Aufruf setzt den synthetischen Demo-Stand zurueck und spielt das
-Hero-Szenario mit Dashboard-Pausen. Nach dem Start von API/DB/Web und dem Build
-des Worker-Images den normalen Worker stoppen, dann:
+This private repository and the work produced for this track belong to Talona;
+the application is not MIT-licensed. See [general rules](general-rules.md) and
+[COMPLIANCE.md](COMPLIANCE.md). Use synthetic data and team test accounts only.
+
+## Run the demo
+
+You need repository access, Git, and a running Docker Engine with Compose v2
+supporting `--wait` (Linux containers; Docker Desktop on Windows).
+The base images support ARM64 and x64; no platform emulation is forced.
+No host Python/Node installation, LLM key, Gmail account or Telegram bot is needed
+for the cached demo. The first build needs internet for images/dependencies;
+after building, the offline demo needs no external services.
+
+Clone the private repository using your authorised GitHub account:
+
+```sh
+git clone https://github.com/davidsteindl/ProximataHackathon.git
+cd ProximataHackathon
+```
+
+Copy the environment template from the repository root:
+
+```powershell
+Copy-Item .env.example .env
+```
+
+On Linux/macOS use `cp .env.example .env`. The defaults select cached extraction,
+advice, Q&A routing and vision; both external message adapters are disabled.
+The sample database password is public and for local development only.
+If another stack is already running, choose a distinct `COMPOSE_PROJECT_NAME`
+and host ports in `.env` before starting; update `DASHBOARD_BASE_URL` accordingly.
+
+Start all five services, then stop the normal worker while using the simulated
+demo clock. The replay command will run its own worker client:
+
+```sh
+docker compose up --build -d --wait
+docker compose stop worker
+docker compose run --rm --no-deps -v ./cad:/cad:ro -v ./.replay:/replay-output worker python -m app.replay --reset-only --output /replay-output/reset.jsonl
+```
+
+**Reset replaces all demo data**, including sources, Evidence review history,
+Flags, Proposals, outbox, learning and geometry. On a fresh instance it imports
+the synthetic building, schedule, Crews, Evidence baseline and four Rev-C DXF
+plans. Rev D arrives later in the hero replay. Transcripts remain in local
+`.replay/`, which Git ignores. Do not use reset on an instance with data to keep.
+
+| Open with default ports | Expected result after reset |
+| --- | --- |
+| [Dashboard](http://localhost:3000) | Building overview, upcoming Tasks and activity |
+| [3D site](http://localhost:3000/site) / [bathroom 3B](http://localhost:3000/zones/3B-BATH) | Geometry from imported plans; selectable floors and Zones |
+| [Evidence review](http://localhost:3000/evidence) | Explicit synthetic baseline and unconfirmed/contradictory sample claims |
+| [Flag inbox](http://localhost:3000/flags) / [Proposals](http://localhost:3000/proposals) | Human workflow views; the replay creates new conflicts |
+| [API health](http://localhost:8000/health) | HTTP 200, `{"api":"ok","db":"ok"}` |
+| [API docs](http://localhost:8000/docs) / [OpenAPI](http://localhost:8000/openapi.json) | REST contract |
+| MCP: `http://localhost:8001/mcp` | Streamable HTTP endpoint for an MCP client, not a browser page |
+
+### Guided hero scenario
+
+Keep the normal worker stopped and run this in an interactive terminal:
 
 ```sh
 docker compose run --rm --no-deps -v ./cad:/cad:ro -v ./.replay:/replay-output worker python -m app.replay --mode offline --speed 3600 --output /replay-output/hero.jsonl
 ```
 
-Die API muss `LLM_PROVIDER=cached` verwenden. Der Reset ersetzt die Demo-Daten.
-Online-Modus, echte Testnutzer, Kanal-Konfiguration, Reset-only und Checkpoints:
-[Replay-Anleitung](docs/REPLAY.md). Die beiden Hero-Fragen werden bereits eingelesen;
-echte Telegram-Antworten sind noch von #20 abhaengig und werden nicht simuliert.
+This resets the baseline again and advances the synthetic scenario clock.
+Follow the terminal's dashboard links and perform each requested human action,
+then press Enter. Enter checks the stored decision; it makes no decision itself.
 
-## Lokal starten (Issue #2)
+1. The architect's Rev-D DXF moves bathroom 3B's wall by 30 cm. The deterministic
+   plan diff identifies 3B; **Flag B** reports missing valid Crew receipt of Rev D.
+2. A postponed Inspection and “Abnahme dürfte passen” remain unconfirmed.
+   “morgen früh machen wir 3B zu, platten sind da” triggers **Flag A** because
+   the required Inspection is not established.
+3. Acknowledge the Flag and separately approve the Superintendent's Proposal.
+   Closing the Flag with feedback does not confirm an Inspection.
+4. Correct a question misread as a work announcement using explicit false-alarm
+   feedback. Repeating that exact case uses traceable Site Knowledge; a genuine
+   unsafe work announcement still creates a Flag.
+5. Review the specific day-4 Inspection Evidence and resolve the sample
+   counterclaim separately. A satisfied Precondition still leaves its Flag open
+   for a separate human closure.
 
-Voraussetzung: Docker mit Compose v2 und laufender Docker Engine (Linux-Container).
-Die Basis-Images unterstützen x64 und ARM64; es wird keine Plattform erzwungen.
+Offline deliveries are explicitly recorded as synthetic in the transcript and
+outbox; no email or Telegram message is sent. Offline questions show record
+context, not simulated Telegram answers. Real channel delivery and Telegram Q&A
+need the optional test-account setup below. Replay does not automatically verify
+answer contents (`telegram_answers_verified: false`).
+Full sequence, checkpoints and online mode: [REPLAY.md](docs/REPLAY.md).
 
-```sh
-cp .env.example .env
-docker compose up --build
-```
-
-In PowerShell statt `cp`: `Copy-Item .env.example .env`. Beim ersten Start baut auch
-`docker compose up` die noch fehlenden Images; nach Codeänderungen `--build` verwenden.
-
-- Dashboard (GroundIQ, #55): http://localhost:3000 – Startseite mit Kennzahlen,
-  3D-Modell, „Needs your attention“, Activity und den nächsten 48 h; aktualisiert
-  sich alle 5 s. Dunkle Arbeitsansichten: `/flags` (Inbox), `/flags/<id>`
-  (Detail mit getrennten Karten für Kenntnisnahme und Abschluss), `/evidence`
-  (Prüfung, auch ohne Flag), `/proposals` (Advisor-Proposals mit Freigabe/Ablehnung
-  durch den Superintendent, #13), `/activity` (Timeline, Terminplan mit Filtern, Site
-  Knowledge und Feedback-Kennzahl aus #21, Pläne, Inspections, API-/DB-Status). Links
-  aus Warnungen (`/#flag-<id>`) leiten auf `/flags/<id>` weiter. Einen Chat im Dashboard
-  gibt es nicht (#19, PLAN §4): Fragen laufen über Telegram (#20) und `POST /qa`, externe
-  Agents verbinden sich über `/mcp`; alte Links auf `/chat` erklären das. Der
-  Demo-Rollenumschalter sitzt in der Navigation und gilt seitenübergreifend (keine
-  Authentifizierung). Gestaltung:
-  [design/HANDOFF.md](design/HANDOFF.md).
-- Statischer Site Record (Issue #5): Nach dem Start in einem zweiten Terminal
-  `docker compose exec api python -m app.seed` ausführen. Das Dashboard zeigt dann
-  Zonen, Terminplan, Crews, Revisionen/Bestätigungen und Inspections.
-  Evidence mit Quelle, genauem Geltungsbereich und Prüf-Historie steht unter
-  `/evidence` sowie lesend im Dashboard. Synthetische Ausgangsnachweise sind
-  von unbestätigten Aussage-Beispielen getrennt; Seed-Herkunft ersetzt keine
-  erfundene menschliche Freigabe. Der explizite Demo-Reset setzt auch diese
-  Nachweise samt Historie zurück. Extraktion (#6) und menschliche Prüf-Aktion
-  (#9) verwenden den Vertrag in [SITE_RECORD.md](docs/SITE_RECORD.md).
-  Derselbe Befehl setzt die statischen Daten auf den Seed-Ausgangszustand zurück.
-  Format, Zonen-IDs für #3, REST-Vertrag und Migrationen: [docs/SITE_RECORD.md](docs/SITE_RECORD.md).
-- API-Health: http://localhost:8000/health – `200` mit
-  `{"api":"ok","db":"ok"}`, bei DB-Ausfall `503` mit `db: "error"`.
-- CAD-Geometrie (#15): Nach dem Seed-Import
-  `docker compose exec api python -m app.cad_import` ausführen. Importiert alle fünf
-  DXFs aus #3 samt Metadaten; Originaldateien bleiben je Revision gespeichert.
-  Geometrie in Metern unter `/geometry?floor_id=F3` bzw.
-  `/geometry?zone_id=3B&revision_id=A-103-D`. API-/Importvertrag und 3D-Koordinaten:
-  [docs/CAD-PIPELINE.md](docs/CAD-PIPELINE.md). Ein Seed-Reset entfernt auch die
-  daraus abgeleitete Geometrie; danach den CAD-Import erneut ausführen.
-- 3D-Baustellenansicht (#16): http://localhost:3000/site, Raumansicht unter
-  `/zones/<zoneId>` (z. B. `/zones/3B-BATH`, teilbarer Link). Braucht Seed,
-  CAD-Import und für Flag A die Hero-Nachricht unten. Das Gebäude wird nur aus
-  `/geometry` erzeugt (Wände auf Geschosshöhe extrudiert, Räume, Türen, Sanitär,
-  Abwasser); Kräne, Gerüst, Zaun, Bäume und Container sind als dekorativer
-  Kontext gekennzeichnet. Status kommt aus `/flags`, `/inspections`, `/evidence`
-  und wird alle 3 s über `web` (`/api/site-state`) nachgeladen, ohne Reload.
-  Helle Plan-Shell: Geschoss-Leiste mit 2D (Draufsicht-Kamera) / 3D, Infopanel
-  rechts (einklappbar, Kontext bleibt erhalten), Schnellaktionen unten.
-  Die Ansicht liest nur; Evidence-Prüfung und Flag-Abschluss bleiben getrennte
-  menschliche Aktionen unter `/evidence` und `/flags/<id>`.
-- OpenAPI: http://localhost:8000/openapi.json, interaktive Dokumentation unter `/docs`.
-- MCP: http://localhost:8001/mcp – Streamable HTTP mit neun Kontext-Tools,
-  Verbindung und Beispiele unter [MCP-Verbindung](#mcp-verbindung-issue-18).
-- `docker compose logs worker mcp` zeigt den erfolgreichen API-Zugriff beider Dienste.
-  Der Worker wiederholt die Prüfung alle 30 Sekunden; MCP prüft beim Start.
-
-`.env.example` enthält alle derzeit benötigten Einstellungen: lokale DB-Zugangsdaten,
-Host-Ports und `API_BASE_URL` (Compose-intern, standardmäßig `http://api:8000`).
-Das Beispielpasswort ist ausschließlich für lokale Entwicklung. `.env` wird nicht
-versioniert. Nur `api` liegt im DB-Netz und erhält DB-Zugangsdaten; die übrigen
-Anwendungsdienste verwenden die REST-API.
-
-Stoppen: `docker compose down`. Die Daten bleiben im Volume `db-data` erhalten.
-`docker compose down --volumes` löscht auch die lokalen Daten.
-
-Enthalten sind Infrastruktur, Health-Prüfungen, der statische Site Record aus
-Issue #5, Nachrichten-Ingestion, Event-Extraktion und Timeline aus #6 sowie
-DXF-Extraktion und Geometrie-API aus #15, Conflict A und Flag-Inbox aus #7,
-Conflict B aus Revisionsnotizen (#8), Gmail-Eingang aus #11,
-Outbox-/Gmail-Versand aus #10 sowie die 3D-Ansicht aus #16 und der DXF-Plan-Diff
-aus #17 sowie MCP-Kontext-Tools aus #18 und der Q&A-Kern aus #19. Telegram-Adapter, Authentifizierung
-und Hosting folgen in ihren eigenen Issues.
-
-### MCP-Verbindung (Issue #18)
-
-Nach `docker compose up --build` und dem Seed-Import verbindet sich ein beliebiger
-MCP-Client per **Streamable HTTP** mit `http://localhost:8001/mcp`.
-Bei geändertem `MCP_PORT` den Port anpassen; Compose-interne Clients verwenden
-`http://mcp:8001/mcp`. Keine API-, DB- oder LLM-Zugangsdaten im Client hinterlegen.
-
-Zum manuellen Testen `npx @modelcontextprotocol/inspector` starten, in dessen UI
-**Streamable HTTP** wählen, die URL eintragen und verbinden. Unter **Tools**
-`get_zone_status` mit `{"zone_id":"3B"}` aufrufen: Die Antwort enthält die
-Wohnung und Unterzonen, den auch für 3B geltenden Etagen-Terminplan, Inspections,
-Evidence mit Prüfstatus, deterministische Preconditions, offene Flags und Quellen.
-Vor einer Arbeitsankündigung ist ein nicht ausgewerteter Task ausdrücklich
-`unknown`, nicht freigegeben. Nach der Hero-Nachricht aus dem Abschnitt unten
-erscheint Flag A; auch hochkonfidente LLM-Aussagen bleiben `unconfirmed`.
-
-| Tool | Verwendung |
-|---|---|
-| `list_zones` | Zonen-IDs und Gebäudehierarchie entdecken |
-| `get_zone_status(zone_id)` | Status inklusive abdeckender übergeordneter Records; keine Geschwister-only-Records |
-| `list_flags(status="open")` | Offene, geschlossene oder alle Flags mit Quellen und Historie |
-| `get_flag(flag_id)` | Flag-Detail, Prüfstatus und Audit |
-| `get_timeline(zone_id?, from_time?, to_time?, limit=100)` | Events, Evidence-Entscheidungen, Flag-Audit, Revisionen |
-| `search_record(query, zone_id?, limit=50)` | Wörtliche, nicht semantische Suche im Record |
-| `get_zone_plan(zone_id, revision_id?)` | Importierte DXF-Elemente in Metern; standardmäßig letzte importierte Geometrie |
-| `get_plan_diff(revision_id)` | Deterministischer Diff gegen den unmittelbaren Vorgänger desselben Plans (#17) |
-| `create_proposal(flag_id, action, rationale)` | Ungeprüften Handlungsvorschlag für einen offenen Flag speichern |
-
-Alle Tools liefern JSON als MCP `structuredContent` plus kompatiblen Textinhalt.
-`source_refs` und `record_ref` identifizieren `source:<id>` (Originalquelle über
-`GET /source-messages/<id>`), `event:<id>`, `evidence:<id>`, `flag:<id>`,
-`task:<id>`, `zone:<id>`, `plan:<id>` bzw. `revision:<id>` im REST-Record;
-`seed:…` bleibt als explizite synthetische Herkunft erhalten. DXF-Antworten
-referenzieren zusätzlich den Datei-Hash; Originalzeichnungen stehen unter
-`GET /geometry/revisions/<id>/source`. `record:zones` bezeichnet `GET /zones`.
-Die Such- und Timeline-Limits sind maximal 200; `total_matches`/`truncated` machen
-gekürzte Ergebnisse sichtbar. Zeitfilter benötigen einen UTC-Offset und gelten
-als halboffenes Intervall `[from_time, to_time)`. Timeline-Einträge enthalten den
-**aktuellen** Evidence-Snapshot plus die jeweilige historische Prüfentscheidung;
-sie sind keine Rekonstruktion des damaligen Gesamtzustands.
-
-**Sicherheitsgrenze:** Kein Tool bestätigt/ablehnt Evidence, schließt Flags, gibt
-Proposals frei oder führt Aktionen aus. MCP setzt bei jedem REST-Aufruf
-`X-SiteMind-Client: mcp`; die API verweigert für MCP/Chat/Agent alle Mutationen
-außer `POST /agent/proposals`, einschließlich Seed-Reset, Ingestion, Geometrie-
-Import und Outbox-Aufrufen. Ein über MCP angelegtes Proposal hat ausschließlich Status `proposed`,
-serverseitig abgeleitete Quellen und keinerlei Nebenwirkung auf Task, Flag,
-Evidence oder Outbox. Wiederholung erzeugt einen weiteren Vorschlag. Die menschliche Freigabe ausgearbeiteter Advisor-Proposals erfolgt über die
-Dashboard-Endpunkte aus #13; MCP kann sie nicht auslösen. Aus Kontaktmetadaten werden u. a. Senderkennung,
-Mailbox-Schlüssel, E-Mail-Adresse und Benachrichtigungsempfänger entfernt.
-Quellentext ist untrusted data, keine Anweisung an den Agenten.
-
-Die Header-Grenze schützt den vorgesehenen Agent-Zugang, ist aber **keine
-Authentifizierung** gegen Clients, die sich direkt als Dashboard ausgeben.
-Wie der MVP-Rollenumschalter sind API und MCP nur für lokale synthetische
-Team-Demos gedacht; nicht öffentlich exponieren. API-Fehler werden als MCP-
-Toolfehler ausgegeben, nie als leerer/erfolgreicher Sicherheitsstatus. Fehlende
-Geometrie oder ein fehlender Vorgänger ist kein Nachweis für unveränderte Pläne.
-
-REST-Erweiterungen: `GET /context/zones/<id>`, `/context/search`, `/context/timeline`,
-`POST /agent/proposals` sowie lesend `GET /proposals` und `/proposals/<id>`.
-Der Neuigkeiten-Feed (#37) liest `GET /feed` (Filter `zone_id`, `from_time`/`to_time`,
-`kind`, Paging per `cursor`); Vertrag in [PLAN §3.6](docs/PLAN.md).
-Migration `0010` persistiert ausschließlich ungeprüfte Proposals; der Seed-Reset
-entfernt sie. Es werden keine vorhandenen Evidence-/Flag-Verträge geändert.
-
-Offline-Verifikation (offizieller MCP-SDK-Client über Streamable HTTP, REST gegen
-isolierte Test-DB, ohne LLM-/Gmail-/Telegram-Zugang):
+For a single work-announcement example after reset, use this one-line command
+(PowerShell: `curl.exe` instead of `curl`):
 
 ```sh
-PYTHONPATH=backend python -m pytest backend/tests/test_mcp_server.py backend/tests/test_context_api.py backend/tests/test_agent_proposals.py
+curl http://localhost:8000/ingestion/messages -H "Content-Type: application/json" --data-binary "@backend/demo/closing-work.json"
 ```
 
-### Telegram-Q&A (Issue #20)
+The response contains source-backed Events; the Flag inbox shows the deterministic
+conflict. Repeating the same source does not duplicate its Events. With the
+normal worker stopped, notifications stay queued. Use the full replay above
+for a fresh scenario with explicitly synthetic delivery.
 
-Der erlaubte Telegram-Chat verwendet den Q&A-Kern aus #19. Record-Antworten und
-Entscheidungsweiterleitungen laufen ueber die Outbox; Chat kann keine Nachweise
-bestaetigen oder Entscheidungen freigeben. API-Vertrag: `POST /telegram/qa`
-mit `source_id` und Worker-Key, auf Basis einer bereits ingestierten Quelle.
-Migration `0015` ergaenzt die Outbox-Arten `qa_reply` und `decision_request`.
-Einrichtung, Nachrichten-Erkennung und Grenzen: [TELEGRAM.md](docs/TELEGRAM.md).
+### Stop, restart and troubleshoot
 
-### Q&A-Kern (Issue #19)
+`docker compose down` stops the stack and preserves the database volume.
+`docker compose up -d` starts it again; `--build` rebuilds changed code.
+`docker compose down --volumes` also deletes this stack's database. It does not
+delete provider copies, local OAuth files or replay transcripts.
 
-`POST /qa` mit `{"text": "...", "sender_role": "crew_lead"}` beantwortet eine Frage
-für den Telegram-Bot (#20). `api` ist dabei MCP-Client des eigenen `mcp`-Servers
-(`MCP_URL`) und nutzt nur dessen Tools. Das LLM klassifiziert nur (Fragetyp und Zone
-aus fester Auswahl, `QA_ROUTER_PROVIDER=decisions` mit `OPENAI_API_KEY`, sonst
-`cached`); der Antworttext wird deterministisch aus den Tool-Ergebnissen mit Quellen
-und Prüfstatus gebaut. Antwortarten: `answer`, `clarification` (Konfidenz unter
-`QA_CONFIDENCE_THRESHOLD` oder unbekannte Zone, mit Vorschlägen), `not_found`,
-`decision_request` (nicht beantwortet, #20 leitet weiter), `dashboard_review`
-(Nachweis bestätigen geht nur im Dashboard) und `not_a_question`. Routing- oder
-Record-Fehler ergeben HTTP 503 mit Fehlercode, nie eine geratene Antwort.
-`list_zones` liefert dafür zusätzlich die Site (Zeitzone, Starttag = Tag 1).
-`get_zone_status` enthaelt zudem `plans` mit vollstaendiger Revisionshistorie und
-aktueller Revision je abdeckendem Plan, unabhaengig von Timeline-Limits.
-Empfangsmeldungen stammen aus Evidence mit aktuellem Pruefstatus und Zone;
-Extraktionsherkunft und menschliche Nachweispruefung werden getrennt dargestellt.
+- Startup failure: use `docker compose ps` and `docker compose logs --tail 100 api worker mcp web`.
+  API startup applies Alembic migrations before serving; DB failure returns health
+  HTTP 503. Wait for a healthy API before resetting.
+- Empty site/3D: run reset-only above. A plain seed import clears geometry;
+  `docker compose exec api python -m app.cad_import` imports **all five** bundled
+  plans, including Rev D. For the hero's Rev-C starting point use reset-only.
+- `cache_miss`: cached mode recognises the authored demo text/role (and photo
+  bytes), not arbitrary messages. Use the exact fixtures/replay or configure a
+  live provider explicitly. There is no live fallback.
+- No real notification: adapters are off by default. Seed Crew Leads have no
+  email addresses; configure team recipients and the appropriate transport.
+  Pending/failed deliveries and safe error codes are visible in the Flag/outbox.
+- Unexpected early Flags: the normal worker uses the real clock for scans and
+  escalation. Keep it stopped during replay; replay invokes jobs itself.
+- Port collision or multiple worktrees: give each `.env` a distinct
+  `COMPOSE_PROJECT_NAME`, `API_PORT`, `MCP_PORT` and `WEB_PORT`. Update
+  `DASHBOARD_BASE_URL` to match the browser-facing web port.
+  Keep `API_BASE_URL=http://api:8000` and `MCP_URL=http://mcp:8001/mcp`
+  for Compose-internal traffic. Project names also separate database volumes.
+- API/MCP have no production authentication and published ports bind all host
+  interfaces by default. Use a trusted local network/firewall; do not expose the
+  demo publicly.
 
-```sh
-PYTHONPATH=backend python -m pytest backend/tests/test_qa.py
-```
+## Environment and optional integrations
 
-### Nachricht → Event → Timeline (Issue #6)
+[.env.example](.env.example) documents every Compose input and its defaults.
+`.env` and `.gmail/` are ignored; never commit credentials. Recreate affected
+services after edits with `docker compose up -d api worker mcp web`.
 
-Nach `docker compose up --build` und dem Seed-Import kann die synthetische
-Hero-Nachricht ohne LLM-Key oder Internet verarbeitet werden:
+| Configuration | Owner and use |
+| --- | --- |
+| `COMPOSE_PROJECT_NAME`, host ports | Compose stack/volume isolation and browser access |
+| `POSTGRES_*` | Local database; Compose maps these to `PG*` only inside API |
+| `API_BASE_URL`, `MCP_URL` | REST consumers and API's own MCP client |
+| `LLM_*` | API extraction/advisor; `cached` or `openai_compatible` |
+| `VISION_*` | API photo findings; cached by default, live uses `LLM_BASE_URL` / `LLM_API_KEY` |
+| `QA_ROUTER_PROVIDER`, `OPENAI_API_KEY`, `QA_CONFIDENCE_THRESHOLD` | API Q&A routing; cached by default, `decisions` explicitly enables live routing |
+| `GMAIL_*` | Worker-only, opt-in inbound/read and outbound/send; OAuth under `.gmail/` |
+| Telegram bot, allowlists, sender role/Crew maps, poll interval, photo opt-in | Worker-only transport configuration |
+| `TELEGRAM_COMPLIANCE_KEY` | Shared API/worker credential for privacy, retention and Telegram Q&A routes |
+| Telegram retention/operator, Crew Lead/group recipient maps | API privacy policy and outbox addressing |
+| `MORNING_SCAN_TIME`, `ESCALATION_CHECK_SECONDS` | Worker schedule, in Site local time / elapsed seconds |
+| `SCAN_LOOKAHEAD_DAYS`, `ESCALATION_HOURS`, `SUPERINTENDENT_EMAIL`, `DASHBOARD_BASE_URL` | API scan/escalation policy, test recipient and browser links |
 
-```sh
-curl http://localhost:8000/ingestion/messages \
-  -H 'Content-Type: application/json' \
-  --data-binary @backend/demo/closing-work.json
-```
+Gmail and Telegram credentials live only in `worker`; LLM keys only in `api`.
+No model or channel credentials are passed to web, MCP or external agents.
+`SUPERINTENDENT_EMAIL` and recipient maps are contact configuration, not credentials.
 
-In PowerShell `curl.exe` verwenden und den Befehl in eine Zeile schreiben.
-Bei geändertem `API_PORT` die URL anpassen. Danach das Dashboard neu laden:
-Die Event-Timeline zeigt die Arbeitsankündigung für 3B samt Originalquelle und
-Zeitfenster am Folgetag. Wiederholtes Senden liefert dieselben Event-IDs.
-Irrelevante Nachrichten bleiben als Quellen gespeichert, erzeugen aber keine Events.
-Die Timeline nutzt dieselben Zonen-/Datumsfilter wie der Terminplan; ihre Daten
-beziehen sich auf den Zeitpunkt der ursprünglichen Nachricht.
+- **Gmail:** [GMAIL.md](docs/GMAIL.md) gives Cloud/OAuth setup and exact
+  `gmail.readonly` + optional `gmail.send` scopes. Use a dedicated project test
+  mailbox, never a personal mailbox. Optional host OAuth setup needs Python 3.13
+  and the backend requirements. External/Testing refresh tokens expire after 7
+  days. Enable inbound and outbound separately and configure team recipients.
+- **Telegram:** [TELEGRAM.md](docs/TELEGRAM.md) covers BotFather, privacy mode,
+  numeric chat **and** user allowlists, mapped roles/Crews, privacy commands and
+  Q&A. Empty allowlists deny all. Use a random local shared worker key and actual
+  test operator contact. Photos require explicit `TELEGRAM_PHOTOS_ENABLED=true`;
+  image pixels are not anonymised: [photo limits](docs/COMPLIANCE.md).
+- **Live models:** extraction/advisor need `LLM_PROVIDER=openai_compatible`,
+  `LLM_BASE_URL` ending in `/v1`, `LLM_MODEL` and `LLM_API_KEY` for a
+  JSON-mode-capable provider. Vision uses a vision-capable `VISION_MODEL` or
+  falls back to `LLM_MODEL`. Q&A `decisions` uses its own key and fixed endpoint.
+  EU processing, DPA and zero retention are deployment requirements, not defaults;
+  read [COMPLIANCE.md](COMPLIANCE.md) before enabling live processing.
+- **Normal operation:** after reset and adapter configuration,
+  `docker compose up -d worker` resumes polling, advice generation, outbox
+  delivery and scheduled jobs. `MORNING_SCAN_TIME=off` and
+  `ESCALATION_CHECK_SECONDS=0` disable automatic jobs, not inbound polling.
+  Default scan is 06:00 Site time, one day ahead; escalation is after four hours
+  without human reaction. Both jobs can be triggered with a simulated `as_of`:
+  [FLAGS.md](docs/FLAGS.md#morning-scan-and-escalation-14).
 
-`LLM_PROVIDER=cached` nutzt ausdrücklich synthetische Extraktionsergebnisse für
-die dokumentierten Hero-Nachrichten. Andere Texte melden `cache_miss`, ohne einen
-Live-Aufruf auszulösen. Für beliebige Texte `LLM_PROVIDER=openai_compatible`,
-`LLM_BASE_URL`, `LLM_MODEL` und `LLM_API_KEY` für einen JSON-Mode-fähigen Provider
-in `.env` setzen und `api` neu erstellen. Nur `api` erhält den LLM-Key.
+### MCP connection
 
-Abnahme-, Task-Abschluss- und Revisionsbestätigungen aus Nachrichten werden immer
-als **unbestätigte Evidence** mit Quelle/Zitat gespeichert. Sie überschreiben keine
-vorhandene Bestätigung und geben keine Arbeit frei. Die menschliche Prüfung folgt
-in #9. Conflict A und B werden bereits deterministisch geprüft.
-Der Seed-Befehl setzt auch die neuen Nachrichten
-und Events zurück. REST-Vertrag, Cache-Inhalte, Fehler-/Retry-Verhalten und
-Datenschutzgrenzen: [docs/INGESTION.md](docs/INGESTION.md).
+An MCP client uses **Streamable HTTP** at `http://localhost:8001/mcp`
+(adapt `MCP_PORT`). Internal clients use `http://mcp:8001/mcp`.
+No DB, LLM or channel credentials belong in the client. An optional inspector
+is available via `npx @modelcontextprotocol/inspector` (requires Node.js).
 
-### Conflict A und Flag-Inbox (Issue #7)
+| Tool | Purpose |
+| --- | --- |
+| `list_zones` | Discover Site and Zone hierarchy |
+| `get_zone_status(zone_id)` | Preconditions, Evidence review status, Tasks, Flags, plans and sources |
+| `list_flags(status="open")`, `get_flag(flag_id)` | Flag context and audit |
+| `get_timeline(zone_id?, from_time?, to_time?, limit=100)` | Source-backed changes and current Evidence snapshot |
+| `search_record(query, zone_id?, limit=50)` | Literal search in the Site Record |
+| `get_zone_plan(zone_id, revision_id?)` | Imported geometry in metres |
+| `get_plan_diff(revision_id)` | Deterministic comparison to the preceding Revision |
+| `create_proposal(flag_id, action, rationale)` | Store a proposed action without approving/executing it |
 
-Nach der Hero-Nachricht zeigt `GET /flags` den offenen Flag A für 3B mit
-Quellzitat, betroffener Task, erforderlicher Rohinstallationsabnahme und
-verantwortlichem Crew Lead. `GET /flags/{id}` liefert die Details. Wiederholte
-Erkennung ergänzt den bestehenden offenen Flag. Die Regel bewertet Nachweise
-als erfüllt, nicht erfüllt, unbekannt oder widersprüchlich; eine unbestätigte
-Erfolgsmeldung reicht nie als Freigabe. Neue Events und menschliche
-Nachweisentscheidungen lösen die Prüfung in derselben Transaktion aus.
-Ein später erfüllter Nachweis schließt keinen Flag.
+Try `get_zone_status` with `{"zone_id":"3B"}`. Outputs provide JSON
+`structuredContent`, source references and uncertainty. A missing evaluation is
+`unknown`, never clearance. Limits are at most 200; truncation is explicit.
+Time filters require a UTC offset and use `[from_time, to_time)`.
+`source:<id>`, `event:<id>`, `evidence:<id>` and other record references
+resolve through the REST contract. Original CAD source downloads include hashes.
 
-Migration `0005` ergänzt Flags, Quellenverknüpfungen und Audit; der Seed-Reset
-entfernt diese Daten mit. Die Inbox ist lesend; menschliche Lifecycle- und Nachweisaktionen ergänzt #9
-(siehe unten). Details zu Regel,
-Nachweisgültigkeit und Integration für #8/#9/#14: [docs/FLAGS.md](docs/FLAGS.md).
-
-### Flag-Lifecycle und Nachweisprüfung (Issue #9)
-
-`POST /flags/{id}/actions` speichert menschliche Kenntnisnahme (`confirmed`)
-oder Abschluss (`resolved` / `false_alarm`) mit Begründung und vollständigem
-Audit. `GET /flags?status=closed` hält abgeschlossene Flags samt Feedback
-zugänglich. Systemsignale für Benachrichtigung (#10), freigegebene Maßnahmen
-(#13) und Eskalation (#14) nutzen den gemeinsamen API-internen Lifecycle.
-
-Die separate Dashboard-Aktion `POST /evidence/{id}/reviews` bestätigt/ablehnt
-quellengebundene Nachweise mit genauem Geltungsbereich, auch ohne Flag. Jede
-Entscheidung prüft die Regeln erneut; ein erfüllter Nachweis lässt den Flag offen
-und setzt nur `awaiting_human_closure`. Kenntnisnahme, Nachweisentscheidung,
-Proposal-Freigabe und Abschluss bleiben getrennt. Der Rollenumschalter verwendet
-synthetische Identitäten und ist keine produktionsreife Authentifizierung.
-MCP/Chat-Kanäle dürfen diese Aktionen nicht ausführen. REST-Payloads,
-Übergänge, Rollen und Integrationsgrenzen: [docs/FLAGS.md](docs/FLAGS.md#lifecycle-and-evidence-review-9).
-### Conflict B aus Revisionsnotizen (Issue #8)
-
-Nach dem Seed dieselbe Ingestion mit `backend/demo/revision-note.json` aufrufen
-(gleicher curl-Befehl wie oben, mit diesem Dateinamen). Die Hero-Notiz von Tag 1,
-10:15 Uhr, registriert A-103 Rev D auch ohne CAD-Import und erzeugt Flag B für
-die Sanitär-Crew in 3B: bestätigter Empfang C, erforderlich D. Ebenfalls betroffene
-geplante Arbeiten werden geprüft. Die Inbox zeigt Crew, Revisionen, Quellen und
-den **unbestätigten** Zonenbezug aus der Notiz. Danach die Closing-Work-Nachricht
-senden: Für die Trockenbau-Arbeit in 3B erscheinen A und B.
-
-Eine spezifische Empfangsmeldung bleibt unbestätigte Evidence. „Warnung gesehen“
-bestätigt keinen Revisionsempfang; auch bestätigter Empfang belegt keine Umsetzung.
-Migration `0006` erlaubt `file_name: null` für reine Notizrevisionen und ergänzt
-`Flag.context` mit Crew, Plan sowie erforderlicher und bestätigter Revision.
-CAD-Import kann die vorläufigen Metadaten derselben Revision vervollständigen;
-dabei entstehen weder geometrische Änderungszonen noch Empfangsbestätigungen.
-Details und Tests: [docs/FLAGS.md](docs/FLAGS.md).
-
-### Outbox-Vertrag (Issue #10)
-
-Migration `0007` ergänzt optionale `crew_leads.email` (auch im Seed-/Crew-REST-Vertrag)
-und eine transaktionale Outbox: genau eine faktische Gmail-Warnung pro neuem Flag.
-`GET /outbox?flag_id=…` zeigt Status und Versuche. Der Worker reserviert über
-`POST /outbox/claim` eine Nachricht für fünf Minuten und meldet mit Lease-Token
-über `POST /outbox/{id}/result` Erfolg oder Fehler. Fehler werden mit Backoff
-(60 Sekunden bis eine Stunde) erneut versucht. Nur bestätigter Versand setzt
-einen noch `detected` Flag auf `notified`; menschliche Zustände bleiben erhalten.
-Versandversuche und Ergebnisse stehen im Flag-Audit. Der Demo-Reset leert die Outbox.
-
-Versand aktivieren: Crew-Lead-Testadresse im Seed hinterlegen, OAuth mit
-`python -m app.gmail_auth --send` erneut autorisieren und `GMAIL_SEND_ENABLED=true`
-setzen. Fehlende Adressen werden als Versandfehler sichtbar. Einrichtung, Hero-Test
-und Grenzen (Gmail-Annahme, mögliche Duplikate bei unklarem Versandresultat):
-[docs/GMAIL.md](docs/GMAIL.md#factual-flag-warnings-outbox).
-
-### Proposals und Freigabe (Issue #13)
-
-Für jeden offenen Flag fordert der Worker über `POST /flags/{id}/advice` einmalig eine
-Erklärung mit Proposals an. Das LLM läuft nur in `api` und bekommt nur Fakten aus dem
-Record. Jede Aussage zitiert einen dieser Fakten; erfundene Zitate, Zonen, Crews oder
-Tasks werden abgelehnt. Der Superintendent bekommt eine Freigabe-Anfrage per Mail
-(`SUPERINTENDENT_EMAIL`) mit Link und entscheidet im Dashboard
-(`POST /proposals/{id}/decisions`). Eine Freigabe setzt einen zur Kenntnis genommenen
-Flag auf `in_progress` und schickt die Folge-Nachricht über die Outbox an die
-betroffenen Crew Leads. Eine Ablehnung ändert nichts. Die Freigabe bestätigt keine
-Nachweise und schließt keinen Flag. Migration `0014` ergänzt `flag_advice`,
-`proposals` und `outbox_messages.kind`/`dedup_key`. Details: [docs/PROPOSALS.md](docs/PROPOSALS.md).
-
-### Blockierte Tasks und Crew-Hinweise (Issue #38)
-
-Flags liefern zusätzlich `blocked_tasks`: anstehende Tasks in der Zone samt
-Unterzonen, der zugeordnete Task und deren transitive Nachfolger. Flag-Detail und
-Raumansicht zeigen diese Liste. Faktische Hinweise gehen je Flag/Crew einmal über
-die Outbox an Leads und konfigurierte Gruppen (`TELEGRAM_CREW_GROUPS_JSON`, z. B.
-`{"drywall":"-100123456"}`; Gruppe auch in `TELEGRAM_ALLOWED_CHATS_JSON` eintragen).
-Der separate Proposal „Put blocked Tasks on hold“ zeigt Empfänger, Tasks und die
-geplante Pausenanweisung. Nur seine Freigabe versendet diese Anweisung; Ablehnung
-sendet nichts. Termine und Evidence bleiben unverändert. Details und Prüfschritte:
-[Proposals](docs/PROPOSALS.md#blocked-tasks-and-hold-proposal-38).
-
-### DXF-Plan-Diff (Issue #17)
-
-Vor dem Hero-Replay mindestens `A-103_RevC.dxf` über den CAD-Import laden.
-Die Hero-Mail mit `A-103_RevD.dxf` läuft über `/ingestion/messages`: Der Vergleich
-C → D liefert ausschließlich 3B und löst dort Conflict B aus. Die Originalnotiz
-bleibt als Erklärung erhalten. `GET /geometry/revisions/A-103-D/diff` liefert
-die geänderten Elemente mit alter/neuer Geometrie, gruppiert nach Wohnung.
-Identische Geometrie ergibt einen leeren Diff und keine betroffenen Zonen.
-
-Schlägt der Vergleich fehl, prüft B weiter die unbestätigten Notizzonen; die Inbox
-zeigt den Fallback samt Fehlergrund. Ein erfolgreicher Diff ersetzt keine
-menschlich bestätigte Empfangs-Evidence. Dateinamen, Metadaten, Herkunft und
-Fehlerverhalten: [CAD-PIPELINE.md](docs/CAD-PIPELINE.md#plan-diff-17).
-
-### Morgen-Scan und Eskalation (Issue #14)
-
-Der `worker` löst beide Jobs per REST aus; die Logik liegt in `api`. Der
-**Morgen-Scan** (`MORNING_SCAN_TIME`, Ortszeit der Site, einmal pro Tag) prüft
-Tasks, die bis zum Ende des Tages in `SCAN_LOOKAHEAD_DAYS` Tagen beginnen, nur
-anhand des Terminplans, mit derselben Nachweisregel wie bei Events. Die
-**Eskalation** schickt einen Flag ohne menschliche Reaktion nach
-`ESCALATION_HOURS` genau einmal über die Outbox an `SUPERINTENDENT_EMAIL` und
-schreibt das ins Audit. Für das Replay lassen sich beide Jobs mit simulierter Uhr
-direkt auslösen. Die Eskalation misst dabei ab der Uhr des Auslösers (`sent_at`
-der Quellnachricht bzw. `as_of` des Scans). Damit die Echtzeit-Jobs des Workers
-Replay und Hero-Szenario nicht vorwegnehmen, schalten `MORNING_SCAN_TIME=off`
-und `ESCALATION_CHECK_SECONDS=0` sie ab:
-
-```sh
-curl -X POST localhost:8000/jobs/morning-scan -H 'Content-Type: application/json' -d '{"as_of":"2026-11-14T05:00:00Z"}'
-curl -X POST localhost:8000/jobs/escalation -H 'Content-Type: application/json' -d '{"as_of":"2026-11-15T05:00:00Z"}'
-```
-
-Details: [docs/FLAGS.md](docs/FLAGS.md#morning-scan-and-escalation-14).
-
-### Gmail-Eingang (Issue #11)
-
-Der optionale Worker-Adapter liest ein verifiziertes Projekt-Testpostfach/Label
-und übergibt Betreff, Text und Originalanhänge an dieselbe Ingestion. Bereits
-verarbeitete Quellen werden über eine exakte REST-Abfrage nach Kanal, Konto und
-Gmail-ID übersprungen. Einrichtung und Grenzen: [docs/GMAIL.md](docs/GMAIL.md).
-Die OAuth-Zugangsdaten erhält ausschließlich der Worker; ohne Konfiguration
-bleibt Gmail deaktiviert.
-
-Kurzsetup: Gmail API im Team-Cloud-Projekt aktivieren, OAuth-Consent im Testmodus
-konfigurieren und das Projekt-Testkonto als **Test user** eintragen. Einen OAuth-
-Client vom Typ **Desktop app** anlegen; dessen JSON lokal unter
-`.gmail/client-secret.json` speichern. Nach Installation der Backend-Abhängigkeiten
-vom Repository-Root aus autorisieren:
-
-```powershell
-$env:PYTHONPATH = 'backend'
-python -m app.gmail_auth
-```
-
-Im Browser das Projektkonto auswählen. Danach in `.env` `GMAIL_ENABLED=true`,
-`GMAIL_MAILBOX=<Projektkonto>` und optional `GMAIL_LABEL=<exakter Labelname>` setzen;
-`GMAIL_POLL_SECONDS=15` steuert die Pause zwischen Polls. Mit
-`docker compose up --build -d worker` starten (Seed-Baseline muss vorhanden sein).
-Nur `gmail.readonly` wird angefordert. `.gmail/` bleibt lokal und wird nur in den
-Worker gemountet. **External/Testing:** Ohne eingetragenen Testnutzer scheitert die
-Anmeldung; Refresh-Tokens für Gmail laufen nach **7 Tagen** ab. Dann die lokale
-Autorisierung erneut ausführen. Vollständige Schritte, Hero-Mails und Fehlerhilfe:
-[docs/GMAIL.md](docs/GMAIL.md).
-
-### Telegram-Ein-/Ausgang (Issue #12)
-
-Opt-in Polling im `worker`, Chat- **und** Nutzer-Allowlist, Transparenz beim
-Gruppenbeitritt, private `/my_data`- und `/delete_my_data`-Kommandos sowie
-konfigurierbare Rohdaten-Retention. Warnungen und Compliance-Antworten laufen
-über die kanalgebundene Outbox; der Bot-Token bleibt ausschließlich im Worker.
-Setup, REST-/Schemaänderungen und Grenzen der Löschung: [Telegram](docs/TELEGRAM.md).
-
-### Fotos als Beleg (Issue #26, Stretch)
-
-Mit `TELEGRAM_PHOTOS_ENABLED=true` lädt der `worker` Fotos aus freigegebenen Chats
-herunter und übergibt sie mit der Bildunterschrift an `POST /ingestion/messages`.
-`api` lässt sie von einem Vision-LLM beschreiben (`VISION_PROVIDER`, offline
-`cached` mit [demo/vision-cache.json](backend/demo/vision-cache.json)). Jeder Befund
-wird ein unbestätigtes Event (`origin: llm_vision`, `details.visual_finding`,
-`details.attachment_id`); ein Foto einer geschlossenen Wand löst dieselbe
-deterministische Prüfung A aus und hängt am passenden Flag. Ein Abnahme-Etikett
-zählt erst nach menschlicher Evidence-Bestätigung. Offline nachstellen:
-
-```bash
-curl -X POST localhost:8000/ingestion/messages -H 'Content-Type: application/json' -d "{
-  \"channel\":\"telegram\",\"source_key\":\"-100\",\"external_id\":\"photo-1\",
-  \"sender_role\":\"crew_lead\",\"sender_crew_id\":\"drywall\",
-  \"sent_at\":\"2026-11-15T07:30:00Z\",\"text\":\"3B ist schon zu\",
-  \"attachments\":[{\"file_name\":\"wall.png\",\"media_type\":\"image/png\",
-  \"content_base64\":\"$(base64 -w0 backend/demo/photos/3B-wall-closed.png)\"}]}"
-```
-
-Gesichter/Unbeteiligte, Retention und die Nachweisgrenze: [Compliance](docs/COMPLIANCE.md).
-
-### Lokale Checks
-
-Backend (Python 3.13, aus dem Repository-Ordner):
-
-```sh
-python -m venv .venv
-# Aktivieren: Windows .venv\Scripts\Activate.ps1; Linux/macOS source .venv/bin/activate
-python -m pip install -r backend/requirements-dev.txt
-cd backend
-python -m pytest tests
-```
-
-Frontend (Node.js 22, aus dem Repository-Ordner):
-
-```sh
-cd web
-npm ci
-npm test
-npm run lint
-npm run build
-```
-
-Compose-Konfiguration (aus dem Repository-Ordner):
-
-```sh
-docker compose --env-file .env.example config --quiet
-```
-
-Diese Checks laufen bei jedem Pull Request und bei Pushes auf `main` in GitHub Actions.
-
-## Links
-
-**Google Docs:**
-https://docs.google.com/document/d/191BTonyg6-m5O6dTQWNTi6LpWj3htCbGVGOswbQmgXY/edit?usp=sharing
-
-**Excalidraw Whiteboard:**
-https://excalidraw.com/#room=ac3240648cf122511709,arFEEYfSUXenyB8QTL0RbQ
-
-**Projektplan:** [docs/PLAN.md](docs/PLAN.md)
+Our Telegram Q&A core uses these same tools through `MCP_URL`. The model routes
+question type and Zone; answers are built deterministically from the record,
+with citations and review status. Decision requests go to the Superintendent;
+Evidence confirmation requests direct the human to the dashboard. There is no
+dashboard chat. See [Telegram Q&A](docs/TELEGRAM.md#questions-and-superintendent-decisions-20).
 
 ## Architektur
 
-Learning Loop (#21): [REST-/Datenvertrag und Offline-Demo](docs/LEARNING.md).
+The glossary and autonomy contract are in [PLAN §2–3](docs/PLAN.md).
+The diagrams below describe the implemented service boundaries. Mermaid source
+lives here; update it with architecture changes.
 
-Die Diagramme hier sind die Grundlage für die Implementierung. Begriffe wie Flag, Event oder Precondition stehen in [PLAN.md §2](docs/PLAN.md). Wer die Architektur ändert, passt zuerst das Diagramm per PR an.
-
-**Bearbeiten:** Die Quelle ist der Mermaid-Code in dieser Datei. Für das Whiteboard einen Block kopieren und in Excalidraw über *Weitere Werkzeuge → Mermaid zu Excalidraw* einfügen. Änderungen am Whiteboard danach hier im Code nachziehen.
-
-### 1. Dienste und Kanäle
+### Services and channels
 
 ```mermaid
 flowchart LR
-  classDef ext fill:#f4f4f5,stroke:#71717a,color:#18181b
-  classDef svc fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-  classDef store fill:#dcfce7,stroke:#16a34a,color:#14532d
-  classDef person fill:#fef3c7,stroke:#d97706,color:#78350f
-
-  SUP(["Superintendent"]):::person
-  CREW(["Crews · Crew Leads"]):::person
-  ARCH(["Architekt · Inspektor"]):::person
-
-  subgraph KANAL["Bestehende Kanäle der Baustelle"]
-    GMAIL["Gmail<br/>Projektpostfach"]:::ext
-    TG["Telegram<br/>Crew-Gruppen"]:::ext
-  end
-
-  SEED["Seed-Dateien<br/>Terminplan · Gebäude-Metadaten · DXF-Pläne"]:::ext
-  REPLAY["Replay-Skript<br/>Demo · Reset"]:::ext
-  LLM["LLM-Provider<br/>austauschbar"]:::ext
-  EXTAG["Externer Agent<br/>z. B. Talona"]:::ext
-
-  subgraph SITEMIND["SiteMind · docker compose"]
-    WEB["web<br/>Next.js · Dashboard · 3D"]:::svc
-    API["api<br/>FastAPI · Context Engine"]:::svc
-    WORKER["worker<br/>Kanal-Adapter · Scheduler"]:::svc
-    MCP["mcp<br/>MCP-Server"]:::svc
-    DB[("db<br/>PostgreSQL")]:::store
-  end
-
-  ARCH -->|"Mails, DXF-Revisionen"| GMAIL
-  CREW <-->|"Chat"| TG
-  GMAIL -.->|"Warnungen, Freigabe-Anfragen"| SUP
-  SUP <-->|"Raumstatus-Fragen, Links ins Dashboard"| TG
-  SUP -->|"Browser"| WEB
-  GMAIL <-->|"Gmail API: Polling / Senden"| WORKER
-  TG <-->|"Bot API: Polling / Senden"| WORKER
-  WORKER -->|"REST: Ingest, Outbox, Trigger"| API
-  WEB -->|"REST"| API
-  MCP -->|"REST"| API
-  API -->|"MCP (Q&A-Kern)"| MCP
-  EXTAG -->|"MCP"| MCP
-  API <-->|"SQL"| DB
-  API -.->|"Extraktion, Erklärung, Q&A-Routing"| LLM
-  SEED -->|"Seed-Import"| API
-  REPLAY -->|"echte Mails"| GMAIL
-  REPLAY -->|"echte Nachrichten"| TG
-  REPLAY -.->|"Offline-Modus: Ingest"| API
+  TEAM["Team test users"] <--> CHANNELS["Gmail / Telegram"]
+  CHANNELS <--> WORKER["worker: adapters, scheduler, sender"]
+  REPLAY["Seed / replay client"] -->|REST import / ingestion| API
+  WORKER -->|REST: ingest, jobs, outbox| API["api: FastAPI context engine"]
+  WEB["web: Next.js + Three.js"] -->|REST| API
+  EXT["External agent"] --> MCP["mcp: context tools"]
+  MCP -->|REST| API
+  API -->|MCP: our Q&A core| MCP
+  API <--> DB[("db: PostgreSQL")]
+  API -->|redacted text / facts; opt-in images| MODEL["Model provider, or local cache"]
 ```
 
-### 2. Vom Eingang zum Flag (in `api`)
-
-Der gemeinsame REST-Eingang ist `POST /ingestion/messages`; `GET /events` liefert
-die quellengebundene Timeline. Quellen und Originalanhänge werden vor der
-Extraktion gespeichert. Details zum Vertrag: [INGESTION.md](docs/INGESTION.md).
-
-Durchgezogene Pfeile sind der Hauptfluss, gestrichelte die Rückkopplung aus dem Learning Loop. LLM-Events sind Aussagen mit Prüfstatus. Sie dürfen sofort Prüfungen auslösen; als Nachweis zur Erfüllung einer Precondition zählen sie erst nach einer expliziten menschlichen Bestätigung im Dashboard. Bestätigungsstatus und Precondition-Bewertung sind getrennt (PLAN §3.2).
+### Ingestion, Evidence and rules
 
 ```mermaid
 flowchart TD
-  classDef llm fill:#ede9fe,stroke:#7c3aed,color:#3b0764
-  classDef rule fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
-  classDef store fill:#dcfce7,stroke:#16a34a,color:#14532d
-  classDef human fill:#fef3c7,stroke:#d97706,color:#78350f
-
-  IN["Source Message<br/>Mail · Chat · Seed · Replay"] --> TYP{"Inhalt?"}
-  TYP -->|"Text"| EXTR["LLM-Extraktion<br/>wer · Zone · was · wann · Absicht"]:::llm
-  TYP -->|"DXF-Anhang (MVP)"| GEO["Geometrie-Extraktion<br/>Räume · Wände · Bauteile → Zonen"]:::rule
-  TYP -.->|"DWG-Anhang (Erweiterung)"| CONV["DWG → DXF<br/>externer Konverter"]:::rule
-  CONV -.-> GEO
-  GEO --> DIFF["Plan-Diff<br/>zur vorherigen Revision"]:::rule
-  EXTR -->|"unbestätigte Aussage"| EV["Event mit Quelle und Herkunft"]
-  DIFF -->|"betroffene Zonen"| EV
-  GEO -->|"Geometrie für 3D und Agent"| REC
-  EV --> REC[("Site Record<br/>Events · Nachweise mit Prüfstatus<br/>Zonen · Tasks · Revisionen · Inspections")]:::store
-  REC --> REVIEW["Mensch im Dashboard<br/>Quelle und Geltungsbereich prüfen<br/>auch ohne Flag"]:::human
-  REVIEW --> VERIFY["api: bestätigen / ablehnen<br/>Audit: Person · Zeitpunkt · Quelle"]:::rule
-  VERIFY -->|"Prüfstatus speichern, erneut prüfen"| REC
-  SCAN["Morgen-Scan<br/>täglich, ausgelöst vom worker"] --> RULES
-  REC --> RULES{"Regel-Engine<br/>gültige bestätigte Nachweise?<br/>Precondition-Bewertung"}:::rule
-  RULES -->|"erfüllt"| OK["kein neuer Flag<br/>bestehender bleibt offen"]
-  RULES -->|"nicht erfüllt / unbekannt / widersprüchlich"| DEDUP{"Offener Flag für<br/>denselben Konflikt?"}:::rule
-  DEDUP -->|"ja"| ATT["an bestehenden Flag anhängen"]
-  DEDUP -->|"nein"| NEW["neuer Flag<br/>+ verantwortliche Person"]
-  NEW --> ADV["Advisor<br/>Erklärung · Proposal"]:::llm
-  ADV --> OUT["Outbox"]
-  OUT -->|"Fakten: automatisch"| CL(["Crew Lead"]):::human
-  OUT -->|"Proposal: braucht Freigabe"| SUP(["Superintendent"]):::human
-  CL -->|"zur Kenntnis genommen"| LIFE["Flag-Lebenszyklus<br/>+ Audit-Trail"]:::rule
-  SUP -->|"Freigabe · Feedback"| LIFE
-  LIFE -->|"Abschluss mit Feedback"| LEARN["Learning Loop"]
-  LEARN --> SK[("Site Knowledge")]:::store
-  SK -.->|"Kontext und fallbezogene Extraktionskorrektur<br/>keine Regel-Deaktivierung"| EXTR
+  IN["Single message ingestion"] --> TEXT["LLM extraction / opt-in vision"]
+  IN --> CAD["DXF geometry + deterministic plan diff"]
+  TEXT --> CLAIM["Unconfirmed Event / Evidence with source"]
+  CAD --> RECORD["Site Record: geometry, Zones, Tasks, Revisions, Evidence"]
+  CLAIM --> RECORD
+  RECORD --> REVIEW["Human dashboard review, also without a Flag"]
+  REVIEW --> VALIDATE["API validates source, scope, role; audits decision"]
+  VALIDATE --> RULES
+  RECORD --> RULES{"Deterministic Precondition evaluation"}
+  SCAN["Worker triggers morning scan"] --> RULES
+  RULES -->|satisfied| SAT["No new Flag; existing Flag stays open"]
+  RULES -->|not satisfied / unknown / contradictory| DEDUP["Create Flag or append source to open Flag"]
+  DEDUP --> OUTBOX["API-owned outbox: factual warning"]
+  DEDUP --> ADVICE["Advisor: explanation + proposed actions"]
+  ADVICE --> HUMAN["Superintendent approves or rejects separately"]
+  HUMAN -->|approved follow-up| OUTBOX
+  OUTBOX --> SEND["Worker sends and reports delivery status"]
+  FEEDBACK["Human Flag feedback"] --> KNOWLEDGE["Traceable Site Knowledge"]
+  KNOWLEDGE -.->|specific extraction correction; no rule changes| TEXT
 ```
 
-### 3. Flag-Lebenszyklus
+### Flag lifecycle
 
 ```mermaid
 flowchart LR
-  classDef open fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
-  classDef closed fill:#dcfce7,stroke:#16a34a,color:#14532d
-
-  E["erkannt"]:::open -->|"System"| B["benachrichtigt"]:::open
-  B -->|"keine Reaktion nach X h:<br/>Eskalation an nächsthöhere Stelle"| B
-  B -->|"verantwortliche Person:<br/>Feedback bestätigt"| K["zur Kenntnis genommen"]:::open
-  K -->|"Superintendent gibt Maßnahme frei"| I["in Bearbeitung"]:::open
-  I -.->|"System: gültiger Nachweis bestätigt,<br/>Precondition erfüllt; kein Abschluss"| I
-  I -->|"Mensch: Feedback erledigt"| D["erledigt"]:::closed
-  B -->|"Mensch: Feedback Fehlalarm"| F["Fehlalarm"]:::closed
-  K -->|"Mensch: Feedback Fehlalarm"| F
-  I -->|"Mensch: Feedback Fehlalarm"| F
+  D["detected"] -->|delivery reported| N["notified"]
+  N -->|no human reaction: audit + escalation outbox| N
+  N -->|human acknowledgment| A["acknowledged"]
+  A -->|human Proposal approval| P["in_progress"]
+  P -->|human feedback + reason| R["resolved"]
+  N -->|human feedback + reason| F["false_alarm"]
+  A -->|human feedback + reason| F
+  P -->|human feedback + reason| F
 ```
 
-### Architekturregeln
+The core rules are:
 
-- **`api` ist der einzige Dienst mit Zugriff auf die DB.** `worker`, `mcp` und `web` sprechen ausschließlich über die REST-API (OpenAPI-Vertrag).
-- **Alle Quellen laufen über einen Ingestion-Eingang.** Ein neuer Kanal (z. B. WhatsApp) ist nur ein neuer Adapter im `worker`.
-- **Ausgehende Nachrichten laufen über eine Outbox.** `api` legt jede Nachricht als Eintrag an, `worker` versendet und meldet den Status zurück. Keine Nachricht geht verloren, und jede steht im Audit-Trail.
-- **Das LLM berät nur** (lila im Diagramm 2). Flags entstehen ausschließlich durch die Regel-Engine, Handlungen und Abschlüsse nur durch Menschen.
-- **Extraktion ist keine Nachweisbestätigung.** Nur ein zuständiger Mensch bestätigt eine LLM-extrahierte Aussage im Dashboard als Nachweis für eine konkrete Precondition. `api` prüft Status und Geltungsbereich; Quelle, Person, Zeitpunkt und Entscheidung werden protokolliert. Hohe Modellkonfidenz genügt nicht. MCP/Chat dürfen Nachweise weder bestätigen noch ablehnen oder ihren Prüfstatus übersteuern; der Rollenumschalter im MVP ersetzt keine produktionsreife Authentifizierung.
-- **Fehlende oder widersprüchliche Daten sind keine Freigabe.** Preconditions werden als erfüllt / nicht erfüllt / unbekannt / widersprüchlich bewertet. Nur gültige bestätigte Nachweise erlauben „erfüllt“. Neue Gegenmeldungen gehen in die Prüfung ein, ohne menschliche Bestätigungen durch das LLM zu überschreiben. Nachweisentscheidungen lösen erneut die Regelprüfung aus; bestehende Flags bleiben bis zum menschlichen Abschluss offen.
-- **Seed und CAD haben explizite Herkunft.** Synthetische bestätigte Ausgangsnachweise werden als Seed markiert; LLM-Aussagen bleiben auch im Offline-Replay unbestätigt. Deterministische CAD-Events aktualisieren Geometrie/betroffene Zonen, bestätigen aber keine Inspection, Crew-Kenntnisnahme oder Task-Abschlüsse.
-- **Learning ersetzt keinen Nachweis.** Im MVP korrigiert Feedback fallbezogen die Extraktion. Es deaktiviert keine Sicherheitsprüfung und umgeht keine Bestätigungspflicht. Änderungen sicherheitsrelevanter Regeln brauchen gesonderte menschliche Freigabe, begrenzten Geltungsbereich und Audit.
-- **Der Q&A-Kern nutzt dieselben MCP-Tools wie externe Agents.** Was unser Telegram-Bot beantwortet, kann auch Talonas Agent beantworten.
-- **Kanal-Zugangsdaten** (Gmail, Telegram) liegen nur im `worker`, der LLM-Key nur in `api`.
+- Only `api` touches the database; worker, MCP and web use REST/OpenAPI.
+  Inbound channel messages share one ingestion path. All application notifications
+  use the outbox; delivery can repeat after an ambiguous provider response.
+- The LLM advises. Deterministic rules alone create Flags; humans alone close
+  them with feedback/reason. All Flag transitions are audited with actor, time,
+  channel and source. Factual notifications/escalation are automatic; operative
+  instructions require human Proposal approval.
+- Extracted Events, including high-confidence statements, are unconfirmed.
+  In `/evidence`, a responsible human inspects the source and exact scope
+  (Zone, Inspection/Task or Crew + Revision), then confirms/rejects Evidence.
+  API records reviewer, time, source and decision and re-runs rules, including
+  when there is no existing Flag.
+- Preconditions are `satisfied`, `not_satisfied`, `unknown` or `contradictory`.
+  Missing, stale, mismatched, unconfirmed or unresolved contradictory Evidence
+  cannot satisfy them. New counterclaims remain visible; models cannot overwrite
+  human decisions. Explanations distinguish uncertainty from confirmed failure.
+- Evidence review, Flag acknowledgment, Proposal approval and Flag closure are
+  independent actions. Confirming Evidence closes nothing; acknowledging/closing
+  a Flag or approving a Proposal confirms no Evidence.
+- Synthetic baseline Evidence is explicitly labelled `seed_baseline` with seed
+  provenance, not fabricated human confirmation. Offline/replayed LLM claims stay
+  unconfirmed. CAD events establish geometry/affected Zones, never an Inspection,
+  Crew receipt or Task completion.
+- MCP/chat cannot review Evidence, approve Proposals or close Flags. API blocks
+  mutations marked `mcp|chat|agent` except storing an agent Proposal. This header
+  convention and the dashboard role switcher are **not authentication**.
+- Learning corrects a specific extraction error through traceable feedback; it
+  cannot auto-confirm Evidence, disable checks or suppress genuine conflicts.
+  Safety-rule changes require separate human approval, narrow scope and audit.
 
-## CAD-Eingabe im MVP
+## Scope and assumptions
 
-Der MVP setzt DXF-Dateien mit der [Layer-Konvention](cad/README.md) voraus.
-Die synthetischen Pläne liegen in `cad/plans/`; die Hero-Mail enthält
-`A-103_RevD.dxf`. Die CAD-Pipeline (#15) extrahiert daraus die Geometrie.
-Originaldatei und Revision bleiben als Quelle erhalten.
+The implemented conflict checks cover **A:** closing work before a confirmed
+Inspection; **B:** work without confirmed receipt of the current plan Revision;
+and **C:** work before confirmed predecessor Task completion. Scans and Event
+checks share the Evidence policy. Flags belong to Zones, Tasks and trades,
+with responsible Crew Leads and Superintendent decisions; there are no per-person
+performance rankings.
 
-DWG-Import und DWG-Export sind außerhalb des MVP. LibreDWG ist als separates
-Programm in einem optionalen Compose-Job vorbereitet. Eine spätere Anbindung
-kann DWG vor derselben DXF-Extraktion umwandeln; Layer, Beschriftungen, Einheiten
-und relevante Geometrie müssen dabei erhalten bleiben.
-Setup und bekannte Grenzen: [CAD-Konverter](docs/CAD-CONVERTER.md).
+The synthetic Site has one building, four floors and four apartments per floor.
+Its scenario dates and Europe/Vienna clock are fixed; replay simulates time
+instead of shifting records to today. The 3D building comes from the API's DXF
+geometry; decorative cranes/scaffolding are labelled context. DXF input must
+follow the [layer/Zone convention](cad/README.md). Plan diff uses stable element
+IDs; notes provide an explicitly unconfirmed fallback when geometry diff fails.
+
+This is not a production authorisation, worker-monitoring or safety-certification
+system. Authentication/permissions, comprehensive retention, real third-party
+data, automatic safety-rule learning, DWG import/export integration and production
+hosting are outside the MVP. LibreDWG is an optional **separate process** prototype,
+not a linked library: [CAD converter](docs/CAD-CONVERTER.md).
+Photo findings remain advisory and need the same human Evidence review.
+
+## Verification with GitHub CI
+
+[The CI workflow](.github/workflows/ci.yml) runs on every pull request and pushes
+to `main`. It uses the same repository suites/commands that can be run locally:
+
+| Job | Environment and commands |
+| --- | --- |
+| Backend | Python 3.13; install `backend/requirements-dev.txt`; `python -m pytest backend/tests` with `PYTHONPATH=backend` |
+| Frontend | Node.js 22 in `web/`; `npm ci`, `npm test`, `npm run lint`, `npm run build` |
+| Compose | `docker compose --env-file .env.example config --quiet` |
+
+Provider HTTP calls are mocked; CI needs no LLM/Gmail/Telegram credentials.
+Backend suites use isolated test databases; Compose CI validates configuration,
+it does not boot a full stack. Green CI is not evidence of live account delivery,
+ARM64 runtime verification or production compliance. Review a PR's Checks tab
+for its exact commit.
+
+## Further documentation
+
+- [Project plan, glossary and hero acceptance scenario](docs/PLAN.md)
+- [Site Record, seed and Evidence contract](docs/SITE_RECORD.md)
+- [Ingestion and extraction](docs/INGESTION.md)
+- [Flags, evidence evaluation, scans and escalation](docs/FLAGS.md)
+- [Proposals, blocked Tasks and human approval](docs/PROPOSALS.md)
+- [CAD extraction and plan diff](docs/CAD-PIPELINE.md)
+- [Learning and feedback metric](docs/LEARNING.md)
+- [Replay and reset](docs/REPLAY.md)
+- [Compliance and production gaps](COMPLIANCE.md)
+- [Dashboard design handoff](design/HANDOFF.md)
