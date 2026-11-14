@@ -110,7 +110,7 @@ def test_global_search_and_timeline_include_unresolved_claims(initialized):
 @pytest.mark.parametrize("path", [
     "/evidence/example/reviews", "/flags/example/actions", "/seed/import",
     "/ingestion/messages", "/geometry/import", "/outbox/example/status",
-    "/proposals/example/approve",
+    "/proposals/example/approve", "/telegram/retention", "/telegram/commands",
 ])
 def test_api_denies_direct_and_indirect_agent_mutations(initialized, path, agent):
     evidence_before = initialized.get("/evidence").json()

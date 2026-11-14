@@ -304,7 +304,7 @@ Evidence-Prüfstatus bleiben sichtbar. `X-SiteMind-Client: mcp|chat|agent` sperr
 in der API alle Mutationen außer `POST /agent/proposals`; insbesondere auch
 indirekte Nachweisänderungen über Seed/Import/Ingestion. Dies ist eine MVP-
 Zugangskonvention, keine Produktionsauthentifizierung. Die neue Tabelle
-`proposals` (Migration `0009`) speichert nur `proposed`, Flag-Bezug, Handlung,
+`proposals` (Migration `0010`) speichert nur `proposed`, Flag-Bezug, Handlung,
 Begründung, Kanal, Zeitpunkt und serverseitige Quellen. Kein Versand, keine
 Freigabe und kein Flag-/Evidence-Übergang entstehen daraus; die menschliche
 Approval-Integration bleibt #13. Seed-Reset löscht auch diese Vorschläge.

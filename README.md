@@ -133,7 +133,7 @@ Geometrie oder ein fehlender Vorgänger ist kein Nachweis für unveränderte Pl�
 
 REST-Erweiterungen: `GET /context/zones/<id>`, `/context/search`, `/context/timeline`,
 `POST /agent/proposals` sowie lesend `GET /proposals` und `/proposals/<id>`.
-Migration `0009` persistiert ausschließlich ungeprüfte Proposals; der Seed-Reset
+Migration `0010` persistiert ausschließlich ungeprüfte Proposals; der Seed-Reset
 entfernt sie. Es werden keine vorhandenen Evidence-/Flag-Verträge geändert.
 
 Offline-Verifikation (offizieller MCP-SDK-Client über Streamable HTTP, REST gegen
