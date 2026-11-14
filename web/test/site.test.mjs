@@ -16,6 +16,8 @@ test("schedule and timeline filtering reach REST while other overview data remai
   assert.equal(result.error, null);
   assert.equal(result.data.site.id, "SITE-DEMO");
   assert.ok(urls.some((url) => url.pathname === "/evidence"));
+  assert.ok(urls.some((url) => url.pathname === "/flags" && url.search === ""));
+  assert.deepEqual(result.data.flags, []);
   const tasks = urls.find((url) => url.pathname === "/tasks");
   assert.equal(tasks.searchParams.get("zone_id"), "F3");
   assert.equal(tasks.searchParams.get("from_time"), "2026-11-15T00:00:00Z");

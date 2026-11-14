@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { flattenZones, formatTime } from "../lib/site.mjs";
 import EventTimeline from "./event-timeline";
+import FlagInbox from "./flag-inbox";
 
 function ZoneTree({ zones }) {
   return (
@@ -19,12 +20,13 @@ function ZoneTree({ zones }) {
 }
 
 export default function SiteOverview({ data, filters }) {
-  const { site, zones, tasks, crews, plans, inspections, evidence, events } = data;
+  const { site, zones, tasks, crews, plans, inspections, evidence, events, flags } = data;
   if (!site) return <p>No site data has been loaded yet.</p>;
 
   const crewNames = Object.fromEntries(crews.map((crew) => [crew.id, crew.name]));
   return (
     <>
+      <FlagInbox flags={flags} timezone={site.timezone} />
       <section aria-labelledby="site-title">
         <h2 id="site-title">{site.name}</h2>
         <p>Scenario day 1: {site.start_date}. Schedule times: {site.timezone}.</p>
