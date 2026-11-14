@@ -35,6 +35,7 @@ async function loadLocal(pathname) {
     // The pure view model is ESM; import it up front so the CommonJS output can require it synchronously.
     "../../lib/site-model.mjs": await import("../lib/site-model.mjs"),
     "../../lib/site.mjs": await import("../lib/site.mjs"),
+    "../../lib/key-layout.mjs": await import("../lib/key-layout.mjs"),
     "./site-view.css": {},
   };
   const loaded = new Map();

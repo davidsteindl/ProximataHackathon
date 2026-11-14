@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { observeKeyLayout } from "../../lib/key-layout.mjs";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   changedElements, elementStatus, elementZone, flagsForZone, floorOf, focusBounds, indexZones, inspectionConfirmedPassed,
@@ -261,9 +262,12 @@ export default function SiteView({ model, initialState, error }) {
   const legendRef = useRef(null);
   useEffect(() => {
     const legend = legendRef.current;
-    const floating = legend && legendOpen && getComputedStyle(legend).position === "absolute";
-    sceneRef.current?.setCoveredRight(floating ? legend.offsetWidth + 16 : 0);
-    sceneRef.current?.refresh();
+    const viewport = stageRef.current;
+    if (!legend || !viewport) return;
+    return observeKeyLayout(legend, viewport, (coveredRight) => {
+      sceneRef.current?.setCoveredRight(coveredRight);
+      sceneRef.current?.refresh();
+    });
   }, [legendOpen, sceneReady]);
 
   // Anchored callouts: open Flags (on their flagged element if there is one) and revision changes.
