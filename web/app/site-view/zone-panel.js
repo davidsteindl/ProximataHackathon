@@ -97,8 +97,17 @@ export function Widget({ title, aside, wide, children }) {
   );
 }
 
+// Display of inspectionPass(); only "confirmed" ever reads as a pass.
+const PASS = {
+  confirmed: { tone: "ok", text: "confirmed pass" },
+  review: { tone: "vio", text: "disputed: counterclaim open" },
+  unchecked: { tone: "warn", text: "confirmed statement, freshness not shown" },
+  none: { tone: "warn", text: "pass not confirmed" },
+};
+
 function InspectionRow({ summary }) {
-  const { inspection, counts, confirmedPassed } = summary;
+  const { inspection, counts, pass } = summary;
+  const verdict = PASS[pass];
   return (
     <li className="pc-row">
       <div className="pc-main">
@@ -110,7 +119,7 @@ function InspectionRow({ summary }) {
         {counts.unconfirmed > 0 && <Chip tone="warn">{counts.unconfirmed} unconfirmed</Chip>}
         {counts.rejected > 0 && <Chip tone="unk">{counts.rejected} rejected</Chip>}
         {!counts.confirmed && !counts.unconfirmed && !counts.rejected && <Chip tone="unk">no evidence</Chip>}
-        <Chip tone={confirmedPassed ? "ok" : "warn"}>{confirmedPassed ? "confirmed pass" : "pass not confirmed"}</Chip>
+        <Chip tone={verdict.tone}>{verdict.text}</Chip>
       </div>
     </li>
   );

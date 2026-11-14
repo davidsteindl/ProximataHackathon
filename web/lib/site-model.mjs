@@ -64,17 +64,38 @@ function evidenceFor(evidence, inspection) {
   return evidence.filter((record) => record.scope.kind === "inspection" && record.scope.inspection_id === inspection.id);
 }
 
+/** Last review decision counts only from a human, or from the seed import for an explicit seed baseline. */
+function validConfirmation(record) {
+  const review = record.history?.at(-1);
+  return review?.status === "confirmed"
+    && (review.actor_type === "human" || (record.origin === "seed_baseline" && review.actor_type === "seed_import"));
+}
+
 /**
- * Coarse colour for an Inspection. Only a human-confirmed (or explicit seed-baseline confirmed) pass
- * without any unrejected counterclaim counts as done; the recorded Inspection.status alone never does.
- * This is a display hint, not a Precondition evaluation — those come from the rule engine via Flags.
+ * Conservative display state of an Inspection's pass, mirroring the boundary of backend/app/rules.py without
+ * re-implementing it (Flags carry the authoritative evaluation):
+ * - "confirmed": an exact-scope (inspection + zone) pass with a valid human/seed confirmation and no relevant
+ *   counterclaim. Relevant = exact-scope or unresolved-scope (no inspection_id) claims in the inspection's zone
+ *   scope; the client cannot see a statement's inspection kind, so every such claim counts.
+ * - "review": a confirmed pass exists but an unrejected counterclaim is still open.
+ * - "unchecked": the only confirmed passes are extracted statements whose source time (staleness) the API
+ *   does not expose here, so the view never calls them a pass.
+ * - "none": no valid confirmed pass. The recorded Inspection.status alone never counts.
  */
-export function inspectionConfirmedPassed(inspection, evidence) {
-  const records = evidenceFor(evidence, inspection);
-  const passed = records.some((record) => record.claim === "passed" && record.review_status === "confirmed");
-  const counter = records.some((record) => record.claim !== "passed" && record.review_status !== "rejected"
-    && !(record.origin === "seed_baseline" && record.claim === "pending"));
-  return passed && !counter;
+export function inspectionPass(index, inspection, evidence) {
+  const scope = scopeOf(index, inspection.zone_id);
+  const relevant = (evidence || []).filter((record) => record.scope.kind === "inspection" && record.review_status !== "rejected" && (
+    record.scope.inspection_id === inspection.id ? record.scope.zone_id === inspection.zone_id
+      : !record.scope.inspection_id && record.scope.zone_id && scope.has(record.scope.zone_id)));
+  const positives = relevant.filter((record) => record.claim === "passed" && record.scope.inspection_id === inspection.id && validConfirmation(record));
+  if (!positives.length) return "none";
+  const counter = relevant.some((record) => record.claim !== "passed" && !(record.origin === "seed_baseline" && record.claim === "pending"));
+  if (counter) return "review";
+  return positives.every((record) => record.origin === "llm_statement") ? "unchecked" : "confirmed";
+}
+
+export function inspectionConfirmedPassed(index, inspection, evidence) {
+  return inspectionPass(index, inspection, evidence) === "confirmed";
 }
 
 /** "conflict" (open Flag) > "open" (an Inspection in scope is not confirmed passed) > "ok". */
@@ -83,7 +104,7 @@ export function zoneStatus(index, state, zoneId) {
   if (flagsForZone(index, state.flags, zoneId).length > 0) return "conflict";
   const chain = new Set(ancestors(index, zoneId));
   const open = (state.inspections || []).some((inspection) => chain.has(inspection.zone_id)
-    && !inspectionConfirmedPassed(inspection, state.evidence || []));
+    && !inspectionConfirmedPassed(index, inspection, state.evidence));
   return open ? "open" : "ok";
 }
 
@@ -111,7 +132,7 @@ export function zoneDetails(index, state, zoneId) {
       const records = evidenceFor(evidence, inspection);
       const counts = { confirmed: 0, unconfirmed: 0, rejected: 0 };
       for (const record of records) counts[record.review_status] = (counts[record.review_status] || 0) + 1;
-      return { inspection, evidence: records, counts, confirmedPassed: inspectionConfirmedPassed(inspection, evidence) };
+      return { inspection, evidence: records, counts, pass: inspectionPass(index, inspection, evidence) };
     });
   const unresolvedEvidence = evidence.filter((record) => record.scope.kind === "inspection"
     && !record.scope.inspection_id && (!record.scope.zone_id || scope.has(record.scope.zone_id)));
@@ -187,6 +208,18 @@ export function zoneBounds(geometry, zoneId) {
   const xs = points.map((point) => point[0]);
   const ys = points.map((point) => point[1]);
   return { minX: Math.min(...xs), maxX: Math.max(...xs), minY: Math.min(...ys), maxY: Math.max(...ys) };
+}
+
+/** Camera focus: an element (e.g. a wall) is framed together with its parent room, so it has context. */
+export function focusBounds(index, geometry, zoneId) {
+  const own = zoneBounds(geometry, zoneId);
+  const zone = index.get(zoneId);
+  const parent = own && zone?.kind === "element" ? zoneBounds(geometry, zone.parent_id) : null;
+  if (!parent) return own;
+  return {
+    minX: Math.min(own.minX, parent.minX), maxX: Math.max(own.maxX, parent.maxX),
+    minY: Math.min(own.minY, parent.minY), maxY: Math.max(own.maxY, parent.maxY),
+  };
 }
 
 /** Route-derived view: the selected Zone decides isolation, camera and highlight. */

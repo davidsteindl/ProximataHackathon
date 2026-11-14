@@ -4,14 +4,16 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  changedElements, elementStatus, elementZone, flagsForZone, floorOf, indexZones, inspectionConfirmedPassed,
-  inspectionKindLabel, viewForZone, zoneBounds, zoneDetails, zoneStatus,
+  changedElements, elementStatus, elementZone, flagsForZone, floorOf, focusBounds, indexZones, inspectionConfirmedPassed,
+  inspectionKindLabel, viewForZone, zoneDetails, zoneStatus,
 } from "../../lib/site-model.mjs";
 import SiteNav from "./site-nav";
 import { Chip, STATUS, Widget, ZonePanel } from "./zone-panel";
 import "./site-view.css";
 
 const POLL_MS = 3000;
+// Until the first successful load every derivation runs on empty data; the error card says why.
+const EMPTY_STATE = { site: null, flags: [], evidence: [], inspections: [], plans: [], tasks: [], crews: [] };
 
 function zoneFromPath(pathname) {
   const match = pathname.match(/^\/zones\/([^/]+)/);
@@ -152,7 +154,8 @@ export default function SiteView({ model, initialState, error }) {
   const router = useRouter();
   const zoneId = zoneFromPath(pathname);
   const index = useMemo(() => indexZones(model?.zones), [model]);
-  const [state, live] = useLiveState(initialState);
+  const [liveState, live] = useLiveState(initialState);
+  const state = liveState || EMPTY_STATE;
   const geometry = useMemo(() => model?.geometry || [], [model]);
   const changes = useMemo(() => geometry.flatMap((plan) => changedElements(plan, model?.previous?.[plan.plan_id])
     .map((change) => ({ ...change, floorId: plan.floor_id, label: plan.label, previousLabel: model.previous[plan.plan_id].label }))), [geometry, model]);
@@ -217,7 +220,7 @@ export default function SiteView({ model, initialState, error }) {
   }, [geometry, index, changes]);
 
   // Route-derived view: isolation, camera mode, highlight and focus.
-  const focus = useMemo(() => (route.highlight ? zoneBounds(geometry, route.highlight) : null), [route, geometry]);
+  const focus = useMemo(() => (route.highlight ? focusBounds(index, geometry, route.highlight) : null), [index, route, geometry]);
   useEffect(() => {
     sceneRef.current?.setView({ floorId: route.floorId, mode, highlight: route.highlight, focus: route.floorId && route.highlight !== route.floorId ? focus : null });
   }, [route.floorId, route.highlight, mode, focus, sceneReady]);
@@ -259,7 +262,7 @@ export default function SiteView({ model, initialState, error }) {
     // One callout per floor: the earliest inspection there whose pass is not confirmed and that has claims to review.
     if (!route.highlight || route.highlight === route.floorId) for (const floorId of floors) {
       const pending = (state.inspections || [])
-        .filter((inspection) => inspection.zone_id === floorId && !inspectionConfirmedPassed(inspection, state.evidence || []))
+        .filter((inspection) => inspection.zone_id === floorId && !inspectionConfirmedPassed(index, inspection, state.evidence))
         .map((inspection) => ({ inspection, unconfirmed: (state.evidence || []).filter((record) => record.scope.inspection_id === inspection.id && record.review_status === "unconfirmed").length }))
         .sort((a, b) => b.unconfirmed - a.unconfirmed || a.inspection.scheduled_at.localeCompare(b.inspection.scheduled_at))[0];
       if (!pending) continue;
@@ -279,7 +282,7 @@ export default function SiteView({ model, initialState, error }) {
 
   const details = zoneId && route.known ? zoneDetails(index, state, zoneId) : null;
   const building = model?.zones?.[0];
-  const timezone = state?.site?.timezone || "Europe/Vienna";
+  const timezone = state.site?.timezone || "Europe/Vienna";
   const floorsDesc = [...geometry].sort((a, b) => b.floor_elevation_m - a.floor_elevation_m);
   const plansLabel = geometry.map((plan) => `${plan.plan_id} Rev ${plan.label}`).join(" · ");
 
@@ -295,25 +298,34 @@ export default function SiteView({ model, initialState, error }) {
     <Shell live={live}>
       <div className={`sv-body${panelOpen ? "" : " collapsed"}`}>
         <div className="sv-stage">
-          <div ref={stageRef} className="sv-canvas" />
-          {!geometry.length && (
-            <div className="sv-state overlay">
-              <h1>No plan geometry imported yet</h1>
-              <p>The 3D view is generated only from imported DXF plans. Run <code>docker compose exec api python -m app.cad_import</code>, then reload.</p>
-            </div>
-          )}
-          {webglError && <div className="sv-state overlay"><h1>3D view unavailable</h1><p>{webglError}. Zone details stay available in the side panel.</p></div>}
-
-          {route.known && <div className={`callouts${route.highlight && route.highlight !== route.floorId ? " compact" : ""}`} aria-label="Plan callouts">
-            {callouts.map((c) => (
-              <div key={c.key} ref={(el) => (el ? calloutRefs.current.set(c.key, el) : calloutRefs.current.delete(c.key))} className={`callout t-${c.tone}`} style={{ visibility: "hidden" }}>
-                <button type="button" onClick={() => selectZone(c.target)}>
-                  <strong>{c.title}</strong><span>{c.text}</span>
-                </button>
+          <div className="sv-viewport">
+            <div ref={stageRef} className="sv-canvas" />
+            {!geometry.length && (
+              <div className="sv-state overlay">
+                <h1>No plan geometry imported yet</h1>
+                <p>The 3D view is generated only from imported DXF plans. Run <code>docker compose exec api python -m app.cad_import</code>, then reload.</p>
               </div>
-            ))}
-          </div>}
-          <div ref={tipRef} className="hover-tip" hidden><strong /><span /></div>
+            )}
+            {webglError && <div className="sv-state overlay"><h1>3D view unavailable</h1><p>{webglError}. Zone details stay available in the side panel.</p></div>}
+
+            {route.known && <div className={`callouts${route.highlight && route.highlight !== route.floorId ? " compact" : ""}`} aria-label="Plan callouts">
+              {callouts.map((c) => (
+                <div key={c.key} ref={(el) => (el ? calloutRefs.current.set(c.key, el) : calloutRefs.current.delete(c.key))} className={`callout t-${c.tone}`} style={{ visibility: "hidden" }}>
+                  <button type="button" onClick={() => selectZone(c.target)}>
+                    <strong>{c.title}</strong><span>{c.text}</span>
+                  </button>
+                </div>
+              ))}
+            </div>}
+            <div ref={tipRef} className="hover-tip" hidden><strong /><span /></div>
+            {zoneId && !route.known && (
+              <div className="sv-state overlay" role="alert">
+                <h1>Zone “{zoneId}” is not in the site record</h1>
+                <p>Check the link, or choose a zone from the list. Nothing was changed.</p>
+                <Link className="primary-btn" href="/site">Back to the building</Link>
+              </div>
+            )}
+          </div>
 
           <div className="stage-card" data-reserve>
             {zoneId && !route.known ? (
@@ -341,55 +353,50 @@ export default function SiteView({ model, initialState, error }) {
             )}
           </div>
 
-          <nav className="floor-rail" data-reserve aria-label="Floor isolation">
-            <Link href="/site" className={!route.floorId ? "cur" : ""} aria-current={!route.floorId ? "page" : undefined} title="Whole building">All</Link>
-            {floorsDesc.map((plan) => (
-              <Link key={plan.floor_id} href={`/zones/${plan.floor_id}`} className={route.floorId === plan.floor_id ? "cur" : ""}
-                aria-current={route.floorId === plan.floor_id ? "true" : undefined} title={`Isolate floor ${plan.floor_id}`}>
-                {plan.floor_id}<i className={`dot s-${zoneStatus(index, state, plan.floor_id)}`} aria-hidden="true" />
-              </Link>
-            ))}
-          </nav>
+          {/* Desktop: floating controls on the stage. Mobile: in document flow under the canvas (no overlap). */}
+          <div className="stage-dock">
+            <nav className="floor-rail" data-reserve aria-label="Floor isolation">
+              <Link href="/site" className={!route.floorId ? "cur" : ""} aria-current={!route.floorId ? "page" : undefined} title="Whole building">All</Link>
+              {floorsDesc.map((plan) => (
+                <Link key={plan.floor_id} href={`/zones/${plan.floor_id}`} className={route.floorId === plan.floor_id ? "cur" : ""}
+                  aria-current={route.floorId === plan.floor_id ? "true" : undefined} title={`Isolate floor ${plan.floor_id}`}>
+                  {plan.floor_id}<i className={`dot s-${zoneStatus(index, state, plan.floor_id)}`} aria-hidden="true" />
+                </Link>
+              ))}
+            </nav>
 
-          <div className="toolbar" data-reserve role="toolbar" aria-label="View">
-            <div className="seg">
-              <button type="button" aria-pressed={mode === "orbit"} onClick={() => setMode("orbit")}>3D</button>
-              <button type="button" aria-pressed={mode === "top"} onClick={() => setMode("top")}>Top-down</button>
+            <div className="toolbar" data-reserve role="toolbar" aria-label="View">
+              <div className="seg">
+                <button type="button" aria-pressed={mode === "orbit"} onClick={() => setMode("orbit")}>3D</button>
+                <button type="button" aria-pressed={mode === "top"} onClick={() => setMode("top")}>Top-down</button>
+              </div>
+              <span className="sep" />
+              <button type="button" className="icon" aria-label="Zoom in" onClick={() => sceneRef.current?.zoom(0.7)}>+</button>
+              <button type="button" className="icon" aria-label="Zoom out" onClick={() => sceneRef.current?.zoom(1.4)}>−</button>
+              <button type="button" className="icon" aria-label="Recenter view" title="Recenter" onClick={() => sceneRef.current?.recenter()}>
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true"><circle cx="8" cy="8" r="2.5" /><path d="M8 1.5v3M8 11.5v3M1.5 8h3M11.5 8h3" /></svg>
+              </button>
+              <span className="sep" />
+              {[["status", "Status"], ["changes", "Rev diff"], ["context", "Context"]].map(([key, text]) => (
+                <button key={key} type="button" className="toggle" aria-pressed={filters[key]} onClick={() => setFilters((f) => ({ ...f, [key]: !f[key] }))}>{text}</button>
+              ))}
             </div>
-            <span className="sep" />
-            <button type="button" className="icon" aria-label="Zoom in" onClick={() => sceneRef.current?.zoom(0.7)}>+</button>
-            <button type="button" className="icon" aria-label="Zoom out" onClick={() => sceneRef.current?.zoom(1.4)}>−</button>
-            <button type="button" className="icon" aria-label="Recenter view" title="Recenter" onClick={() => sceneRef.current?.recenter()}>
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true"><circle cx="8" cy="8" r="2.5" /><path d="M8 1.5v3M8 11.5v3M1.5 8h3M11.5 8h3" /></svg>
-            </button>
-            <span className="sep" />
-            {[["status", "Status"], ["changes", "Rev diff"], ["context", "Context"]].map(([key, text]) => (
-              <button key={key} type="button" className="toggle" aria-pressed={filters[key]} onClick={() => setFilters((f) => ({ ...f, [key]: !f[key] }))}>{text}</button>
-            ))}
+
+            <details className="legend" data-reserve open={legendOpen} onToggle={(event) => setLegend(event.currentTarget.open)}>
+              <summary>
+                <span className="sw-row" aria-hidden="true"><i className="sw crit" /><i className="sw warn" /><i className="sw sel" /><i className="sw pipe" /></span>
+                Key<span className="meta"> · scenery is decorative</span>
+              </summary>
+              <div className="legend-body">
+                <span><i className="sw crit" />Open Flag</span>
+                <span><i className="sw warn" />Inspection not confirmed</span>
+                <span><i className="sw sel" />Selected</span>
+                <span><i className="sw ghost" />Previous revision</span>
+                <span><i className="sw pipe" />Drain</span>
+                <p>Building, walls, rooms, door openings, fixtures and drains: imported DXF geometry ({geometry.length} plans). Schematic: fixture sizes, door leaves, swing arcs and lintels. Decorative context, not plan data: crane, scaffold, fence, street, vehicles, materials, trees and neighbouring buildings.</p>
+              </div>
+            </details>
           </div>
-
-          <details className="legend" data-reserve open={legendOpen} onToggle={(event) => setLegend(event.currentTarget.open)}>
-            <summary>
-              <span className="sw-row" aria-hidden="true"><i className="sw crit" /><i className="sw warn" /><i className="sw sel" /><i className="sw pipe" /></span>
-              Key<span className="meta"> · scenery is decorative</span>
-            </summary>
-            <div className="legend-body">
-              <span><i className="sw crit" />Open Flag</span>
-              <span><i className="sw warn" />Inspection not confirmed</span>
-              <span><i className="sw sel" />Selected</span>
-              <span><i className="sw ghost" />Previous revision</span>
-              <span><i className="sw pipe" />Drain</span>
-              <p>Building, rooms, doors, fixtures and drains: imported DXF geometry ({geometry.length} plans). Fixture sizes are schematic. Cranes, scaffold, fence, trees and containers are decorative context, not plan data.</p>
-            </div>
-          </details>
-
-          {zoneId && !route.known && (
-            <div className="sv-state overlay" role="alert">
-              <h1>Zone “{zoneId}” is not in the site record</h1>
-              <p>Check the link, or choose a zone from the list. Nothing was changed.</p>
-              <Link className="primary-btn" href="/site">Back to the building</Link>
-            </div>
-          )}
         </div>
 
         <aside className="sv-side" aria-label="Zone information">

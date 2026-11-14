@@ -35,6 +35,8 @@
 .sv-body { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) 400px; gap: 12px; padding: 12px; }
 .sv-body.collapsed { grid-template-columns: minmax(0, 1fr) auto; }
 .sv-stage { position: relative; min-width: 0; border-radius: 16px; overflow: hidden; background: var(--canvas); }
+.sv-viewport { position: absolute; inset: 0; }
+.stage-dock { display: contents; }
 .sv-canvas { position: absolute; inset: 0; }
 .sv-canvas canvas { display: block; width: 100%; height: 100%; touch-action: none; }
 
@@ -82,15 +84,15 @@
 .legend-body p { margin: 4px 0 0; color: var(--muted); font-size: 11.5px; line-height: 1.45; }
 .sw { width: 11px; height: 11px; border-radius: 3px; display: inline-block; }
 .sw.crit { background: var(--crit); } .sw.warn { background: var(--warn); } .sw.sel { background: var(--accent); }
-.sw.ghost { border: 1.5px dashed var(--muted); } .sw.pipe { background: var(--pipe); }
+.sw.ghost { border: 1.5px dashed #1F9A93; background: rgba(47, 196, 188, .3); } .sw.pipe { background: var(--pipe); }
 
 /* Anchored callouts (positioned by the scene every rendered frame) */
 .callouts { position: absolute; inset: 0; pointer-events: none; z-index: 2; }
 .callout { --tone: #E9E6DC; position: absolute; left: 0; top: 0; will-change: transform; }
 .callout.t-crit { --tone: var(--crit); } .callout.t-warn { --tone: var(--warn); }
 .callout::after { content: ""; position: absolute; left: -6px; top: -6px; width: 12px; height: 12px; border-radius: 50%; background: var(--tone); box-shadow: 0 0 0 3px rgba(20, 20, 16, .55), 0 0 0 6px color-mix(in srgb, var(--tone) 30%, transparent); }
-.callout::before { content: ""; position: absolute; left: -1px; top: calc(-1 * var(--stem, 34px)); width: 2px; height: var(--stem, 34px); background: linear-gradient(to top, var(--tone), color-mix(in srgb, var(--tone) 55%, transparent)); }
-.callout[data-dir="down"]::before { top: 0; background: linear-gradient(to bottom, var(--tone), color-mix(in srgb, var(--tone) 55%, transparent)); }
+/* Leader line from the anchor to the nearest point of the card, in any direction (set by the scene). */
+.callout::before { content: ""; position: absolute; left: 0; top: -1px; width: var(--len, 0); height: 2px; transform-origin: 0 50%; transform: rotate(var(--ang, 0rad)); background: linear-gradient(to right, var(--tone), color-mix(in srgb, var(--tone) 55%, transparent)); }
 .callout button { pointer-events: auto; position: absolute; left: 0; top: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 1px; width: max-content; max-width: 250px; padding: 8px 12px 8px 11px; border-radius: 10px; text-align: left; background: rgba(22, 22, 18, .92); color: #F2EFE6; border-left: 3px solid var(--tone); box-shadow: 0 10px 26px rgba(0, 0, 0, .38); backdrop-filter: blur(6px); }
 .callout button strong { font-family: var(--display); font-size: 13.5px; color: #fff; display: flex; align-items: center; gap: 7px; }
 .callout.t-crit button strong::before { content: "!"; display: inline-grid; place-items: center; width: 17px; height: 17px; border-radius: 5px; background: var(--crit); color: #fff; font: 700 11px/1 var(--mono); }
@@ -114,8 +116,9 @@
 .side-head { display: flex; align-items: center; gap: 10px; }
 .side-head .ghost-btn { margin: 0; }
 .pill-sum { font-family: var(--mono); font-size: 12px; color: var(--muted); }
-.collapsed .sv-side { width: 132px; }
-.collapsed .pill-sum { writing-mode: horizontal-tb; }
+.collapsed .sv-side { width: max-content; }
+.collapsed .side-head { flex-direction: column; align-items: flex-start; gap: 6px; }
+.side-head .ghost-btn, .pill-sum { white-space: nowrap; }
 .side-scroll { overflow-y: auto; min-height: 0; display: flex; flex-direction: column; gap: 12px; padding-bottom: 12px; scrollbar-width: thin; }
 .widgets { display: flex; flex-direction: column; gap: 12px; }
 .widget { margin: 0; padding: 14px 16px; background: var(--card); border: 1px solid var(--line); border-radius: 14px; }
@@ -199,19 +202,36 @@
   .sv { position: static; min-height: 100dvh; }
   .sv-nav { gap: 12px; padding: 0 12px; }
   .demo { display: none; }
-  .sv-body, .sv-body.collapsed { grid-template-columns: 1fr; padding: 8px; }
-  .sv-stage { height: 68dvh; }
-  .legend { top: auto; bottom: 166px; right: 12px; max-width: calc(100% - 24px); }
-  .legend[open] { bottom: auto; top: 12px; }
-  .floor-rail { top: auto; bottom: 112px; transform: none; flex-direction: row; }
+  .sv-body, .sv-body.collapsed { grid-template-columns: minmax(0, 1fr); padding: 8px; }
   .sv-nav nav a { padding: 6px 10px; white-space: nowrap; }
   .sv-nav .brand img { height: 20px; }
   .live { font-size: 0; gap: 0; }
-  .stage-card { max-width: calc(100% - 24px); left: 12px; top: 12px; padding: 9px 12px; }
+  /* Mobile: title above, canvas, then every control in normal flow below it. Nothing floats over the
+     model except the anchored callouts, so controls can never cover each other or the scene. */
+  .sv-stage { display: flex; flex-direction: column; }
+  .stage-card, .floor-rail, .toolbar, .legend { position: relative; inset: auto; transform: none; box-shadow: none; max-width: none; }
+  .stage-card { order: 0; margin: 8px 8px 0; padding: 9px 12px; }
   .stage-card h1 { font-size: 17px; }
   .stage-card .meta { font-size: 11px; }
+  .stage-card .ghost-btn { margin-top: 6px; }
+  .sv-viewport { position: relative; order: 1; height: clamp(300px, 56dvh, 560px); }
+  .stage-dock { order: 2; display: flex; flex-wrap: wrap; align-items: flex-start; gap: 8px; padding: 0 8px 8px; }
+  .floor-rail { flex-direction: row; }
+  .floor-rail a { width: 40px; height: 36px; }
+  .toolbar { width: auto; flex: 1 1 260px; justify-content: flex-start; }
+  .legend { flex: 1 1 100%; }
+  .legend summary { white-space: normal; }
   .callout button span { display: none; }
   .collapsed .sv-side { width: auto; }
+}
+@media (max-width: 400px) {
+  .sv-nav { gap: 6px; padding: 0 10px; }
+  .sv-nav nav a { padding: 6px 8px; font-size: 13px; }
+  .sv-nav .brand img { height: 18px; }
+  .toolbar .sep { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .flag-card.is-new { animation: none; }
 }
 
 /* Flag detail page (same chrome as the site model, normal document scrolling) */
