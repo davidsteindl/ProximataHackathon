@@ -21,7 +21,8 @@ export default function EventTimeline({ events, timezone, crewNames }) {
             <li key={event.id}>
               <article>
                 <p><time dateTime={event.source.sent_at}>{formatTime(event.source.sent_at, timezone)}</time></p>
-                <h3>{intentLabels[event.intent] || event.intent} · {event.zone_ids.join(", ") || "Zone unresolved"}</h3>
+                <h3>{event.origin === "deterministic_plan_diff" ? "Plan revision diff" : intentLabels[event.intent] || event.intent}
+                  {" · "}{event.zone_ids.join(", ") || (event.origin === "deterministic_plan_diff" ? "No affected zones" : "Zone unresolved")}</h3>
                 <p>{crewNames[event.crew_id] || event.actor || "Actor unknown"}
                   {event.activity && ` · ${event.activity.replaceAll("_", " ")}`}
                   {event.trade && ` · ${event.trade}`}</p>
@@ -45,7 +46,10 @@ export default function EventTimeline({ events, timezone, crewNames }) {
                       </li>
                     ))}
                   </ul>
-                ) : <p>Unconfirmed extracted statement.</p>}
+                ) : <p>{event.origin === "deterministic_plan_diff"
+                  ? "Affected zones determined by DXF plan diff. This does not confirm inspection, crew receipt or task completion."
+                  : "Unconfirmed extracted statement."}</p>}
+                {event.details.diff_status === "failed" && <p>Plan diff failed — using unconfirmed revision note: {event.details.diff_error}</p>}
                 <details>
                   <summary>Source message · {event.source.channel} · {event.source.sender_role.replaceAll("_", " ")}</summary>
                   <blockquote className="source-text">{event.source.text}</blockquote>

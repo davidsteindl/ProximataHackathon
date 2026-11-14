@@ -97,3 +97,15 @@ def get_source(revision_id: str, session: Database):
         stored.source, media_type="image/vnd.dxf",
         headers={"Content-Disposition": "attachment; filename*=UTF-8''" + quote(stored.original_filename, safe="")},
     )
+
+
+@router.get("/geometry/revisions/{revision_id}/diff", response_model=cad_schemas.PlanDiff)
+def get_plan_diff(revision_id: str, session: Database):
+    from app.plan_diff import revision_diff
+
+    if session.get(models.Revision, revision_id) is None:
+        raise HTTPException(404, "Revision not found")
+    try:
+        return revision_diff(session, revision_id)
+    except InvalidPlan as error:
+        raise HTTPException(409, str(error)) from error

@@ -9,6 +9,7 @@ from app import ingestion
 from app.extraction import ExtractionError
 from app.gmail import GmailClient, GmailSettings
 from app.gmail_polling import poll_gmail
+from test_cad_pipeline import ENTRIES, upload
 from test_gmail import MAILBOX, credentials, forwarded_message, gmail_message
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -56,6 +57,7 @@ def identity(client, message_id="gmail-1", **changes):
 
 @pytest.mark.parametrize("subject,body,sender,role", HEROES)
 def test_hero_mail_to_timeline_and_byte_exact_dxf(initialized, subject, body, sender, role):
+    assert upload(initialized, ENTRIES[2]).status_code == 200
     dxf = (ROOT / "cad/plans/A-103_RevD.dxf").read_bytes()
     message = gmail_message(subject, body, attachments=[("A-103_RevD.dxf", dxf)], sender=sender)
     gmail, http, calls = make_gmail(message)
@@ -70,18 +72,52 @@ def test_hero_mail_to_timeline_and_byte_exact_dxf(initialized, subject, body, se
         url = f"/source-messages/{source['id']}/attachments/{attachment['id']}"
         assert initialized.get(url).content == dxf
         timeline = initialized.get("/events").json()
-        assert len(timeline) == 1
-        assert timeline[0]["source"]["id"] == source["id"]
-        assert timeline[0]["quote"] == body
-        assert all(evidence["review_status"] == "unconfirmed" for evidence in timeline[0]["evidence"])
+        assert len(timeline) == (1 if role == "architect" else 2)
+        assert all(event["source"]["id"] == source["id"] for event in timeline)
+        statement = next(event for event in timeline if event["quote"] == body)
+        assert all(evidence["review_status"] == "unconfirmed" for evidence in statement["evidence"])
+        if role == "inspector":
+            assert statement["intent"] == "inspection_result"
+            assert statement["origin"] == "llm_statement"
+            assert len(statement["evidence"]) == 1
+        diff = next(event for event in timeline if event["origin"] == "deterministic_plan_diff")
+        assert diff["zone_ids"] == ["3B"]
+        assert diff["details"]["attachment_id"] == attachment["id"]
+        assert diff["details"]["source_sha256"] == attachment["sha256"]
+        assert diff["evidence"] == []
         # New client instance represents a restarted worker; no local cursor is needed.
         restarted = GmailClient(gmail.settings, http, credentials())
         assert poll_gmail(restarted, initialized) == 0
-        assert len(initialized.get("/events").json()) == 1
+        assert initialized.get("/events").json() == timeline
         assert sum(path.endswith("/messages/gmail-1") for path in calls) == 1
         assert identity(initialized, channel="telegram").json() is None
         assert identity(initialized, source_key="another@example.test").json() is None
         assert initialized.get("/source-messages").status_code == 422
+
+
+def test_dxf_only_mail_retries_after_missing_baseline_is_imported(initialized):
+    dxf = (ROOT / "cad/plans/A-103_RevD.dxf").read_bytes()
+    gmail, http, _ = make_gmail(gmail_message("", "", attachments=[("A-103_RevD.dxf", dxf)]))
+    with http:
+        assert poll_gmail(gmail, initialized) == 0
+        failed = identity(initialized).json()
+        assert failed["status"] == "failed"
+        assert failed["error_code"] == "plan_diff_failed"
+        assert initialized.get("/events").json() == []
+        assert initialized.get("/geometry/revisions/A-103-D/source").status_code == 404
+        assert upload(initialized, ENTRIES[2]).status_code == 200
+        assert poll_gmail(gmail, initialized) == 1
+        processed = identity(initialized).json()
+        assert processed["id"] == failed["id"]
+        assert processed["status"] == "processed"
+        assert processed["error_code"] is None
+        assert processed["attachments"] == failed["attachments"]
+        events = initialized.get("/events").json()
+        assert len(events) == 1
+        assert events[0]["origin"] == "deterministic_plan_diff"
+        assert events[0]["zone_ids"] == ["3B"]
+        assert poll_gmail(gmail, initialized) == 0
+        assert initialized.get("/events").json() == events
 
 
 def test_forwarded_email_download_preserves_original_bytes(initialized):

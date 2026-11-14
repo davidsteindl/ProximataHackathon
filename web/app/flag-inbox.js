@@ -29,7 +29,11 @@ export default function FlagInbox({ flags, timezone, closed = false }) {
                     <p>Crew: {flag.context.crew_id || "Unresolved"} · Plan: {flag.context.plan_id}
                       {" · "}Confirmed receipt: Rev {flag.context.acknowledged_revision || "unknown"}
                       {" · "}Required: Rev {flag.context.current_revision}</p>
-                    <p>Affected zones come from an unconfirmed revision note.</p>
+                    <p>{flag.context.affected_zones_origin === "deterministic_plan_diff"
+                      ? "Affected zones determined by DXF plan diff."
+                      : flag.context.diff_status === "failed"
+                        ? `Plan diff failed — using unconfirmed revision note: ${flag.context.diff_error}`
+                        : "Affected zones come from an unconfirmed revision note."}</p>
                     <p>Receipt confirms that the revision was received; implementation requires separate evidence.</p>
                   </div>
                 )}

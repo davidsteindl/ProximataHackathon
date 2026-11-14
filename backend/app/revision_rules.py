@@ -47,6 +47,13 @@ def revision_work(session, statement, zones):
 
     notes = session.scalars(select(models.Event).where(models.Event.intent == "revision")).all()
     notes = [note for note in notes if note.details.get("revision_id")]
+    # A successful geometry result supersedes all note scopes for that revision,
+    # including later text-only deliveries. Empty diffs are authoritative too.
+    deterministic = {note.details["revision_id"]: note for note in notes
+                     if note.details.get("origin") == "deterministic_plan_diff"}
+
+    def scope(note):
+        return deterministic.get(note.details["revision_id"], note).zone_ids
     revisions = session.scalars(select(models.Revision)).all()
     latest = {}
     for revision in revisions:
@@ -58,7 +65,7 @@ def revision_work(session, statement, zones):
         for task in session.scalars(select(models.Task)):
             if utc(task.ends_at) <= max(utc(statement.source.sent_at), utc(current.issued_at)):
                 continue
-            for zone_id in statement.zone_ids:
+            for zone_id in scope(statement):
                 if task.zone_id in ancestors(zone_id, zones):
                     target = zone_id
                 elif zone_id in ancestors(task.zone_id, zones):
@@ -74,7 +81,7 @@ def revision_work(session, statement, zones):
                 current = latest[revision.plan_id]
                 if statement.ends_at and utc(statement.ends_at) <= utc(current.issued_at):
                     continue
-                for zone_id in note.zone_ids:
+                for zone_id in scope(note):
                     if zone_id in ancestors(work.zone_id, zones):
                         targets.add((work.zone_id, revision.plan_id))
                     elif work.zone_id in ancestors(zone_id, zones):
@@ -173,6 +180,14 @@ class RevisionAcknowledged:
                        acknowledged_revision=last.label if last else None,
                        acknowledged_revision_id=last.id if last else None,
                        affected_zones_origin="unconfirmed_revision_note")
+        revision_events = [note for note in session.scalars(select(models.Event).where(
+            models.Event.intent == "revision")) if note.details.get("revision_id") == revision.id]
+        if any(note.details.get("origin") == "deterministic_plan_diff" for note in revision_events):
+            context["affected_zones_origin"] = "deterministic_plan_diff"
+        elif any(note.details.get("diff_status") == "failed" for note in revision_events):
+            context["diff_status"] = "failed"
+            context["diff_error"] = next(note.details["diff_error"] for note in revision_events
+                                         if note.details.get("diff_status") == "failed")
         positives = [item for item in confirmed if item.claim == "acknowledged"]
 
         def superseded_nonreceipt(item):

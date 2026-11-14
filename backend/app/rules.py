@@ -243,6 +243,8 @@ def evaluate_site(session, *, source_ref="rules:scan", actor="rule_engine", chan
 
 @event.listens_for(Session, "before_flush")
 def queue_rule_evaluation(session, _context, _instances):
+    if session.info.get("defer_rules"):
+        return
     triggers = [item for item in session.new if isinstance(item, models.Event) or
                 isinstance(item, models.EvidenceReview) and item.actor_type == "human"]
     if triggers:

@@ -265,7 +265,13 @@ replace provisional sequence/issue time with explicit CAD metadata for the same
 ID/plan/label, rejecting collisions. Extracted scope stays on the source Event;
 CAD import alone supplies no affected-zone diff and no crew receipt. Seed reset
 removes note revisions, Events, Evidence and Flags and restores explicit baseline
-provenance. Geometry diff remains #17; dashboard decisions remain #9.
+provenance. DXF attachments now replace note scope with the deterministic diff
+from #17; `Flag.context.affected_zones_origin` is `deterministic_plan_diff` on
+success. A failed comparison retains `unconfirmed_revision_note` and exposes
+`diff_status: failed` with `diff_error` in the context and inbox. An empty
+successful diff never falls back to note zones. Receipt Evidence rules remain
+unchanged. See [CAD-PIPELINE.md](CAD-PIPELINE.md#plan-diff-17).
+Dashboard decisions remain #9.
 
 To verify offline, seed and ingest `backend/demo/revision-note.json`, then
 `backend/demo/closing-work.json`. Check plumbing C→D at 3B and both A/B for drywall.

@@ -66,8 +66,8 @@ Enthalten sind Infrastruktur, Health-Prüfungen, der statische Site Record aus
 Issue #5, Nachrichten-Ingestion, Event-Extraktion und Timeline aus #6 sowie
 DXF-Extraktion und Geometrie-API aus #15, Conflict A und Flag-Inbox aus #7,
 Conflict B aus Revisionsnotizen (#8), Gmail-Eingang aus #11,
-Outbox-/Gmail-Versand aus #10 sowie die 3D-Ansicht aus #16. Plan-Diff,
-Telegram-Adapter, MCP-Tools, Authentifizierung
+Outbox-/Gmail-Versand aus #10 sowie die 3D-Ansicht aus #16 und der DXF-Plan-Diff
+aus #17. Telegram-Adapter, MCP-Tools, Authentifizierung
 und Hosting folgen in ihren eigenen Issues.
 
 ### Nachricht → Event → Timeline (Issue #6)
@@ -169,6 +169,20 @@ Versand aktivieren: Crew-Lead-Testadresse im Seed hinterlegen, OAuth mit
 setzen. Fehlende Adressen werden als Versandfehler sichtbar. Einrichtung, Hero-Test
 und Grenzen (Gmail-Annahme, mögliche Duplikate bei unklarem Versandresultat):
 [docs/GMAIL.md](docs/GMAIL.md#factual-flag-warnings-outbox).
+
+### DXF-Plan-Diff (Issue #17)
+
+Vor dem Hero-Replay mindestens `A-103_RevC.dxf` über den CAD-Import laden.
+Die Hero-Mail mit `A-103_RevD.dxf` läuft über `/ingestion/messages`: Der Vergleich
+C → D liefert ausschließlich 3B und löst dort Conflict B aus. Die Originalnotiz
+bleibt als Erklärung erhalten. `GET /geometry/revisions/A-103-D/diff` liefert
+die geänderten Elemente mit alter/neuer Geometrie, gruppiert nach Wohnung.
+Identische Geometrie ergibt einen leeren Diff und keine betroffenen Zonen.
+
+Schlägt der Vergleich fehl, prüft B weiter die unbestätigten Notizzonen; die Inbox
+zeigt den Fallback samt Fehlergrund. Ein erfolgreicher Diff ersetzt keine
+menschlich bestätigte Empfangs-Evidence. Dateinamen, Metadaten, Herkunft und
+Fehlerverhalten: [CAD-PIPELINE.md](docs/CAD-PIPELINE.md#plan-diff-17).
 
 ### Gmail-Eingang (Issue #11)
 

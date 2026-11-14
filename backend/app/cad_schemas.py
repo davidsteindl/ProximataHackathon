@@ -64,3 +64,23 @@ class ImportResult(BaseModel):
     element_count: int
     source_sha256: str
     ignored_layers: list[IgnoredLayer]
+
+
+class ElementChange(BaseModel):
+    change: Literal["added", "removed", "moved"]
+    element_id: str
+    before: Element | None
+    after: Element | None
+
+
+class ZoneChanges(BaseModel):
+    zone_id: str
+    changes: list[ElementChange]
+
+
+class PlanDiff(BaseModel):
+    revision_id: str
+    previous_revision_id: str
+    origin: Literal["deterministic_plan_diff"] = "deterministic_plan_diff"
+    affected_zone_ids: list[str]
+    zones: list[ZoneChanges]
