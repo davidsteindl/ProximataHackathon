@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>GroundIQ — Flag detail</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=JetBrains+Mono:wght@400;500&amp;family=Space+Grotesk:wght@500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#0E1116;color:#E9ECF1;font:14px/1.55 Inter,system-ui,sans-serif}
+a{color:#E9ECF1;text-decoration:none}a:hover{color:#5AA2EE}
+h1,h2,h3,h4{font-family:'Space Grotesk',Inter,sans-serif;margin:0;letter-spacing:-.01em}
+.mono{font-family:'JetBrains Mono',monospace;font-size:12px}
+.app{display:flex;min-height:100vh}
+.side{width:216px;flex:0 0 216px;background:#12151B;border-right:1px solid #22272F;padding:22px 14px 18px;box-sizing:border-box;display:flex;flex-direction:column}
+.logo{width:158px;margin:0 6px 24px;display:block}
+.item{display:flex;align-items:center;gap:11px;padding:9px 12px;border-radius:10px;color:#8A93A1;font-size:13.5px;font-weight:500;margin-bottom:3px}
+.item svg{flex:0 0 auto}
+.item:hover{color:#fff;background:#1A1F27}
+.item.cur,.item.cur:hover{color:#fff;background:#176AC6}
+.foot{margin-top:auto;display:flex;flex-direction:column;gap:10px;padding:0 4px}
+.clock{font-family:'JetBrains Mono',monospace;font-size:12px;color:#8A93A1}
+.rolebtn{font:600 13px Inter,sans-serif;color:#E9ECF1;background:#1A1F27;border:1px solid #2C333D;border-radius:9px;padding:8px 12px;cursor:pointer;text-align:left}
+.main{flex:1;min-width:0;padding:22px 26px 32px;box-sizing:border-box;max-width:1080px}
+.panel{background:#171A1F;border:1px solid #262B33;border-radius:14px}
+.panel h3{font-size:13.5px;padding:12px 16px;border-bottom:1px solid #232830;color:#C7CDD6}
+.pad{padding:16px}
+.muted{color:#8A93A1}
+.small{font-size:12.5px}
+.chip{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;font-weight:600;padding:3px 8px;border-radius:6px;border:1px solid;white-space:nowrap}
+.chip::before{content:"";width:7px;height:7px;border-radius:2px;background:currentColor}
+.s-crit{color:#FF7A66;background:#2A1512;border-color:#55281F}
+.s-unk{color:#9BA4B2;background:#1B2027;border-color:#333B46}
+.btn{font:600 13.5px Inter,sans-serif;border-radius:9px;padding:9px 16px;cursor:pointer;border:1px solid #333B46;background:#1A1F27;color:#E9ECF1}
+.btn-crit{background:#C2412B;border-color:#C2412B;color:#fff}
+blockquote.q{margin:6px 0;padding:8px 12px;border-left:3px solid #176AC6;background:#1A1F27;border-radius:0 8px 8px 0;font-size:13.5px;color:#C7CDD6}
+.step{display:flex;align-items:center;gap:6px;font-size:12.5px;font-weight:600;color:#8A93A1}
+.step .dot{width:10px;height:10px;border-radius:50%;background:#2C333D;border:2px solid #2C333D}
+.step.done .dot{background:#43CD8A;border-color:#43CD8A}
+.step.cur .dot{background:#171A1F;border-color:#FF7A66}
+.step.cur{color:#FF7A66}
+.step.done{color:#43CD8A}
+.tl li{display:flex;gap:12px;padding:8px 0;border-bottom:1px solid #20252D;font-size:13px}
+.tl li:last-child{border-bottom:0}
+.tl .when{flex:0 0 110px;color:#5AA2EE;font-family:'JetBrains Mono',monospace;font-size:12px}
+textarea{font:13.5px Inter,sans-serif;border:1px solid #333B46;border-radius:8px;padding:8px;resize:vertical;background:#1A1F27;color:#E9ECF1}
+</style>
+</helmet>
+
+<div class="app">
+<aside class="side">
+  <a href="Main.dc.html" aria-label="GroundIQ start"><img class="logo" src="groundiq-logo-white.svg" alt="GroundIQ"></a>
+  <nav style="display:flex;flex-direction:column" aria-label="Main">
+    <a class="item" href="Main.dc.html"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 8.2 8 3l5.5 5.2M4.2 7.4V13h7.6V7.4"/></svg>Overview</a>
+    <a class="item" href="SiteOverview.dc.html"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="2.5" width="11" height="11" rx="1.5"/><path d="M8 2.5V8h5.5M2.5 10.8H8V8"/></svg>Site plan</a>
+    <a class="item cur" href="FlagInbox.dc.html" aria-current="page"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.2 13.5V2.8h8l-1.8 2.7 1.8 2.7h-8"/></svg>Flags</a>
+    <a class="item" href="EvidenceReview.dc.html"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="2.2" width="10" height="11.6" rx="1.5"/><path d="m5.6 8.4 1.8 1.8 3.2-3.6"/></svg>Evidence</a>
+    <a class="item" href="#chat" title="Chat agent (issue #19): read-only Q&amp;A"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" aria-hidden="true"><path d="M2.8 3.4h10.4v6.8H7.4l-2.8 2.6v-2.6H2.8z"/></svg>Chat</a>
+  </nav>
+  <div class="foot">
+    <span class="clock">Day 2 · 18:10</span>
+    <button type="button" class="rolebtn" aria-haspopup="listbox" title="Demo role switcher (MVP) — not authentication">Superintendent ▾</button>
+    <span class="mono muted">synthetic demo data</span>
+  </div>
+</aside>
+
+<main class="main">
+  <p class="mono muted" style="margin:0 0 6px"><a href="FlagInbox.dc.html">Flags</a> / FLG-0007</p>
+  <div style="display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap;margin-bottom:8px">
+    <span class="chip s-crit" style="margin-top:6px">Critical</span>
+    <h1 style="font-size:21px;max-width:720px">Wall closure in 3B before confirmed inspection</h1>
+  </div>
+  <div class="small muted" style="display:flex;gap:18px;flex-wrap:wrap;margin-bottom:14px">
+    <span>Zone: <a href="RoomView.dc.html" class="mono" style="color:#5AA2EE">3B</a></span>
+    <span>Trade: drywall</span>
+    <span>Responsible: M. Leitner (crew lead)</span>
+  </div>
+
+  <div class="panel pad" style="display:flex;gap:22px;flex-wrap:wrap;margin-bottom:18px" aria-label="Lifecycle">
+    <span class="step done"><span class="dot"></span>Detected</span>
+    <span class="step cur"><span class="dot"></span>Notified</span>
+    <span class="step"><span class="dot"></span>Acknowledged</span>
+    <span class="step"><span class="dot"></span>In progress</span>
+    <span class="step"><span class="dot"></span>Closed</span>
+  </div>
+
+  <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start">
+    <div style="flex:999 1 500px;min-width:0;display:flex;flex-direction:column;gap:16px">
+
+      <section class="panel" aria-labelledby="pre-h">
+        <h3 id="pre-h">Why this flag exists</h3>
+        <div class="pad" style="display:flex;flex-direction:column;gap:10px">
+          <p class="small" style="margin:0">The drywall group announced closing wall 3B tomorrow morning, but:</p>
+          <div class="small"><span class="chip s-unk">Unknown</span> Rough-in inspection 3B is not confirmed passed — latest claims are unreviewed.</div>
+          <div class="small"><span class="chip s-crit">Not satisfied</span> The crew has not confirmed Rev D, which moved this wall 30 cm.</div>
+        </div>
+      </section>
+
+      <section class="panel" aria-labelledby="src-h">
+        <h3 id="src-h">Sources</h3>
+        <div class="pad" style="display:flex;flex-direction:column;gap:12px">
+          <div class="small">
+            <span class="mono" style="color:#5AA2EE">D2 18:05 · Telegram · drywall group</span>
+            <blockquote class="q" lang="de">„morgen früh machen wir 3B zu, platten sind da“</blockquote>
+          </div>
+          <div class="small">
+            <span class="mono" style="color:#5AA2EE">D2 16:40 · Gmail · inspector</span> <span class="chip s-unk">Unconfirmed</span>
+            <blockquote class="q" lang="de">„Die Abnahme der Rohinstallation im 3. OG verschiebt sich auf Tag 4.“</blockquote>
+            <a href="EvidenceReview.dc.html" style="color:#5AA2EE">Review evidence →</a>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel" aria-labelledby="audit-h">
+        <h3 id="audit-h">Timeline</h3>
+        <div class="pad">
+          <ul class="tl" style="list-style:none;margin:0;padding:0">
+            <li><span class="when">D2 18:05</span><span>Detected by rule engine (Telegram message, quote stored)</span></li>
+            <li><span class="when">D2 18:06</span><span>Notified: Telegram → M. Leitner · Gmail → superintendent</span></li>
+            <li><span class="when">D2 18:08</span><span>Proposal created (LLM, advisory) — <a href="ProposalDetail.dc.html" style="color:#5AA2EE">open →</a></span></li>
+          </ul>
+        </div>
+      </section>
+    </div>
+
+    <div style="flex:1 1 300px;min-width:280px;max-width:400px;display:flex;flex-direction:column;gap:16px">
+      <section class="panel" aria-labelledby="ack-h">
+        <h3 id="ack-h">Acknowledge</h3>
+        <div class="pad">
+          <button type="button" class="btn" style="width:100%">Acknowledge flag</button>
+          <p class="small muted" style="margin:8px 0 0">Confirms the warning was seen — nothing else.</p>
+        </div>
+      </section>
+
+      <section class="panel" aria-labelledby="close-h">
+        <h3 id="close-h">Close flag</h3>
+        <form class="pad" style="display:flex;flex-direction:column;gap:10px">
+          <label class="small"><input type="radio" name="fb"> Resolved</label>
+          <label class="small"><input type="radio" name="fb"> False alarm</label>
+          <label class="small" style="display:flex;flex-direction:column;gap:4px">Reason
+            <textarea rows="2"></textarea>
+          </label>
+          <button type="button" class="btn btn-crit">Close flag</button>
+          <p class="small muted" style="margin:0">Superintendent only. Closing confirms no evidence; the system never closes flags itself.</p>
+        </form>
+      </section>
+    </div>
+  </div>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1360,"height":1120}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,89 @@
+# Dashboard mockup handoff (issue #35)
+
+The mockup lives in `design/mockup/`. Open `design/mockup/index.html` in any
+browser. Every page is static HTML with inline CSS and SVG. Nothing needs to
+be built or served, and only Google Fonts loads from the network. All data is
+synthetic and comes from the hero scenario in `docs/PLAN.md` §7.
+
+Live canvas with all pages side by side:
+https://claude.ai/artifact/3MjWimC7hjDSDSK9RqtxxN
+
+The `*.dc.html` files come from the Claude design canvas. `support.js` is an
+empty stub for its runtime, and `canvas.json` holds the board layout. Both can
+be ignored when implementing.
+
+| Widget expanded, zone 3B selected | Widget collapsed |
+|---|---|
+| ![expanded](mockup/screenshots/SiteZone3B.png) | ![collapsed](mockup/screenshots/SiteCollapsed.png) |
+
+Start page: `mockup/screenshots/Main.png`.
+
+## Pages and navigation
+
+| Page | Theme | Purpose | Implementation issue |
+|---|---|---|---|
+| `Main` | dark | Superintendent start: KPI row, site model with markers, "Needs your attention", activity, next 48 h | #5, #37 |
+| `SiteOverview` | light | Plan with no zone selected, widget expanded | #16 |
+| `SiteZone3B` | light | Zone 3B selected; widget shows preconditions and attention items | #16 |
+| `SiteCollapsed` | light | Widget collapsed to a pill (count + zone). Selection kept, reopen with `⟪` | #16 |
+| `Site3D` | light | Isometric 3D placeholder with floor rail and markers | #16, #17 |
+| `RoomView` | light | `/zones/3B`: room plan with the Rev D wall diff, status, tasks, inspections | #15, #17 |
+| `FlagInbox` | dark | Stat tiles and flag table | #9 |
+| `FlagDetail` | dark | Lifecycle, precondition explanation, source quotes, timeline, acknowledge and close | #7, #8, #9 |
+| `EvidenceReview` | dark | Confirm or reject evidence. Works without a flag | #6, #30 |
+| `ProposalDetail` | dark | Approve or reject an advisory LLM proposal | #13 |
+| `SystemStates` | dark | Loading, empty and error states; Gmail and Telegram deep links into the dashboard | #10, #12 |
+
+Navigation: dark pages use the left sidebar, light plan pages use the top pill
+nav plus a bottom quick-action dock. Both carry the demo role switcher
+(`Superintendent ▾`), which is a demo mechanism and not authentication.
+"Ask GroundIQ" and "Chat" point to `#chat` as a placeholder for #19.
+
+## Human actions stay separate
+
+Each decision gets its own control and its own page:
+
+- **Evidence**: Confirm / Reject in `EvidenceReview` only. This does not close any flag, and MCP or chat cannot do it.
+- **Flag acknowledge**: a separate card in `FlagDetail`.
+- **Proposal**: Approve / Reject in `ProposalDetail`, labelled "LLM proposal — advisory".
+- **Flag closure**: in `FlagDetail`, Resolved or False alarm plus a required reason. Superintendent only. The system never closes flags.
+
+Precondition results use four chips: Satisfied (green), Not satisfied (red),
+Unknown (grey) and Contradictory (violet). Unconfirmed evidence shows its
+confidence with the note "confidence is not confirmation".
+
+## Visual tokens
+
+Brand: GroundIQ. The logo is `mockup/groundiq-logo.svg`. On dark backgrounds use
+`groundiq-logo-white.svg`, which swaps black for `#F2F4F7` and keeps the blue.
+
+| Token | Value |
+|---|---|
+| Brand blue (only accent) | `#176AC6`; text on dark `#5AA2EE` |
+| Cool black | `#171A1F` (panels, ink), `#0E1116` (dark page bg), `#12151B` (sidebar) |
+| Dark borders / muted | `#262B33` / `#8A93A1` |
+| Light page bg | `linear-gradient(155deg,#EDF1F5,#DDE4EB 55%,#CCD6E0)` |
+| Glass card | `rgba(255,255,255,.85)`, radius 16, shadow `0 14px 36px rgba(23,26,31,.12)` |
+| Critical / warning / ok | `#FF7A66` / `#E8B04B` / `#43CD8A` on dark; `#A3271A` / `#845800` / `#1E6F42` on light |
+| Plan: selected zone | fill `#DCEAFB`, stroke `#176AC6` |
+| Plan: changed wall (Rev D) | `#E2492F`; old position dashed `#8A93A1` |
+
+Type: Space Grotesk for headings, Inter for body text (14 px), JetBrains Mono
+for timestamps, IDs and plan labels. Spacing follows a loose 4 px grid. Panels
+are 14–16 px radius, and pills and buttons are fully rounded.
+
+## Synthetic fixtures used
+
+- Site B1, floor F3, zones 3A–3D; hero zone 3B with plan A-103, Rev C → Rev D (bathroom wall moved 30 cm, drain rerouted).
+- FLG-0007 critical: drywall closing 3B on Day 3 before the rough-in inspection is confirmed (conflict A).
+- Warning flag: Rev D not acknowledged by the drywall crew (conflict B).
+- Evidence: an unconfirmed claim "Abnahme dürfte passen" (confidence 0.93), one contradictory claim for 2C, and one confirmed seed record.
+- Clock: Day 2 · 18:10.
+
+## Open decisions
+
+1. Three.js scope (#16): the 3D view is a static isometric SVG. Floor isolation and camera controls are still to be decided.
+2. Is the dark/light split (dark work views, light plan views) kept in the real app, or should it be one theme with a toggle?
+3. Chat placement (#19): a drawer from the dock/sidebar or a separate page.
+4. Role switcher roles beyond superintendent and crew lead, and which controls each role hides.
+5. Accessibility: tab order and labels are in place, but colour contrast on glass cards over the plan still needs a check in the real build.

@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>GroundIQ — Evidence review</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=JetBrains+Mono:wght@400;500&amp;family=Space+Grotesk:wght@500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#0E1116;color:#E9ECF1;font:14px/1.55 Inter,system-ui,sans-serif}
+a{color:#E9ECF1;text-decoration:none}a:hover{color:#5AA2EE}
+h1,h2,h3,h4{font-family:'Space Grotesk',Inter,sans-serif;margin:0;letter-spacing:-.01em}
+.mono{font-family:'JetBrains Mono',monospace;font-size:12px}
+.app{display:flex;min-height:100vh}
+.side{width:216px;flex:0 0 216px;background:#12151B;border-right:1px solid #22272F;padding:22px 14px 18px;box-sizing:border-box;display:flex;flex-direction:column}
+.logo{width:158px;margin:0 6px 24px;display:block}
+.item{display:flex;align-items:center;gap:11px;padding:9px 12px;border-radius:10px;color:#8A93A1;font-size:13.5px;font-weight:500;margin-bottom:3px}
+.item svg{flex:0 0 auto}
+.item:hover{color:#fff;background:#1A1F27}
+.item.cur,.item.cur:hover{color:#fff;background:#176AC6}
+.foot{margin-top:auto;display:flex;flex-direction:column;gap:10px;padding:0 4px}
+.clock{font-family:'JetBrains Mono',monospace;font-size:12px;color:#8A93A1}
+.rolebtn{font:600 13px Inter,sans-serif;color:#E9ECF1;background:#1A1F27;border:1px solid #2C333D;border-radius:9px;padding:8px 12px;cursor:pointer;text-align:left}
+.main{flex:1;min-width:0;padding:22px 26px 32px;box-sizing:border-box}
+.panel{background:#171A1F;border:1px solid #262B33;border-radius:14px}
+.panel h3{font-size:13.5px;padding:12px 16px;border-bottom:1px solid #232830;color:#C7CDD6}
+.pad{padding:16px}
+.muted{color:#8A93A1}
+.small{font-size:12.5px}
+.chip{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;font-weight:600;padding:3px 8px;border-radius:6px;border:1px solid;white-space:nowrap}
+.chip::before{content:"";width:7px;height:7px;border-radius:2px;background:currentColor}
+.s-crit{color:#FF7A66;background:#2A1512;border-color:#55281F}
+.s-ok{color:#43CD8A;background:#102A1D;border-color:#1E5538}
+.s-unk{color:#9BA4B2;background:#1B2027;border-color:#333B46}
+.s-con{color:#C78AE8;background:#241330;border-color:#4A2A5C}
+.btn{font:600 13.5px Inter,sans-serif;border-radius:9px;padding:9px 16px;cursor:pointer;border:1px solid #333B46;background:#1A1F27;color:#E9ECF1}
+.btn-ok{background:#1E7A4C;border-color:#1E7A4C;color:#fff}
+.btn-crit{background:#C2412B;border-color:#C2412B;color:#fff}
+blockquote.q{margin:6px 0;padding:8px 12px;border-left:3px solid #176AC6;background:#1A1F27;border-radius:0 8px 8px 0;font-size:13.5px;color:#C7CDD6}
+.ev{display:block;padding:12px 16px;border-bottom:1px solid #20252D;text-decoration:none}
+.ev:last-child{border-bottom:0}
+.ev.sel{background:#12223A;box-shadow:inset 3px 0 0 #176AC6}
+</style>
+</helmet>
+
+<div class="app">
+<aside class="side">
+  <a href="Main.dc.html" aria-label="GroundIQ start"><img class="logo" src="groundiq-logo-white.svg" alt="GroundIQ"></a>
+  <nav style="display:flex;flex-direction:column" aria-label="Main">
+    <a class="item" href="Main.dc.html"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 8.2 8 3l5.5 5.2M4.2 7.4V13h7.6V7.4"/></svg>Overview</a>
+    <a class="item" href="SiteOverview.dc.html"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="2.5" width="11" height="11" rx="1.5"/><path d="M8 2.5V8h5.5M2.5 10.8H8V8"/></svg>Site plan</a>
+    <a class="item" href="FlagInbox.dc.html"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.2 13.5V2.8h8l-1.8 2.7 1.8 2.7h-8"/></svg>Flags</a>
+    <a class="item cur" href="EvidenceReview.dc.html" aria-current="page"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="2.2" width="10" height="11.6" rx="1.5"/><path d="m5.6 8.4 1.8 1.8 3.2-3.6"/></svg>Evidence</a>
+    <a class="item" href="#chat" title="Chat agent (issue #19): read-only Q&amp;A"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" aria-hidden="true"><path d="M2.8 3.4h10.4v6.8H7.4l-2.8 2.6v-2.6H2.8z"/></svg>Chat</a>
+  </nav>
+  <div class="foot">
+    <span class="clock">Day 2 · 18:10</span>
+    <button type="button" class="rolebtn" aria-haspopup="listbox" title="Demo role switcher (MVP) — not authentication">Superintendent ▾</button>
+    <span class="mono muted">synthetic demo data</span>
+  </div>
+</aside>
+
+<main class="main">
+  <div style="display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;margin-bottom:16px">
+    <h1 style="font-size:23px">Evidence review</h1>
+    <span class="muted small">Independent of flags — confirming re-runs the rule checks, nothing more</span>
+  </div>
+
+  <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start">
+
+    <section class="panel" style="flex:1 1 340px;min-width:300px;max-width:460px" aria-label="Evidence list">
+      <h3>Evidence</h3>
+      <nav>
+        <a href="EvidenceReview.dc.html" class="ev sel" aria-current="true">
+          <span class="chip s-unk">Unconfirmed</span> <strong class="small">Inspection passed — 3B rough-in</strong>
+          <span class="mono muted" style="display:block;margin-top:2px">D4 09:12 · Gmail</span>
+        </a>
+        <a href="EvidenceReview.dc.html" class="ev">
+          <span class="chip s-unk">Unconfirmed</span> <strong class="small">“Abnahme dürfte passen” — 3B</strong>
+          <span class="mono muted" style="display:block;margin-top:2px">D2 17:00 · Telegram · unclear scope</span>
+        </a>
+        <a href="EvidenceReview.dc.html" class="ev">
+          <span class="chip s-con">Contradictory</span> <strong class="small">Insulation 2C: completed vs. not completed</strong>
+          <span class="mono muted" style="display:block;margin-top:2px">two conflicting statements</span>
+        </a>
+        <a href="EvidenceReview.dc.html" class="ev">
+          <span class="chip s-ok">Confirmed</span> <strong class="small">Rev C acknowledged — plumbing crew</strong>
+          <span class="mono muted" style="display:block;margin-top:2px">synthetic seed baseline</span>
+        </a>
+      </nav>
+    </section>
+
+    <section class="panel" style="flex:999 1 460px;min-width:0" aria-label="Evidence detail">
+      <h3>Claim: rough-in inspection 3B passed</h3>
+      <div class="pad" style="display:flex;flex-direction:column;gap:14px">
+        <div class="small">
+          <span class="chip s-unk">Unconfirmed</span>
+          <p class="muted" style="margin:6px 0 0">Extracted by LLM (confidence 0.93) — confidence is not confirmation.</p>
+        </div>
+
+        <div class="small">
+          <blockquote class="q" lang="de">„Die Abnahme der Rohinstallation in 3B wurde heute durchgeführt und ist bestanden.“</blockquote>
+          <span class="mono" style="color:#5AA2EE">D4 09:12 · Gmail · inspector</span>
+        </div>
+
+        <div class="small">
+          <strong>Scope</strong>
+          <p style="margin:4px 0 0">Zone <a href="RoomView.dc.html" class="mono" style="color:#5AA2EE">3B</a> · rough-in inspection <span class="mono muted">INSP-3B-ROUGH</span></p>
+        </div>
+
+        <div class="small">
+          <strong>History</strong>
+          <p style="margin:4px 0 0" class="muted"><span class="mono" style="color:#5AA2EE">D4 09:12</span> — recorded, unconfirmed · rule check: precondition still unknown</p>
+        </div>
+
+        <div style="border-top:1px solid #232830;padding-top:14px">
+          <div style="display:flex;gap:10px;flex-wrap:wrap">
+            <button type="button" class="btn btn-ok">Confirm</button>
+            <button type="button" class="btn btn-crit">Reject</button>
+          </div>
+          <p class="small muted" style="margin:10px 0 0">Recorded with person, time and source. Does not close any flag; MCP/chat cannot review evidence.</p>
+        </div>
+      </div>
+    </section>
+  </div>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1360,"height":880}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>GroundIQ — Site plan, 3D view</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=JetBrains+Mono:wght@400;500&amp;family=Space+Grotesk:wght@500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:linear-gradient(155deg,#EDF1F5 0%,#DDE4EB 55%,#CCD6E0 100%);color:#171A1F;font:14px/1.5 Inter,system-ui,sans-serif}
+a{color:#171A1F;text-decoration:none}a:hover{color:#176AC6}
+h1,h2,h3{font-family:'Space Grotesk',Inter,sans-serif;margin:0;letter-spacing:-.01em}
+.mono{font-family:'JetBrains Mono',monospace;font-size:12px}
+.stage{position:relative;min-height:100vh;overflow:hidden}
+.glass{background:rgba(255,255,255,.85);border:1px solid rgba(255,255,255,.95);border-radius:16px;box-shadow:0 14px 36px rgba(23,26,31,.12)}
+.bar{position:absolute;top:18px;left:24px;right:24px;display:flex;align-items:center;gap:16px;z-index:5}
+.logo{height:30px;display:block}
+.pills{display:flex;gap:8px;position:absolute;left:50%;transform:translateX(-50%)}
+.pill{display:inline-flex;align-items:center;padding:9px 18px;border-radius:999px;font:600 13.5px Inter,sans-serif;background:rgba(255,255,255,.78);border:1px solid rgba(255,255,255,.95);color:#4A525C;box-shadow:0 6px 18px rgba(23,26,31,.08)}
+.pill:hover{color:#171A1F}
+.pill.cur,.pill.cur:hover{background:#176AC6;border-color:#176AC6;color:#fff}
+.right{margin-left:auto;display:flex;align-items:center;gap:12px}
+.clock{font-family:'JetBrains Mono',monospace;font-size:12px;color:#5A6470}
+.rolebtn{font:600 13px Inter,sans-serif;color:#171A1F;background:rgba(255,255,255,.85);border:1px solid rgba(255,255,255,.95);border-radius:999px;padding:8px 16px;cursor:pointer;box-shadow:0 6px 18px rgba(23,26,31,.08)}
+.muted{color:#5A6470}
+.small{font-size:12.5px}
+.floor{font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:500;width:40px;height:36px;border:0;background:transparent;border-radius:10px;cursor:pointer;color:#5A6470}
+.floor.cur{background:#171A1F;color:#fff}
+.vbtn{font:600 12px Inter,sans-serif;width:40px;padding:7px 0;border:0;background:transparent;border-radius:10px;cursor:pointer;color:#5A6470;text-align:center;text-decoration:none;display:block;box-sizing:border-box}
+.vbtn.cur{background:#176AC6;color:#fff}
+.mk{position:absolute;display:inline-flex;align-items:center;gap:7px;background:rgba(255,255,255,.92);border:1px solid rgba(255,255,255,.98);border-radius:999px;padding:7px 13px;font:600 12.5px Inter,sans-serif;color:#171A1F;box-shadow:0 10px 24px rgba(23,26,31,.16);white-space:nowrap;z-index:4}
+.mk i{width:8px;height:8px;border-radius:50%;flex:0 0 auto}
+.dock{position:absolute;left:50%;transform:translateX(-50%);bottom:22px;display:flex;gap:4px;padding:8px;border-radius:999px;z-index:5}
+.dock a{display:inline-flex;align-items:center;gap:8px;font:600 13px Inter,sans-serif;padding:9px 16px;border-radius:999px;color:#171A1F}
+.dock a:hover{background:rgba(23,26,31,.06)}
+.dock i{width:8px;height:8px;border-radius:50%;flex:0 0 auto}
+</style>
+</helmet>
+
+<div class="stage">
+<header class="bar">
+  <a href="Main.dc.html" aria-label="GroundIQ overview"><img class="logo" src="groundiq-logo.svg" alt="GroundIQ"></a>
+  <nav class="pills" aria-label="Main">
+    <a class="pill" href="Main.dc.html">Overview</a>
+    <a class="pill cur" href="SiteOverview.dc.html" aria-current="page">Site plan</a>
+    <a class="pill" href="FlagInbox.dc.html">Flags</a>
+    <a class="pill" href="EvidenceReview.dc.html">Evidence</a>
+  </nav>
+  <div class="right">
+    <span class="clock">Day 2 · 18:10</span>
+    <button type="button" class="rolebtn" aria-haspopup="listbox" title="Demo role switcher (MVP) — not authentication">Superintendent ▾</button>
+  </div>
+</header>
+
+<div class="glass" style="position:absolute;left:24px;top:50%;transform:translateY(-50%);padding:10px 6px;display:flex;flex-direction:column;gap:4px;align-items:center;z-index:4" role="group" aria-label="Floor isolation and view">
+  <button type="button" class="floor">F4</button>
+  <button type="button" class="floor cur" aria-pressed="true">F3</button>
+  <button type="button" class="floor">F2</button>
+  <button type="button" class="floor">F1</button>
+  <span style="width:28px;height:1px;background:rgba(23,26,31,.12);margin:6px 0"></span>
+  <a href="SiteZone3B.dc.html" class="vbtn">2D</a>
+  <span class="vbtn cur" aria-current="true">3D</span>
+</div>
+
+<div style="position:absolute;left:100px;right:100px;top:90px;bottom:84px;display:flex;align-items:center;justify-content:center">
+  <svg viewBox="0 0 1100 560" style="width:100%;max-height:100%;filter:drop-shadow(0 24px 36px rgba(23,26,31,.18))" role="img" aria-label="Isometric 3D view of floor F3. Apartment 3B is highlighted in blue; its moved bathroom wall from revision D is a solid red face, the old position dashed.">
+    <polygon points="275,269 765,507 765,552 275,314" fill="#DFE5EB" stroke="#B9C2CC" stroke-width="1.5"/>
+    <polygon points="765,507 1010,388 1010,433 765,552" fill="#D2DAE2" stroke="#B9C2CC" stroke-width="1.5"/>
+    <polygon points="520,150 1010,388 765,507 275,269" fill="#F7F9FB" stroke="#171A1F" stroke-width="2.5"/>
+    <polygon points="794,283 1010,388 887,448 671,343" fill="#DCEAFB" stroke="#176AC6" stroke-width="2.5"/>
+    <g stroke="#9AA4AF" stroke-width="1.5" fill="none">
+      <line x1="794" y1="283" x2="671" y2="343"/>
+      <line x1="628" y1="364" x2="549" y2="402"/>
+      <line x1="398" y1="210" x2="887" y2="448"/>
+      <line x1="354" y1="231" x2="844" y2="469"/>
+    </g>
+    <g stroke="#C3CCD5" stroke-width="1.5" fill="none">
+      <polygon points="520,80 1010,318 765,437 275,199"/>
+      <line x1="520" y1="150" x2="520" y2="80"/>
+      <line x1="1010" y1="388" x2="1010" y2="318"/>
+      <line x1="765" y1="507" x2="765" y2="437"/>
+      <line x1="275" y1="269" x2="275" y2="199"/>
+      <line x1="794" y1="283" x2="794" y2="213"/>
+      <line x1="671" y1="343" x2="671" y2="273"/>
+      <line x1="794" y1="213" x2="671" y2="273"/>
+      <line x1="549" y1="402" x2="549" y2="332"/>
+      <line x1="628" y1="364" x2="628" y2="294"/>
+      <line x1="628" y1="294" x2="549" y2="332"/>
+      <line x1="398" y1="210" x2="398" y2="140"/>
+      <line x1="398" y1="140" x2="887" y2="378"/>
+      <line x1="354" y1="231" x2="354" y2="161"/>
+      <line x1="354" y1="161" x2="844" y2="399"/>
+    </g>
+    <polygon points="765,311 707,339 707,269 765,241" fill="#E2492F" stroke="#C2412B" stroke-width="2.5"/>
+    <g stroke="#8A93A1" stroke-width="2" stroke-dasharray="7 5" fill="none">
+      <line x1="776" y1="316" x2="718" y2="344"/>
+      <line x1="776" y1="246" x2="718" y2="274"/>
+      <line x1="776" y1="316" x2="776" y2="246"/>
+      <line x1="718" y1="344" x2="718" y2="274"/>
+    </g>
+    <g font-family="'JetBrains Mono',monospace" font-size="18" fill="#5A6470">
+      <text x="586" y="250">3A</text>
+      <text x="830" y="372" fill="#176AC6">3B</text>
+      <text x="463" y="310">3C</text>
+      <text x="708" y="430">3D</text>
+    </g>
+  </svg>
+  <a class="mk" href="FlagDetail.dc.html" style="left:66%;top:26%"><i style="background:#E2492F"></i>3B — do not close wall</a>
+  <a class="mk" href="EvidenceReview.dc.html" style="left:70%;top:66%"><i style="background:#176AC6"></i>Inspection pending · D4</a>
+  <a class="mk" href="RoomView.dc.html" style="left:14%;top:38%"><i style="background:#171A1F"></i>Room view 3B →</a>
+</div>
+
+<div class="glass small" style="position:absolute;left:100px;bottom:22px;padding:9px 14px;z-index:4;display:flex;gap:16px;flex-wrap:wrap">
+  <span><svg width="12" height="12" aria-hidden="true"><rect width="12" height="12" fill="#E2492F" stroke="#C2412B"/></svg> 3B-BATH-WALL — Rev D, flagged</span>
+  <span><svg width="18" height="8" aria-hidden="true"><line x1="0" y1="4" x2="18" y2="4" stroke="#8A93A1" stroke-width="3" stroke-dasharray="5 4"/></svg> Rev C position</span>
+  <span><svg width="12" height="12" aria-hidden="true"><rect width="12" height="12" fill="#DCEAFB" stroke="#176AC6"/></svg> selected zone 3B</span>
+</div>
+
+<p class="small muted" style="position:absolute;right:24px;bottom:28px;margin:0;z-index:4">Walls extruded to floor height — static placeholder (Three.js: issue #16)</p>
+
+<nav class="dock glass" aria-label="Quick actions">
+  <a href="FlagInbox.dc.html"><i style="background:#E2492F"></i>Open flags (2)</a>
+  <a href="EvidenceReview.dc.html"><i style="background:#5A6470"></i>Review evidence</a>
+  <a href="#chat" title="Chat agent (issue #19): read-only Q&amp;A"><i style="background:#176AC6"></i>Ask GroundIQ</a>
+</nav>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1360,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>
