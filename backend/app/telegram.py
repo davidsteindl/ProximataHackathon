@@ -1,5 +1,6 @@
 """Polling Telegram adapter. Credentials and provider traffic stay in worker."""
 
+import base64
 import json
 import os
 import re
@@ -9,7 +10,9 @@ from datetime import UTC, datetime
 import httpx
 from pydantic import TypeAdapter
 
-from app.ingestion_schemas import SenderRole, SourceMessageInput
+from app.ingestion_schemas import AttachmentInput, SenderRole, SourceMessageInput
+
+MAX_PHOTO_BYTES = 2_000_000
 
 
 class TelegramError(Exception):
@@ -25,6 +28,7 @@ class TelegramSettings:
     roles: dict[str, str]
     crews: dict[str, str]
     poll_seconds: int = 2
+    photos: bool = False
 
     @classmethod
     def from_env(cls):
@@ -38,6 +42,7 @@ class TelegramSettings:
         roles = json.loads(os.environ.get("TELEGRAM_SENDER_ROLES_JSON") or "{}")
         crews = json.loads(os.environ.get("TELEGRAM_SENDER_CREWS_JSON") or "{}")
         interval = int(os.environ.get("TELEGRAM_POLL_SECONDS", "2"))
+        photos = os.environ.get("TELEGRAM_PHOTOS_ENABLED", "false").lower() == "true"
         if not token or not key or interval < 1:
             raise ValueError("Telegram requires token, compliance key and positive poll interval")
         if any(not re.fullmatch(r"-?[1-9][0-9]{0,18}", value) for value in chats) or any(
@@ -48,7 +53,7 @@ class TelegramSettings:
             raise ValueError("Telegram role and Crew maps must be objects")
         for role in roles.values():
             TypeAdapter(SenderRole).validate_python(role)
-        return cls(token, chats, users, key, roles, crews, interval)
+        return cls(token, chats, users, key, roles, crews, interval, photos)
 
 
 class TelegramClient:
@@ -72,6 +77,25 @@ class TelegramClient:
     def updates(self):
         return self.call("getUpdates", {"offset": self.offset, "timeout": 0,
                                        "allowed_updates": ["message", "my_chat_member"]})
+
+    def download_photo(self, sizes):
+        """Largest Telegram rendition within the ingestion limit, or None if none fits.
+
+        Telegram re-encodes `photo` uploads and drops EXIF metadata such as GPS.
+        """
+        fitting = [size for size in sizes if 0 < size.get("file_size", MAX_PHOTO_BYTES) <= MAX_PHOTO_BYTES]
+        if not fitting:
+            return None
+        best = max(fitting, key=lambda size: size.get("width", 0) * size.get("height", 0))
+        path = self.call("getFile", {"file_id": best["file_id"]}).get("file_path")
+        try:
+            response = self.http.get(f"https://api.telegram.org/file/bot{self.settings.token}/{path}")
+            response.raise_for_status()
+        except httpx.HTTPError:
+            raise TelegramError("telegram_unavailable") from None
+        if not path or not response.content or len(response.content) > MAX_PHOTO_BYTES:
+            return None
+        return response.content
 
     def allowed(self, chat, sender):
         return str(chat) in self.settings.chats and str(sender) in self.settings.users
@@ -125,6 +149,9 @@ def handle_update(telegram, api, update):
     command = None
     membership = update.get("my_chat_member")
     text = message.get("text", "")
+    photo = message.get("photo") if telegram.settings.photos else None
+    if photo:
+        text = message.get("caption", "")
     if membership:
         if (membership["old_chat_member"]["status"] in {"left", "kicked"}
                 and membership["new_chat_member"]["status"] in {"member", "administrator"}):
@@ -135,7 +162,7 @@ def handle_update(telegram, api, update):
                    "/privacy": "notice"}.get(name, "help")
         if command in {"my_data", "delete_my_data"} and chat_id != sender_id:
             command = "help"
-    elif text.strip():
+    elif text.strip() or photo:
         response = api.get("/source-messages", params={
             "channel": "telegram", "source_key": chat_id,
             "external_id": str(message["message_id"]),
@@ -143,12 +170,21 @@ def handle_update(telegram, api, update):
         response.raise_for_status()
         existing = response.json()
         result = None
-        if not existing or existing["status"] != "processed":
+        attachments = []
+        if (not existing or existing["status"] != "processed") and photo:
+            content = telegram.download_photo(photo)
+            if content is not None:
+                attachments.append(AttachmentInput(
+                    file_name=f"telegram-{message['message_id']}.jpg", media_type="image/jpeg",
+                    content_base64=base64.b64encode(content).decode(),
+                ))
+        if (not existing or existing["status"] != "processed") and (text.strip() or attachments):
             source = SourceMessageInput(
                 channel="telegram", source_key=chat_id, external_id=str(message["message_id"]),
                 sender_id=sender_id, sender_role=telegram.settings.roles.get(sender_id, "unknown"),
                 sender_crew_id=telegram.settings.crews.get(sender_id),
                 sent_at=datetime.fromtimestamp(message["date"], UTC), text=text,
+                attachments=attachments,
             )
             response = api.post("/ingestion/messages", json=source.model_dump(mode="json"))
             # Extraction failure still has a durable source. Q&A routing is separate
@@ -157,6 +193,8 @@ def handle_update(telegram, api, update):
                 response.raise_for_status()
             result = response.json()
             existing = result["source"]
+        if not existing:
+            return  # Oversized photo without caption: nothing was stored (#26).
         # Revisit processed sources on retries: ingestion success alone does not mean
         # Q&A has been queued. Deleted raw data remains an identity tombstone.
         candidate = bool(existing["text"].strip()) and is_question(existing["text"])

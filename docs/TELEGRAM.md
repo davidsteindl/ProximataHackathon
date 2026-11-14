@@ -39,7 +39,9 @@ use the existing outbox.
    the notice. Unknown slash commands show help and never go to extraction.
 
 No usernames, profile names, phone numbers, forwarded identities, files, edited
-messages or bot messages are ingested. Supported inbound content is plain text,
+messages or bot messages are ingested. Photos are ingested only with the opt-in
+`TELEGRAM_PHOTOS_ENABLED=true` (#26, see [COMPLIANCE.md](COMPLIANCE.md)); the
+caption is the source text. Otherwise supported inbound content is plain text,
 with chat ID, message ID, numeric sender ID, mapped role/Crew and UTC timestamp.
 Transport metadata never enters the LLM request. Existing API text redaction and
 unconfirmed Evidence policy apply unchanged. Free text is not fully anonymized.

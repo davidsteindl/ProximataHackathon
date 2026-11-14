@@ -330,7 +330,7 @@ Keine feste Rollenverteilung, jeder nimmt sich Issues selbst. Die Abhängigkeite
 | WP13 | Replay-Skript mit simulierter Uhr, Reset, Offline-Modus; menschliche Nachweisbestätigung und unsichere Gegenbeispiele | WP2, WP6, WP7 | M2 |
 | WP14 | Research, Mentor-Interview, Pitch, 3-Min-Video, `COMPLIANCE.md`, finale README, Abgabe | läuft parallel | M4 |
 | S1 | Stretch: Konflikttyp C mit gültigen Abschlussnachweisen gemäß §3.2 | WP4 | M3 |
-| S2 | Stretch: Fotos als Beleg (Vision); LLM-Befunde bleiben unbestätigte Aussagen gemäß §3.2 | WP7 | M3 |
+| S2 | Stretch: Fotos als Beleg (Vision); LLM-Befunde bleiben unbestätigte Aussagen gemäß §3.2. Umsetzung (#26): Events mit `origin: llm_vision`, siehe [COMPLIANCE.md](COMPLIANCE.md) | WP7 | M3 |
 | WP18 | Neuigkeiten-Feed: chronologische Übersicht für den Superintendent über Events, Revisionen, Nachweisentscheidungen, Flag-Änderungen und abgeschlossene Tasks; API + Dashboard-Startseite (§3.6) | WP3, WP5 | M3 |
 | S3 | Stretch: blockierte Tasks bei Konflikten + faktische Hinweise an deren Crews; „pausiert“-Hinweis nach Proposal-Freigabe (§3.2) | WP4, WP5, WP6 | M3 |
 
