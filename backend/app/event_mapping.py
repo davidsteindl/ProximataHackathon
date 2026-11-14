@@ -8,6 +8,7 @@ from sqlalchemy import select
 
 from app import models
 from app.extraction import resolve_time
+from app.revision_rules import register_note
 
 
 def normalized(label):
@@ -46,7 +47,14 @@ def resolve_named(label, records):
 
 
 def build_events(session, source, statements):
-    """Build Events and unconfirmed Evidence in the caller's atomic transaction."""
+    """Flush Events and their Evidence together so rules see the complete batch."""
+    with session.no_autoflush:
+        return _build_events(session, source, statements)
+
+
+def _build_events(session, source, statements):
+    # Serialize note sequence registration with ingestion/review rule checks.
+    session.scalar(select(models.Site).with_for_update())
     site = session.get(models.Site, source.site_id)
     zones = session.scalars(select(models.Zone).where(models.Zone.site_id == site.id)).all()
     zone_by_id = {zone.id: zone for zone in zones}
@@ -72,6 +80,7 @@ def build_events(session, source, statements):
             details=statement.model_dump(mode="json", include={"claim", "inspection_kind", "task_reference", "plan_reference", "revision_label", "crew"}),
             created_at=datetime.now(UTC), zones=[zone_by_id[key] for key in sorted(zone_ids)],
         )
+        register_note(session, event, source, revisions, zone_by_id)
         session.add(event)
         result.append(event)
         if statement.claim is None:
@@ -94,7 +103,8 @@ def build_events(session, source, statements):
                 if len(matches) == 1:
                     revision = matches[0]
                     plan = session.get(models.Plan, revision.plan_id)
-                    if zone_id in revision.zone_ids or zone_id == plan.floor_id:
+                    from app.rules import ancestors
+                    if zone_id and plan.floor_id in ancestors(zone_id, zone_by_id):
                         fields["revision_id"] = revision.id
             session.add(models.Evidence(
                 id=uuid4().hex, origin="llm_statement", statement_ref=event.id,

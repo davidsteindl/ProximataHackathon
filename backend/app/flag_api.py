@@ -41,6 +41,7 @@ class FlagView(Record):
     state: Literal["detected", "notified", "acknowledged", "in_progress", "resolved", "false_alarm"]
     evaluation: Literal["satisfied", "not_satisfied", "unknown", "contradictory"]
     explanation: str
+    context: dict
     created_at: Timestamp
     updated_at: Timestamp
     sources: list[EventView]
@@ -51,10 +52,16 @@ class FlagView(Record):
 def flag_view(session, flag):
     inspection = session.get(models.Inspection, flag.inspection_id) if flag.inspection_id else None
     zones = {zone.id: zone for zone in session.scalars(select(models.Zone))} if inspection else {}
+    evidence = inspection_evidence(session, inspection, inspection_evidence_scope(flag.zone_id, zones)) if inspection else []
+    if flag.type == "B":
+        from app.revision_rules import receipt_evidence
+        zones = {zone.id: zone for zone in session.scalars(select(models.Zone))}
+        revision = session.get(models.Revision, flag.context["revision_id"])
+        evidence = receipt_evidence(session, flag.zone_id, flag.context["crew_id"], revision, zones)
     return FlagView.model_validate({
         **{key: getattr(flag, key) for key in FlagView.model_fields if key not in {"sources", "evidence"}},
         "sources": event_views(session, [link.event for link in flag.sources]),
-        "evidence": inspection_evidence(session, inspection, inspection_evidence_scope(flag.zone_id, zones)) if inspection else [],
+        "evidence": evidence,
     })
 
 

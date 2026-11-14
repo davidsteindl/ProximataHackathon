@@ -61,6 +61,17 @@ Ein neuer Konflikttyp ist damit nur eine neue Precondition, keine neue Architekt
 | **B: Änderung nicht angekommen** | Für die ausführende Crew liegt ein gültiger Nachweis der Bestätigung der neuesten Revision der Zone vor | MVP |
 | **C: Falsche Reihenfolge** | Abschluss der Vorgänger-Task(s) laut Terminplan ist durch gültige Nachweise bestätigt | Stretch |
 
+**Implementierter Notizpfad für B (#8):** Eine aufgelöste Revisionsnotiz prüft
+laufende und zukünftige Tasks in überlappenden Zonen; spätere Arbeitsankündigungen
+werden gegen dieselbe aktuelle Planrevision geprüft. Die Reihenfolge kommt aus
+`Revision.sequence`, nicht aus der Schreibweise des Labels. Reine Notizrevisionen
+haben noch keine Zeichnung (`file_name = null`); ihr Zonenbezug bleibt ausdrücklich
+unbestätigt. `Flag.context` enthält Crew, Plan, erforderliche Revision, letzte durch
+passende bestätigte Evidence belegte Empfangsrevision und die Herkunft des
+Zonenbezugs. Menschlich bestätigter Empfang gilt nur für genau diese Crew und
+Revision sowie die abgedeckte Zone im Plan; er bestätigt keine Umsetzung und
+schließt keinen Flag. REST-, Schema- und Integrationsdetails: [FLAGS.md](FLAGS.md).
+
 ### 3.2 Wer entscheidet was (Autonomie-Grenze)
 - **LLM:** Extraktion (Source Message → Event), Erklärung von Flags, Proposals, Beantwortung von Fragen. **Rein beratend. Das LLM trifft keine Entscheidungen und löst keine Aktionen aus, die über Information hinausgehen.**
 - **Regeln (deterministisch):** Prüfen Preconditions anhand gültiger Nachweise und erzeugen Flags. Dadurch reproduzierbar und erklärbar. Ein LLM-Event allein kann keine Precondition erfüllen.

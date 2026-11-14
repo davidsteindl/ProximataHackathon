@@ -1,4 +1,4 @@
-# Conflict A and the Flag inbox (#7)
+# Conflict A, note-based Conflict B and the Flag inbox (#7, #8)
 
 `GET /flags` returns open Flags ordered by severity (high, medium, low), then
 creation time and ID. `GET /flags/{id}` returns one Flag, or 404. Both include
@@ -15,7 +15,7 @@ or `insulation` require a confirmed **rough_in** Inspection. The separate
 insulation Inspection is not an additional MVP requirement (PLAN §7 day 4).
 The extraction prompt uses the canonical `closing_work` activity for explicit
 closure announcements; deliveries and questions do not qualify.
-Every new Event triggers a recheck. Only closing-work announcements create work
+Every new Event triggers a recheck. For A, only closing-work announcements create work
 candidates; missing/unresolved zones never become invented global work scope.
 
 The nearest ancestor (including the work Zone) with a rough-in Inspection
@@ -65,7 +65,7 @@ retain the human review actor and Evidence reference when triggered by review.
 `app.rules.PRECONDITIONS` registers rules with `applies`/`evaluate`; Flag creation,
 deduplication and audit are shared. `evaluate_site(session, ...)` rechecks persisted
 work Events in the caller's transaction and can be reused by #14's future scan.
-It does not implement a scheduler or independently flag every scheduled Task.
+B also checks scheduled Tasks intersecting a revision note. No scheduler is implemented.
 SQLAlchemy Session hooks run it after new Events and human `EvidenceReview`
 records are flushed, in the same transaction. #9 must validate/authorize decisions
 before appending immutable reviews through this ORM contract; bulk SQL bypasses
@@ -94,3 +94,86 @@ details. An unconfirmed inspection success does not authorize work.
 
 From `backend`, `python -m pytest tests/test_rules.py` covers evaluation, review-triggered
 rechecks, dedup, reset, read-only routes and migration parity/rollback.
+
+
+## Note-based revision receipt (Conflict B, #8)
+
+A revision Event must resolve a known plan, a label and nonempty affected Zones
+inside that plan's floor, without unresolved zone labels. It registers a note-only
+Revision if necessary, with `file_name: null`, sequence after the current latest
+Revision, and issue time from the Source Message. An unknown label from a message
+older than the latest issue time cannot advance the revision history. Existing
+registered labels retain their ordering; label spelling is never sorted to infer
+recency. `GET /plans` returns these records alongside CAD/seed revisions. The
+Event stores the registered `revision_id` and
+`affected_zones_origin: unconfirmed_revision_note`; registration accepts no
+Evidence and does not certify the extracted changed-zone scope.
+
+The note intersects its Zones with scheduled Tasks (ancestor/descendant overlap,
+never siblings) which have not ended before the note/current revision. Later
+`planned_work` Events in the affected scope use the latest registered revision
+of that plan. A note can therefore flag ongoing plumbing and future insulation
+or drywall work. A closing-work Event participates in both A and B.
+
+B uses the same `PRECONDITIONS` registry, evaluation hooks, persistence and audit
+as A. Its conflict key is Zone + Crew + required Revision, independent of the
+triggering Task, so a later announcement joins the note's existing Flag.
+Human closure settles linked sources for that required Revision; a newer
+Revision is a new requirement. Old open Flags remain open until human closure.
+
+The additive `Flag.context` object is empty for A and contains these B fields:
+
+| Field | Meaning |
+| --- | --- |
+| `crew_id` | Required Crew, or null if unresolved |
+| `plan_id`, `revision_id`, `current_revision` | Plan and exact required Revision ID/label |
+| `acknowledged_revision_id`, `acknowledged_revision` | Latest matching confirmed receipt ID/label, or null |
+| `affected_zones_origin` | `unconfirmed_revision_note` |
+
+B detail responses include applicable receipt Evidence and original note/work
+sources. Receipt Evidence requires the exact Crew, Revision and Plan; its Zone
+must cover the work Zone (a floor receipt covers units, a room receipt cannot
+certify a whole unit). Source-backed statements must match their Event scope,
+plan/label and source reference, and cannot predate the target revision.
+Explicit seed baseline or a human decision may confirm a receipt. The legacy
+acknowledgment table and message confidence alone cannot satisfy B.
+
+Missing, unconfirmed, stale, ambiguous or mismatched proof evaluates as `unknown`.
+Confirmed non-receipt is `not_satisfied`. Relevant unrejected receipt and
+non-receipt claims for the current revision are `contradictory`, including
+unconfirmed or unresolved counterclaims and negative statements from descendant
+zones. Human rejection removes a counterclaim from evaluation, preserving its
+history. Confirmed current receipt without a counterclaim is `satisfied`; this
+means receipt only, not implementation. Neither Evidence confirmation nor
+“warning seen” closes a Flag or changes another confirmation.
+
+A strictly later, human-confirmed receipt supersedes an earlier non-receipt
+statement for evaluation only, matching the exact Crew, Zone and Revision.
+Compare source timestamps, never review timestamps. Both Evidence records and
+their review history remain unchanged. Simultaneous/newer negatives and
+different or unresolved scopes still require review; an unconfirmed receipt
+does not supersede anything.
+
+If a receipt arrives before its revision is registered, its stored Evidence may
+have `revision_id: null`. Evaluation can later resolve the immutable source
+Event's explicit plan and revision label to exactly one registered Revision.
+It still validates the source reference, Crew, Zone, label and source timestamp;
+missing labels and stale/wrong scopes never become proof. Only the existing
+explicit human confirmation can satisfy B. Registration never creates a review
+or changes the original Evidence, stored scope or history. `Flag.context` shows
+the resolved confirmed receipt; Evidence retains its original ingestion-time
+scope for traceability. A newer revision still requires its own receipt.
+
+Migration `0006` makes revision filenames nullable and adds the JSON Flag context;
+existing Flags receive `{}`. CAD import serializes on the same Site lock and can
+replace provisional sequence/issue time with explicit CAD metadata for the same
+ID/plan/label, rejecting collisions. Extracted scope stays on the source Event;
+CAD import alone supplies no affected-zone diff and no crew receipt. Seed reset
+removes note revisions, Events, Evidence and Flags and restores explicit baseline
+provenance. Geometry diff remains #17; dashboard decisions remain #9.
+
+To verify offline, seed and ingest `backend/demo/revision-note.json`, then
+`backend/demo/closing-work.json`. Check plumbing C→D at 3B and both A/B for drywall.
+Run `python -m pytest tests/test_rules.py tests/test_revision_rules.py` from
+`backend` for the human Evidence boundary, day 1/day 2, provenance, dedup/reset,
+wrong/missing scopes, contradictions, revision ordering and note/CAD import order.
