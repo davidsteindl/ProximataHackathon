@@ -38,6 +38,8 @@ def import_seed(session: Session, seed: schemas.Seed) -> schemas.ImportResult:
     with session.begin():
         for table in (
             models.EvidenceReview.__table__, models.Evidence.__table__,
+            models.event_zones, models.Event.__table__,
+            models.SourceAttachment.__table__, models.SourceMessage.__table__,
             models.task_dependencies, models.RevisionAcknowledgment.__table__,
             models.revision_zones, models.Inspection.__table__, models.Task.__table__,
             models.Revision.__table__, models.Plan.__table__, models.Crew.__table__,

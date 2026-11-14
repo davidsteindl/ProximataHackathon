@@ -6,10 +6,12 @@ from pydantic import BaseModel
 
 from app.site_api import router
 from app.cad_api import router as cad_router
+from app.ingestion_api import router as ingestion_router
 
 app = FastAPI(title="SiteMind API")
 app.include_router(router)
 app.include_router(cad_router)
+app.include_router(ingestion_router)
 
 
 class Health(BaseModel):

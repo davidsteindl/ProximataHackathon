@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { flattenZones, formatTime } from "../lib/site.mjs";
+import EventTimeline from "./event-timeline";
 
 function ZoneTree({ zones }) {
   return (
@@ -18,7 +19,7 @@ function ZoneTree({ zones }) {
 }
 
 export default function SiteOverview({ data, filters }) {
-  const { site, zones, tasks, crews, plans, inspections, evidence } = data;
+  const { site, zones, tasks, crews, plans, inspections, evidence, events } = data;
   if (!site) return <p>No site data has been loaded yet.</p>;
 
   const crewNames = Object.fromEntries(crews.map((crew) => [crew.id, crew.name]));
@@ -33,6 +34,7 @@ export default function SiteOverview({ data, filters }) {
 
       <section aria-labelledby="schedule-title">
         <h2 id="schedule-title">Schedule</h2>
+        <p>Filters apply to the schedule and event timeline. Timeline dates refer to source message times.</p>
         <form method="get">
           <label>
             Zone and descendants
@@ -47,7 +49,7 @@ export default function SiteOverview({ data, filters }) {
           </label>
           <label>From date (UTC, inclusive)<input name="from" type="date" defaultValue={filters.fromDate || ""} /></label>
           <label>Before date (UTC, exclusive)<input name="to" type="date" defaultValue={filters.toDate || ""} /></label>
-          <button type="submit">Filter schedule</button>
+          <button type="submit">Apply filters</button>
           <Link href="/">Clear filters</Link>
         </form>
         {tasks.length === 0 ? <p>No tasks in this zone and time range.</p> : (
@@ -67,6 +69,8 @@ export default function SiteOverview({ data, filters }) {
           </div>
         )}
       </section>
+
+      <EventTimeline events={events} timezone={site.timezone} crewNames={crewNames} />
 
       <section aria-labelledby="crews-title">
         <h2 id="crews-title">Crews</h2>

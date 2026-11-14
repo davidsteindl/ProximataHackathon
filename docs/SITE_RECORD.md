@@ -70,10 +70,12 @@ the message extraction/Events ingestion from #6. There is no separate runtime
 message ingestion implementation in this issue.
 
 **Import replaces data:** use only the intended local demo database. The endpoint
-has no authentication, as in the MVP skeleton. Reset currently covers only the
-static tables introduced here. When Events/Flags or other referencing tables are
-added, their reset behavior must be integrated in #22; they are not implicitly
-deleted by this importer. Existing foreign keys can reject an incompatible reset,
+has no authentication, as in the MVP skeleton. Reset currently covers the
+static tables introduced here and, since #6, Source Messages, original attachments
+and Events. The latter are deleted before their referenced Site Record tables in
+the same transaction. Future Flags or other referencing tables must likewise
+integrate their reset behavior; they are not implicitly deleted. Existing foreign
+keys can reject an incompatible reset,
 which rolls back rather than leaving a partial state.
 
 ## Seed file formats

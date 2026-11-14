@@ -1,8 +1,8 @@
 from datetime import date, datetime
 
 from sqlalchemy import (
-    CheckConstraint, Column, DateTime, Float, ForeignKey, Integer, String, Table,
-    UniqueConstraint, event, inspect, JSON, LargeBinary,
+    CheckConstraint, Column, DateTime, Float, ForeignKey, Integer, JSON, LargeBinary, String, Table, Text,
+    UniqueConstraint, event, inspect,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
@@ -130,6 +130,81 @@ class Inspection(Base):
     kind: Mapped[str] = mapped_column(String(64))
     status: Mapped[str] = mapped_column(String(20))
     scheduled_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class SourceMessage(Base):
+    __tablename__ = "source_messages"
+    __table_args__ = (
+        UniqueConstraint("channel", "source_key", "external_id", name="source_message_identity"),
+        CheckConstraint("status IN ('pending','processing','processed','failed')", name="source_message_status"),
+    )
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    site_id: Mapped[str] = mapped_column(ForeignKey("sites.id"))
+    channel: Mapped[str] = mapped_column(String(32))
+    source_key: Mapped[str] = mapped_column(String(200))
+    external_id: Mapped[str] = mapped_column(String(200))
+    payload_hash: Mapped[str] = mapped_column(String(64))
+    sender_id: Mapped[str | None] = mapped_column(String(200))
+    sender_role: Mapped[str] = mapped_column(String(32))
+    sender_crew_id: Mapped[str | None] = mapped_column(ForeignKey("crews.id"))
+    sent_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    received_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    text: Mapped[str] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(String(20))
+    error_code: Mapped[str | None] = mapped_column(String(40))
+    processing_token: Mapped[str | None] = mapped_column(String(64))
+    processing_started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    extraction_backend: Mapped[str | None] = mapped_column(String(200))
+    attachments: Mapped[list["SourceAttachment"]] = relationship(lazy="selectin", order_by="SourceAttachment.id")
+
+
+class SourceAttachment(Base):
+    __tablename__ = "source_attachments"
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    source_message_id: Mapped[str] = mapped_column(ForeignKey("source_messages.id"), index=True)
+    file_name: Mapped[str] = mapped_column(String(200))
+    media_type: Mapped[str] = mapped_column(String(100))
+    sha256: Mapped[str] = mapped_column(String(64))
+    content: Mapped[bytes] = mapped_column(LargeBinary)
+
+
+event_zones = Table(
+    "event_zones", Base.metadata,
+    Column("event_id", ForeignKey("events.id"), primary_key=True),
+    Column("zone_id", ForeignKey("zones.id"), primary_key=True),
+)
+
+
+class Event(Base):
+    __tablename__ = "events"
+    __table_args__ = (
+        UniqueConstraint("source_message_id", "ordinal", name="event_source_ordinal"),
+        CheckConstraint("confidence >= 0 AND confidence <= 1", name="event_confidence"),
+        CheckConstraint("ordinal >= 0", name="event_ordinal"),
+    )
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    source_message_id: Mapped[str] = mapped_column(ForeignKey("source_messages.id"), index=True)
+    ordinal: Mapped[int] = mapped_column(Integer)
+    intent: Mapped[str] = mapped_column(String(40))
+    actor: Mapped[str | None] = mapped_column(String(200))
+    crew_id: Mapped[str | None] = mapped_column(ForeignKey("crews.id"))
+    activity: Mapped[str | None] = mapped_column(String(200))
+    trade: Mapped[str | None] = mapped_column(String(64))
+    quote: Mapped[str] = mapped_column(String(2000))
+    confidence: Mapped[float] = mapped_column(Float)
+    starts_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    ends_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    time_precision: Mapped[str] = mapped_column(String(20))
+    time_expression: Mapped[str | None] = mapped_column(String(200))
+    unresolved_zones: Mapped[list] = mapped_column(JSON)
+    details: Mapped[dict] = mapped_column(JSON)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    zones: Mapped[list[Zone]] = relationship(secondary=event_zones, lazy="selectin")
+    source: Mapped[SourceMessage] = relationship(lazy="selectin")
+
+    @property
+    def zone_ids(self):
+        return sorted(zone.id for zone in self.zones)
 
 
 class Evidence(Base):
