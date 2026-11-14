@@ -54,15 +54,17 @@ def advice_facts(session, flag):
         refs[f"S{number}"] = f"source:{link.event.source_message_id}"
         facts["sources"].append({
             "handle": f"S{number}", "status": "unconfirmed_statement", "intent": link.event.intent,
-            "quote": redact_text(link.event.quote), "channel": link.event.source.channel,
+            "quote": redact_text(link.event.quote, link.event.source.sender_id), "channel": link.event.source.channel,
             "sender_role": link.event.source.sender_role, "sent_at": iso(link.event.source.sent_at),
         })
     facts["evidence"] = []
     for number, item in enumerate(flag_evidence(session, flag), 1):
         refs[f"E{number}"] = f"evidence:{item.id}"
+        statement = session.get(models.Event, item.statement_ref) if item.origin == "llm_statement" and item.statement_ref else None
+        sender_id = statement.source.sender_id if statement else None
         facts["evidence"].append({
             "handle": f"E{number}", "review_status": item.review_status, "origin": item.origin,
-            "kind": item.kind, "claim": item.claim, "quote": redact_text(item.quote), "scope": item.scope,
+            "kind": item.kind, "claim": item.claim, "quote": redact_text(item.quote, sender_id), "scope": item.scope,
         })
     if flag.inspection_id and (inspection := session.get(models.Inspection, flag.inspection_id)):
         # The Inspection row's status is not proof; only confirmed Evidence is.

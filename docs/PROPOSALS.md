@@ -17,6 +17,9 @@ Only the Superintendent can approve or reject a Proposal, and only in the dashbo
 
    No crew lead names, emails, phone numbers or usernames are sent. The Inspection row's
    own `status` is left out, because only confirmed Evidence counts as proof.
+   Quotes reuse ingestion's masking of each source's known sender ID, including
+   bare usernames and short numeric identifiers. LLM-extracted Evidence resolves
+   that ID through its originating Event. Original quotes stay in the Site Record.
 3. The output (`explanation`, up to three `proposals`) must pass `validate_advice`,
    or it is rejected with 502 and nothing is stored:
    - the explanation cites at least one triggering source (`[S1]`), and every rationale cites at least one handle

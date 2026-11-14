@@ -6,9 +6,9 @@ from alembic.config import Config
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app import models, proposal_api
+from app import ingestion, models, proposal_api
 from app.advisor import Advice, CachedAdvisor, LLMAdvisor
-from app.extraction import ExtractionError
+from app.extraction import ExtractedBatch, ExtractedEvent, ExtractionError, redact_text
 from app.worker import request_advice
 from conftest import BACKEND
 from test_lifecycle import HUMAN, action, signal
@@ -346,3 +346,51 @@ def test_cached_advice_rejects_an_additional_evidence_statement(client, seed, mo
     assert (response.status_code, response.json().get("detail")) == (502, "cache_miss")
     assert client.get(f"/flags/{flag['id']}").json()["advice"] is None
     assert outbox(client, "approval_request") == []
+
+
+@pytest.mark.parametrize("kind", ["source", "evidence"])
+@pytest.mark.parametrize("sender_id", ["sam_drywall", "12345"])
+def test_advisor_masks_known_sender_ids_and_preserves_original_quotes(initialized, monkeypatch, kind, sender_id):
+    from unittest.mock import Mock
+
+    if kind == "evidence":
+        flag = hero_flag(initialized)
+    original = f"{sender_id}: " + (
+        "The rough-in inspection on floor 3 passed." if kind == "evidence" else "We close 3B tomorrow."
+    )
+    masked = redact_text(original, sender_id)
+    extractor = Mock()
+    extractor.name = "fake:extraction"
+    extractor.extract.return_value = ExtractedBatch(events=[ExtractedEvent(
+        quote=masked, confidence=1,
+        intent="inspection_result" if kind == "evidence" else "planned_work",
+        zones=["F3"] if kind == "evidence" else ["3B"],
+        activity=None if kind == "evidence" else "closing_work",
+        inspection_kind="rough_in" if kind == "evidence" else None,
+        claim="passed" if kind == "evidence" else None,
+    )])
+    monkeypatch.setattr(ingestion, "get_extractor", lambda: extractor)
+    result = ingest(initialized, external_id="sender-claim", text=original, sender_id=sender_id,
+                    sender_role="inspector" if kind == "evidence" else "crew_lead",
+                    sender_crew_id=None if kind == "evidence" else "drywall")
+    assert extractor.extract.call_args.args[0] == masked
+    assert result["events"][0]["quote"] == original
+    if kind == "source":
+        flag = initialized.get("/flags").json()[0]
+    else:
+        evidence = result["events"][0]["evidence"][0]
+        assert evidence["quote"] == original
+        assert evidence["review_status"] == "unconfirmed"
+    llm = FakeLLM(cached_result())
+    monkeypatch.setattr(proposal_api, "get_advisor", lambda: LLMAdvisor(llm))
+    response = advise(initialized, flag)
+    assert response.status_code == 200, response.text
+    [facts] = llm.calls
+    quotes = facts["evidence"] if kind == "evidence" else facts["sources"]
+    assert quotes[0]["quote"] == masked
+    assert sender_id not in json.dumps(facts)
+    stored = initialized.get(f"/flags/{flag['id']}").json()
+    records = stored["evidence"] if kind == "evidence" else stored["sources"]
+    assert records[0]["quote"] == original
+    if kind == "evidence":
+        assert records[0]["review_status"] == "unconfirmed"
