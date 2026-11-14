@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 
 from app import models
 from app.extraction import ExtractedBatch, ExtractedEvent
+from app.lifecycle import transition_flag
 from test_lifecycle import action, signal
 from test_rules import initialized, ingest, inspection_claim  # noqa: F401
 
@@ -15,7 +16,12 @@ QUESTION = "Können wir morgen früh 3B zumachen?"
 def false_alarm(client, engine, *, correct=True):
     original = ingest(client, text=QUESTION)
     flag = client.get("/flags").json()[0]
-    signal(engine, flag["id"], "notified")
+    delivery = client.post("/outbox/claim").json()
+    assert delivery["flag_id"] == flag["id"]
+    assert client.post(f"/outbox/{delivery['id']}/result", json={
+        "lease_token": delivery["lease_token"], "status": "sent",
+        "provider_message_id": f"synthetic-local:{delivery['id']}",
+    }).status_code == 200
     flag = client.get(f"/flags/{flag['id']}").json()
     response = action(client, flag, "false_alarm", reason="A question, not an announcement",
                       correction_event_id=original["events"][0]["id"] if correct else None)
@@ -157,3 +163,24 @@ def test_seed_reset_removes_knowledge_and_preserves_unconfirmed_replay(initializ
     replay = ingest(initialized, text=QUESTION)
     assert replay["events"][0]["intent"] == "planned_work"
     assert initialized.get("/flags").json()
+
+
+def test_metric_denominator_excludes_unreviewed_flags_and_resolution_is_not_double_counted(initialized, engine):
+    false_alarm(initialized, engine)
+    ingest(initialized, external_id="real-work")
+    assert initialized.get("/metrics/flag-feedback").json()[-1]["reviewed_flags"] == 1
+    flag = initialized.get("/flags").json()[0]
+    signal(engine, flag["id"], "notified")
+    flag = initialized.get(f"/flags/{flag['id']}").json()
+    acknowledged = action(initialized, flag, "acknowledge")
+    assert acknowledged.status_code == 200
+    metric = initialized.get("/metrics/flag-feedback").json()[-1]
+    assert (metric["confirmed_flags"], metric["reviewed_flags"], metric["confirmed_share"]) == (1, 2, 0.5)
+    with Session(engine) as session, session.begin():
+        record = session.get(models.Flag, flag["id"])
+        transition_flag(session, record, action="action_approved", actor="synthetic-superintendent",
+                        actor_type="human", role="superintendent", channel="dashboard", source_ref="proposal:test")
+    flag = initialized.get(f"/flags/{flag['id']}").json()
+    assert action(initialized, flag, "resolved").status_code == 200
+    assert initialized.get("/metrics/flag-feedback").json()[-1] == metric
+    assert len(initialized.get("/site-knowledge").json()) == 3

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { flattenZones, formatTime } from "../lib/site.mjs";
 import EventTimeline from "./event-timeline";
 import FlagInbox from "./flag-inbox";
+import SiteKnowledge from "./site-knowledge";
 import { HumanReview, EvidenceActions } from "./human-review";
 
 function ZoneTree({ zones }) {
@@ -32,6 +33,7 @@ export default function SiteOverview({ data, filters }) {
         <summary>Closed Flags and audit history ({closedFlags.length})</summary>
         <FlagInbox flags={closedFlags} timezone={site.timezone} closed />
       </details>
+      <SiteKnowledge knowledge={data.knowledge} metric={data.feedbackMetric} timezone={site.timezone} />
       <section aria-labelledby="site-title">
         <h2 id="site-title">{site.name}</h2>
         <p>Scenario day 1: {site.start_date}. Schedule times: {site.timezone}.</p>

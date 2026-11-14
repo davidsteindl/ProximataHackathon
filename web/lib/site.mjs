@@ -13,6 +13,8 @@ export async function getSiteOverview(baseUrl, { zoneId, fromDate, toDate } = {}
     evidence: "/evidence",
     flags: "/flags",
     closedFlags: "/flags?status=closed",
+    knowledge: "/site-knowledge",
+    feedbackMetric: "/metrics/flag-feedback",
     tasks: `/tasks?${query}`,
     events: `/events?${query}`,
   };

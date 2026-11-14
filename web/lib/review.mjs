@@ -17,6 +17,9 @@ export async function postHumanAction(baseUrl, kind, id, formData) {
       feedback: action === "acknowledge" ? "confirmed" : action,
       expected_state: formData.get("expected_state"),
     });
+    if (action === "false_alarm" && formData.get("correction_event_id")) {
+      payload.correction_event_id = formData.get("correction_event_id");
+    }
     path = `/flags/${encodeURIComponent(id)}/actions`;
   } else {
     Object.assign(payload, {

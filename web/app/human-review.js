@@ -64,6 +64,17 @@ export function FlagActions({ flag }) {
         </select>
       </label>
       {flag.state === "acknowledged" && <p>Resolving this Flag requires an approved measure first.</p>}
+      {flag.sources.some((event) => event.intent === "planned_work") && (
+        <label>Optional extraction correction · only applied when closing as false alarm
+          <select name="correction_event_id" defaultValue="">
+            <option value="">No extraction correction</option>
+            {flag.sources.filter((event) => event.intent === "planned_work").map((event) => (
+              <option key={event.id} value={event.id}>Question, not planned work: {event.quote}</option>
+            ))}
+          </select>
+          <small>Applies only to an exact replay of this message, sender role and Crew. Never confirms Evidence or changes safety rules.</small>
+        </label>
+      )}
     </ReviewForm>
   );
 }

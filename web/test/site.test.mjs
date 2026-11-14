@@ -16,6 +16,8 @@ test("schedule and timeline filtering reach REST while other overview data remai
   assert.equal(result.error, null);
   assert.equal(result.data.site.id, "SITE-DEMO");
   assert.ok(urls.some((url) => url.pathname === "/evidence"));
+  assert.ok(urls.some((url) => url.pathname === "/site-knowledge"));
+  assert.ok(urls.some((url) => url.pathname === "/metrics/flag-feedback"));
   assert.ok(urls.some((url) => url.pathname === "/flags" && url.search === ""));
   assert.deepEqual(result.data.flags, []);
   assert.ok(urls.some((url) => url.pathname === "/flags" && url.searchParams.get("status") === "closed"));

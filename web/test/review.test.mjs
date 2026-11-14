@@ -12,6 +12,22 @@ function form(values) {
 
 const human = { actor: "synthetic-superintendent", role: "superintendent", reason: "Reviewed source" };
 
+test("an explicit extraction correction is sent only with false-alarm feedback", async () => {
+  const payloads = [];
+  mock.method(globalThis, "fetch", async (_url, options) => {
+    payloads.push(JSON.parse(options.body));
+    return Response.json({});
+  });
+  for (const action of ["false_alarm", "acknowledge", "resolved"]) {
+    await postHumanAction("http://api:8000", "flag", "flag-1", form({
+      ...human, action, expected_state: "notified", correction_event_id: "event-question",
+    }));
+  }
+  assert.equal(payloads[0].correction_event_id, "event-question");
+  assert.equal(payloads[1].correction_event_id, undefined);
+  assert.equal(payloads[2].correction_event_id, undefined);
+});
+
 test("human Flag feedback uses the fixed dashboard channel and includes stale-state protection", async () => {
   let request;
   mock.method(globalThis, "fetch", async (url, options) => {
