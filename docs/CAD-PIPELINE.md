@@ -200,6 +200,10 @@ that revision even when a later text note claims broader zones.
 
 A comparison/import failure rolls back the attachment import, retains the
 unconfirmed revision note and adds `diff_status: failed` plus `diff_error`.
+Failure metadata never replaces a successful diff on the same Event: an unrelated
+or conflicting failed attachment cannot change its attachment ID, hash or status.
+A later successful comparison removes earlier fallback error metadata. This
+holds regardless of attachment processing order.
 Flag B exposes this fallback in its context and the dashboard. Without a usable
 note no affected zones are invented. A successful DXF comparison can proceed
 even when text extraction fails; the processed Source Message retains the safe

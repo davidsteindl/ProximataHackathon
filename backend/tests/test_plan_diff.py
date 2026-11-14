@@ -264,3 +264,43 @@ def test_attachment_only_diff_failure_is_visible_and_retryable(seeded, client, m
     else:
         assert retried.status_code == 502
         assert retried.json()['source']['status'] == 'failed'
+
+
+@pytest.mark.parametrize('failed_first', [False, True])
+@pytest.mark.parametrize('failed_filename', ['details.dxf', 'A-103_RevD.dxf'])
+def test_failed_attachment_preserves_successful_diff_provenance(seeded, client, monkeypatch,
+                                                               failed_first, failed_filename):
+    import base64
+    import hashlib
+    from itertools import count
+    from app import ingestion
+    from test_cad_pipeline import CAD
+
+    # Attachments load by ID. Make both processing orders reproducible.
+    identifiers = count(1)
+    monkeypatch.setattr(ingestion, 'uuid4', lambda: SimpleNamespace(hex=format(next(identifiers), '032x')))
+    assert upload(client, ENTRIES[2]).status_code == 200
+    payload = hero_payload()
+    invalid = {'file_name': failed_filename, 'media_type': 'image/vnd.dxf',
+               'content_base64': base64.b64encode(b'broken DXF').decode()}
+    payload['attachments'].insert(0 if failed_first else 1, invalid)
+    response = client.post('/ingestion/messages', json=payload)
+    assert response.status_code == 201, response.text
+    result = response.json()
+    event = result['events'][0]
+    details = event['details']
+    good_hash = hashlib.sha256((CAD / ENTRIES[3]['file']).read_bytes()).hexdigest()
+    good = next(item for item in result['source']['attachments'] if item['sha256'] == good_hash)
+    assert event['origin'] == 'deterministic_plan_diff'
+    assert details['diff_status'] == 'succeeded'
+    assert details['affected_zones_origin'] == 'deterministic_plan_diff'
+    assert details['attachment_id'] == good['id']
+    assert details['source_sha256'] == good_hash
+    assert 'diff_error' not in details
+    assert details['plan_diff']['affected_zone_ids'] == ['3B']
+    assert event['zone_ids'] == ['3B']
+    assert {flag['zone_id'] for flag in client.get('/flags').json()} == {'3B'}
+    assert client.get('/geometry/revisions/A-103-D/source').content == (CAD / ENTRIES[3]['file']).read_bytes()
+    repeated = client.post('/ingestion/messages', json=payload)
+    assert repeated.status_code == 200
+    assert repeated.json()['events'] == result['events']

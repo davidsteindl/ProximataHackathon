@@ -65,13 +65,18 @@ def process_plan_attachments(session, source, events):
             for note in notes:
                 note.zones = [session.get(models.Zone, key) for key in diff.affected_zone_ids]
                 note.unresolved_zones = []
-                note.details = {**note.details, 'plan_reference': plan_id, 'revision_label': label,
+                details = {key: value for key, value in note.details.items() if key != 'diff_error'}
+                note.details = {**details, 'plan_reference': plan_id, 'revision_label': label,
                                 'revision_id': diff.revision_id, 'origin': diff.origin,
                                 'affected_zones_origin': diff.origin, 'plan_diff': diff.model_dump(mode='json'),
                                 'attachment_id': attachment.id, 'source_sha256': attachment.sha256,
                                 'diff_status': 'succeeded'}
         else:
             for note in notes:
+                # A failed/unmatched attachment cannot replace a valid result
+                # or point its geometry/hash at a different source attachment.
+                if note.details.get('diff_status') == 'succeeded':
+                    continue
                 note.details = {**note.details, 'diff_status': 'failed', 'diff_error': error,
                                 'affected_zones_origin': 'unconfirmed_revision_note',
                                 'attachment_id': attachment.id}
