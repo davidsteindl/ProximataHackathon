@@ -5,20 +5,20 @@ from typing import Annotated, Literal
 
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import Field
-from sqlalchemy import select
+from sqlalchemy import or_, select
 
 from app import models, schemas
 from app.flag_api import FlagView, flag_view
 from app.ingestion import event_views
 from app.ingestion_schemas import EventView
-from app.revision_rules import revision_work
-from app.rules import PRECONDITIONS, affected_work, ancestors, utc
+from app.revision_rules import receipt_evidence, revision_work
+from app.rules import PRECONDITIONS, affected_work, ancestors, inspection_evidence, inspection_evidence_scope, utc
 from app.site_api import Database, zone_scope
 
 router = APIRouter(prefix="/context", tags=["Context"])
 EvaluationStatus = Literal["satisfied", "not_satisfied", "unknown", "contradictory"]
 SAFETY_NOTICE = (
-    "Unconfirmed statements are not proof. Missing evaluations or open Flags do not grant clearance. "
+    "Unconfirmed statements are not proof. Missing evaluations or the absence of open Flags do not grant clearance. "
     "Evidence review, Proposal approval and Flag closure are separate human dashboard actions."
 )
 
@@ -61,11 +61,18 @@ def scoped_records(session, zone_id):
         models.Task.starts_at, models.Task.id)).all()
     inspections = session.scalars(select(models.Inspection).where(models.Inspection.zone_id.in_(scope)).order_by(
         models.Inspection.scheduled_at, models.Inspection.id)).all()
-    evidence = session.scalars(select(models.Evidence).where(models.Evidence.zone_id.in_(scope)).order_by(
-        models.Evidence.id)).all()
-    events = session.scalars(select(models.Event).join(models.SourceMessage).where(
-        models.Event.zones.any(models.Zone.id.in_(scope))).order_by(
-        models.SourceMessage.sent_at, models.SourceMessage.id, models.Event.ordinal)).all()
+    evidence_query = select(models.Evidence).order_by(models.Evidence.id)
+    events_query = select(models.Event).join(models.SourceMessage).order_by(
+        models.SourceMessage.sent_at, models.SourceMessage.id, models.Event.ordinal)
+    if zone_id is not None:
+        evidence_query = evidence_query.where(or_(
+            models.Evidence.zone_id.in_(scope),
+            models.Evidence.inspection_id.in_([item.id for item in inspections]),
+            models.Evidence.task_id.in_([task.id for task in tasks]),
+        ))
+        events_query = events_query.where(models.Event.zones.any(models.Zone.id.in_(scope)))
+    evidence = session.scalars(evidence_query).all()
+    events = session.scalars(events_query).all()
     flags = session.scalars(select(models.Flag).where(models.Flag.zone_id.in_(scope)).order_by(
         models.Flag.created_at, models.Flag.id)).all()
     return zones, scope, tasks, inspections, evidence, events, flags
@@ -83,12 +90,20 @@ def preconditions(session, zones, scope, tasks):
                 if not rule.applies(work):
                     continue
                 evaluation = rule.evaluate(session, work, zones)
+                evidence = []
+                if evaluation.inspection_id is not None:
+                    evidence = inspection_evidence(session, session.get(models.Inspection, evaluation.inspection_id),
+                                                   inspection_evidence_scope(work.zone_id, zones))
+                elif work.revision is not None:
+                    evidence = receipt_evidence(session, work.zone_id, work.crew.id if work.crew else None,
+                                                work.revision, zones)
                 result.append(PreconditionView(
                     name=rule.name, zone_id=work.zone_id, task_id=work.task.id if work.task else None,
                     evaluation=evaluation.status, explanation=evaluation.explanation,
                     inspection_id=evaluation.inspection_id, context=evaluation.context,
                     source_refs=[f"source:{statement.source_message_id}", *[
-                        f"event:{identifier}" for identifier in evaluation.source_event_ids]],
+                        f"event:{identifier}" for identifier in evaluation.source_event_ids],
+                        *[item.source_ref for item in evidence]],
                 ))
     covered = {item.task_id for item in result}
     for task in tasks:
@@ -164,7 +179,7 @@ def record_entries(session, zone_id):
             result.append(entry("flag", value, sources=[audit.source_ref], recorded_at=audit.recorded_at,
                                 suffix=f"/audit/{index}").model_copy(update={
                                     "record": {"flag_id": item.id, "audit": audit.model_dump(mode="json"),
-                                               "evaluation": value.evaluation, "evidence": [
+                                               "current_evaluation": value.evaluation, "evidence": [
                                                    evidence.model_dump(mode="json") for evidence in value.evidence]}}))
     plans = session.scalars(select(models.Plan).where(models.Plan.floor_id.in_(scope)).order_by(models.Plan.id)).all()
     for plan in plans:

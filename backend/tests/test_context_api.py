@@ -1,7 +1,35 @@
 import pytest
 
+from app import schemas
 from test_lifecycle import HUMAN, decision
 from test_rules import initialized, ingest, inspection_claim
+
+
+@pytest.mark.parametrize(("claims", "expected"), [
+    ([], "unknown"), (["passed"], "satisfied"), (["failed"], "not_satisfied"),
+    (["pending"], "not_satisfied"), (["passed", "failed"], "contradictory"),
+])
+def test_context_exposes_all_four_deterministic_evaluations(client, seed, monkeypatch, claims, expected):
+    monkeypatch.setenv("LLM_PROVIDER", "cached")
+    monkeypatch.delenv("LLM_CACHE_PATH", raising=False)
+    seed.evidence = [item for item in seed.evidence if item.scope.kind != "inspection"]
+    for index, claim in enumerate(claims):
+        seed.evidence.append(schemas.SeedEvidence(
+            id=f"context-inspection-{index}", origin="seed_statement", source_ref=f"seed:context-{index}",
+            statement_ref=f"synthetic-statement-{index}",
+            quote=f"Synthetic statement: {claim}", claim=claim,
+            scope=schemas.EvidenceScope(kind="inspection", zone_id="F3", inspection_id="rough-in-F3"),
+        ))
+    assert client.post("/seed/import", json=seed.model_dump(mode="json")).status_code == 200
+    for index in range(len(claims)):
+        assert decision(client, f"context-inspection-{index}", "confirmed").status_code == 200
+    ingest(client)
+    status = client.get("/context/zones/3B").json()
+    assert {item["evaluation"] for item in status["preconditions"] if item["name"] == "inspection_passed"} == {expected}
+    for evidence in status["evidence"]:
+        if evidence["id"].startswith("context-inspection-"):
+            assert evidence["history"][0]["status"] == "unconfirmed"
+            assert evidence["history"][-1]["actor_type"] == "human"
 
 
 def test_zone_status_includes_covering_schedule_and_no_sibling_clearance(initialized):
@@ -65,6 +93,17 @@ def test_search_and_timeline_preserve_review_status_sources_and_time_bounds(init
     assert len(limited["entries"]) == 1 and limited["truncated"] and limited["total_matches"] > 1
     assert initialized.get("/context/search", params={"query": " "}).status_code == 422
     assert initialized.get("/context/search", params={"query": "3B", "limit": 201}).status_code == 422
+
+
+def test_global_search_and_timeline_include_unresolved_claims(initialized):
+    result = ingest(initialized, text="Abnahme dürfte passen")
+    evidence = result["events"][0]["evidence"][0]
+    assert evidence["scope"]["zone_id"] is None
+    search = initialized.get("/context/search", params={"query": evidence["id"]}).json()
+    assert any(item["record_ref"] == f"evidence:{evidence['id']}" for item in search["entries"])
+    assert all(item["record"].get("review_status", "unconfirmed") == "unconfirmed" for item in search["entries"])
+    timeline = initialized.get("/context/timeline").json()
+    assert any(item["record_ref"] == f"event:{result['events'][0]['id']}" for item in timeline["entries"])
 
 
 @pytest.mark.parametrize("agent", ["mcp", "chat", "agent"])
