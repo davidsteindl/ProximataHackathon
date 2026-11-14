@@ -6,15 +6,23 @@
       "text": "Können wir morgen früh 3B zumachen?",
       "sender_role": "crew_lead",
       "result": {
-        "events": [{
-          "quote": "Können wir morgen früh 3B zumachen?",
-          "confidence": 0.98,
-          "intent": "planned_work",
-          "zones": ["3B"],
-          "activity": "closing_work",
-          "trade": "drywall",
-          "time": {"expression": "morgen früh", "day_offset": 1, "part_of_day": "morning"}
-        }]
+        "events": [
+          {
+            "quote": "Können wir morgen früh 3B zumachen?",
+            "confidence": 0.98,
+            "intent": "planned_work",
+            "zones": [
+              "3B"
+            ],
+            "activity": "closing_work",
+            "trade": "drywall",
+            "time": {
+              "expression": "morgen früh",
+              "day_offset": 1,
+              "part_of_day": "morning"
+            }
+          }
+        ]
       }
     },
     {
@@ -191,7 +199,9 @@
             "quote": "wie ist der Stand im Bad 3B?",
             "confidence": 0.95,
             "intent": "question",
-            "zones": ["Bad 3B"],
+            "zones": [
+              "Bad 3B"
+            ],
             "activity": "zone_status_question"
           }
         ]
@@ -247,6 +257,65 @@
     },
     {
       "text": "Subject: Abnahme Rohinstallation\n\nAbnahme der Rohinstallation im 3. OG bestanden.",
+      "sender_role": "inspector",
+      "result": {
+        "events": [
+          {
+            "quote": "Abnahme der Rohinstallation im 3. OG bestanden.",
+            "confidence": 0.99,
+            "intent": "inspection_result",
+            "zones": [
+              "F3"
+            ],
+            "inspection_kind": "rough_in",
+            "claim": "passed"
+          }
+        ]
+      }
+    },
+    {
+      "text": "Subject: SiteMind hero: A-103 Rev D\n\nPlan A-103 Rev D: Badwand 3B um 30 cm verschoben, Abwasserleitung neu geführt.",
+      "sender_role": "architect",
+      "result": {
+        "events": [
+          {
+            "quote": "Plan A-103 Rev D: Badwand 3B um 30 cm verschoben, Abwasserleitung neu geführt.",
+            "confidence": 0.95,
+            "intent": "revision",
+            "zones": [
+              "3B"
+            ],
+            "activity": "plan_revision",
+            "plan_reference": "A-103",
+            "revision_label": "D"
+          }
+        ]
+      }
+    },
+    {
+      "text": "Subject: SiteMind hero: Abnahme verschoben\n\nAbnahme der Rohinstallation im 3. OG auf Tag 4 verschoben.",
+      "sender_role": "inspector",
+      "result": {
+        "events": [
+          {
+            "quote": "Abnahme der Rohinstallation im 3. OG auf Tag 4 verschoben.",
+            "confidence": 0.95,
+            "intent": "inspection_result",
+            "zones": [
+              "3. OG"
+            ],
+            "inspection_kind": "rough_in",
+            "claim": "pending",
+            "time": {
+              "expression": "Tag 4",
+              "scenario_day": 4
+            }
+          }
+        ]
+      }
+    },
+    {
+      "text": "Subject: SiteMind hero: Abnahmeergebnis\n\nAbnahme der Rohinstallation im 3. OG bestanden.",
       "sender_role": "inspector",
       "result": {
         "events": [

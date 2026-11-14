@@ -1,0 +1,156 @@
+{
+  "version": 1,
+  "name": "SiteMind hero (synthetic, PLAN section 7)",
+  "steps": [
+    {
+      "id": "revision",
+      "day": 1,
+      "time": "10:15",
+      "channel": "gmail",
+      "sender_role": "architect",
+      "text": "Plan A-103 Rev D: Badwand 3B um 30 cm verschoben, Abwasserleitung neu geführt.",
+      "subject": "SiteMind hero: A-103 Rev D",
+      "attachment": "A-103_RevD.dxf"
+    },
+    {
+      "id": "warning_seen",
+      "day": 1,
+      "time": "11:00",
+      "channel": "telegram",
+      "sender_role": "crew_lead",
+      "text": "Warnung gesehen",
+      "sender_crew_id": "plumbing"
+    },
+    {
+      "id": "acknowledge_b",
+      "day": 1,
+      "time": "11:01",
+      "decision": "acknowledge_b"
+    },
+    {
+      "id": "postponed",
+      "day": 2,
+      "time": "16:40",
+      "channel": "gmail",
+      "sender_role": "inspector",
+      "text": "Abnahme der Rohinstallation im 3. OG auf Tag 4 verschoben.",
+      "subject": "SiteMind hero: Abnahme verschoben"
+    },
+    {
+      "id": "ambiguous",
+      "day": 2,
+      "time": "17:00",
+      "channel": "telegram",
+      "sender_role": "crew_lead",
+      "text": "Abnahme dürfte passen",
+      "sender_crew_id": "plumbing"
+    },
+    {
+      "id": "closing",
+      "day": 2,
+      "time": "18:05",
+      "channel": "telegram",
+      "sender_role": "crew_lead",
+      "text": "morgen früh machen wir 3B zu, platten sind da",
+      "sender_crew_id": "drywall"
+    },
+    {
+      "id": "approve_a",
+      "day": 2,
+      "time": "18:06",
+      "decision": "approve_a"
+    },
+    {
+      "id": "plan_question",
+      "day": 2,
+      "time": "18:30",
+      "channel": "telegram",
+      "sender_role": "crew_lead",
+      "text": "welcher plan gilt für 3B?",
+      "sender_crew_id": "plumbing"
+    },
+    {
+      "id": "room_question",
+      "day": 2,
+      "time": "18:45",
+      "channel": "telegram",
+      "sender_role": "superintendent",
+      "text": "wie ist der Stand im Bad 3B?"
+    },
+    {
+      "id": "resolve_a",
+      "day": 3,
+      "time": "09:00",
+      "decision": "resolve_a"
+    },
+    {
+      "id": "learning_before",
+      "day": 3,
+      "time": "09:10",
+      "channel": "telegram",
+      "sender_role": "crew_lead",
+      "text": "Können wir morgen früh 3B zumachen?",
+      "sender_crew_id": "drywall"
+    },
+    {
+      "id": "correct_false_alarm",
+      "day": 3,
+      "time": "09:11",
+      "decision": "correct_false_alarm"
+    },
+    {
+      "id": "learning_after",
+      "day": 3,
+      "time": "09:12",
+      "channel": "telegram",
+      "sender_role": "crew_lead",
+      "text": "Können wir morgen früh 3B zumachen?",
+      "sender_crew_id": "drywall"
+    },
+    {
+      "id": "genuine_after_learning",
+      "day": 3,
+      "time": "09:15",
+      "channel": "telegram",
+      "sender_role": "crew_lead",
+      "text": "morgen früh machen wir 3B zu, platten sind da",
+      "sender_crew_id": "drywall"
+    },
+    {
+      "id": "concrete_result",
+      "day": 4,
+      "time": "16:00",
+      "channel": "gmail",
+      "sender_role": "inspector",
+      "text": "Abnahme der Rohinstallation im 3. OG bestanden.",
+      "subject": "SiteMind hero: Abnahmeergebnis"
+    },
+    {
+      "id": "confirm_inspection",
+      "day": 4,
+      "time": "16:01",
+      "decision": "confirm_inspection"
+    },
+    {
+      "id": "revision_receipt",
+      "day": 4,
+      "time": "16:05",
+      "channel": "telegram",
+      "sender_role": "crew_lead",
+      "text": "Plan A-103 Rev D für 3B gelesen.",
+      "sender_crew_id": "plumbing"
+    },
+    {
+      "id": "confirm_revision",
+      "day": 4,
+      "time": "16:06",
+      "decision": "confirm_revision"
+    },
+    {
+      "id": "resolve_after_confirmation",
+      "day": 4,
+      "time": "16:10",
+      "decision": "resolve_after_confirmation"
+    }
+  ]
+}
