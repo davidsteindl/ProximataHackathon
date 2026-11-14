@@ -61,7 +61,8 @@ async def list_zones() -> dict[str, Any]:
 async def get_zone_status(zone_id: Identifier) -> dict[str, Any]:
     """Answer 'what is the status of 3B?': contents, covering schedule, inspections, Evidence review status,
     deterministic Preconditions (satisfied/not_satisfied/unknown/contradictory), open Flags and sources.
-    Includes descendants and covering ancestor records, not sibling-only records. Never grants clearance.
+    Includes descendants and covering ancestor records, not sibling-only records. Also returns complete
+    covering Plan metadata and current revisions, independent of timeline truncation. Never grants clearance.
     """
     return await api_request("GET", f"/context/zones/{zone_id}")
 

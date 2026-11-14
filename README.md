@@ -157,6 +157,10 @@ und Prüfstatus gebaut. Antwortarten: `answer`, `clarification` (Konfidenz unter
 (Nachweis bestätigen geht nur im Dashboard) und `not_a_question`. Routing- oder
 Record-Fehler ergeben HTTP 503 mit Fehlercode, nie eine geratene Antwort.
 `list_zones` liefert dafür zusätzlich die Site (Zeitzone, Starttag = Tag 1).
+`get_zone_status` enthaelt zudem `plans` mit vollstaendiger Revisionshistorie und
+aktueller Revision je abdeckendem Plan, unabhaengig von Timeline-Limits.
+Empfangsmeldungen stammen aus Evidence mit aktuellem Pruefstatus und Zone;
+Extraktionsherkunft und menschliche Nachweispruefung werden getrennt dargestellt.
 
 ```sh
 PYTHONPATH=backend python -m pytest backend/tests/test_qa.py

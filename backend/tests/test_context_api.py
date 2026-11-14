@@ -119,3 +119,12 @@ def test_api_denies_direct_and_indirect_agent_mutations(initialized, path, agent
     })
     assert response.status_code == 403
     assert initialized.get("/evidence").json() == evidence_before
+
+
+@pytest.mark.parametrize("zone_id, expected", [
+    ("3B-BATH", {"A-103"}), ("F3", {"A-103"}), ("B1", {"A-101", "A-102", "A-103", "A-104"}),
+])
+def test_zone_status_includes_full_covering_plan_metadata(initialized, zone_id, expected):
+    status = initialized.get(f"/context/zones/{zone_id}").json()
+    assert {plan["id"] for plan in status["plans"]} == expected
+    assert all(plan["current_revision"]["id"] == plan["revisions"][-1]["id"] for plan in status["plans"])

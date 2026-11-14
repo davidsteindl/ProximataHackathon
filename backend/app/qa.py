@@ -185,42 +185,65 @@ def when(value, site):
 
 def source_label(event, site):
     source = event["source"]
-    origin = "attached drawing" if event["origin"] == "deterministic_plan_diff" else "extracted statement, unconfirmed"
+    if event["origin"] == "deterministic_plan_diff":
+        origin = "attached drawing"
+    elif event["evidence"]:
+        origin = "extracted statement; Evidence: " + "; ".join(
+            f"'{item['claim']}' {REVIEW[item['review_status']]}" for item in event["evidence"])
+    else:
+        origin = "extracted statement, unconfirmed"
     return f"{source['channel']} from {source['sender_role']}, {when(source['sent_at'], site)}, {origin} " \
            f"[source:{source['id']}]"
 
 
-async def revision_lines(tools, zone_id, site):
-    timeline = await tools("get_timeline", zone_id=zone_id, limit=200)
-    notes, latest = {}, {}
-    for entry in timeline["entries"]:
-        record = entry["record"]
-        if entry["kind"] == "event" and record["intent"] == "revision" and record["details"].get("revision_id"):
-            # A note backed by the attached drawing beats an extracted text note for the same revision.
-            if record["origin"] == "deterministic_plan_diff" or record["details"]["revision_id"] not in notes:
-                notes[record["details"]["revision_id"]] = record
-        if entry["kind"] == "revision" and record["sequence"] > latest.get(record["plan_id"], {}).get("sequence", 0):
-            latest[record["plan_id"]] = record
+def revision_lines(status, site):
+    # The status includes full plan metadata; timeline limits must not choose the revision.
+    events = {event["id"]: event for event in status["events"]}
+    notes = {}
+    for event in events.values():
+        revision_id = event["details"].get("revision_id")
+        if event["intent"] == "revision" and revision_id:
+            if event["origin"] == "deterministic_plan_diff" or revision_id not in notes:
+                notes[revision_id] = event
     lines, refs = [], []
-    for revision in latest.values():
+    for plan in status["plans"]:
+        revision = plan["current_revision"]
+        if revision is None:
+            continue
         note = notes.get(revision["id"])
-        refs.append(f"source:{note['source']['id']}" if note else f"revision:{revision['id']}")
-        acknowledgments = ", ".join(f"{item['crew_id']} at {when(item['acknowledged_at'], site)}"
-                                    for item in revision["acknowledgments"]) or "none recorded"
-        lines += [
+        reference = f"source:{note['source']['id']}" if note else f"revision:{revision['id']}"
+        refs.append(reference)
+        lines.append(
             f"Plan {revision['plan_id']} Rev {revision['label']} is the latest recorded revision, issued "
             f"{when(revision['issued_at'], site)}. Source: "
-            f"{source_label(note, site) if note else f'site record [{refs[-1]}]'}.",
-            f"Recorded acknowledgments of Rev {revision['label']}: {acknowledgments}.",
-        ]
-    if timeline["truncated"]:
-        lines.append("Note: the record timeline was truncated; a newer revision may be missing.")
+            f"{source_label(note, site) if note else f'site record [{reference}]'}."
+        )
+        receipts = []
+        for item in status["evidence"]:
+            scope = item["scope"]
+            if scope["kind"] != "revision_acknowledgment":
+                continue
+            event = events.get(item["statement_ref"])
+            # Receipts may precede revision registration, leaving their immutable ID empty.
+            matches = (scope["revision_id"] == revision["id"] or
+                       scope["revision_id"] is None and event is not None and
+                       event["details"].get("plan_reference") == plan["id"] and
+                       event["details"].get("revision_label") == revision["label"])
+            if matches:
+                receipts.append(
+                    f"{scope['crew_id'] or 'unknown crew'} (zone {scope['zone_id'] or 'unresolved'}): "
+                    f"'{item['claim']}' {REVIEW[item['review_status']]} [{item['source_ref']}]"
+                )
+                refs.append(item["source_ref"])
+        lines.append(f"Recorded receipt evidence for Rev {revision['label']}: " +
+                     ("; ".join(receipts) or "none recorded") + ".")
+        lines.append("Receipt evidence retains its Zone scope; receipt is not proof of implementation or clearance.")
     return lines, refs
 
 
 async def status_lines(tools, zone_id, site, base):
     status = await tools("get_zone_status", zone_id=zone_id)
-    lines, refs = await revision_lines(tools, zone_id, site)
+    lines, refs = revision_lines(status, site)
     lines.insert(0, f"Status of {status['zone']['name']} ({zone_id}) from the record:")
     for inspection in status["inspections"]:
         # The Inspection row's status is not proof; only reviewed Evidence is.
@@ -301,7 +324,7 @@ async def answer(text, sender_role, tools, qa_router):
             f" Did you mean {', '.join(suggestions)}?" if suggestions else " Which zone do you mean, e.g. 3B?"),
             suggestions=suggestions)
     if kind.value == "revision_in_force":
-        lines, refs = await revision_lines(tools, zone_id, site)
+        lines, refs = revision_lines(await tools("get_zone_status", zone_id=zone_id), site)
         if not lines:
             return reply("not_found", f"The record has no plan revision for {zone_id}.", zone_id=zone_id)
     else:

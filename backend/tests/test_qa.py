@@ -2,15 +2,19 @@
 
 import json
 from contextlib import asynccontextmanager
+from datetime import UTC, datetime
 
 import anyio
 import httpx
 import pytest
 from mcp import ClientSession
 from mcp.client.streamable_http import streamable_http_client
+from sqlalchemy import insert
 
-from app import mcp_server, qa
+from app import mcp_server, models, qa
 from conftest import BACKEND
+from test_lifecycle import decision
+from test_revision_rules import receipt
 from test_mcp_server import api_transport  # noqa: F401 - fixture
 from test_rules import ingest, initialized, inspection_claim  # noqa: F401 - fixture
 
@@ -245,3 +249,62 @@ def test_endpoint_uses_mcp_tools_and_maps_cache_miss_to_503(client, monkeypatch)
 
 def test_qa_core_has_no_direct_data_access():
     assert not {"models", "Session", "Database", "get_session", "select"} & set(vars(qa))
+
+
+@pytest.mark.parametrize("status, label", [
+    ("confirmed", "confirmed"), ("rejected", "rejected"), (None, "UNCONFIRMED claim"),
+])
+def test_revision_answer_uses_current_receipt_evidence(hero, initialized, monkeypatch, status, label):
+    evidence_id = receipt(initialized, monkeypatch)
+    if status:
+        assert decision(initialized, evidence_id, status).status_code == 200
+    evidence = next(item for item in initialized.get("/evidence").json() if item["id"] == evidence_id)
+    answer = ask(REVISION_QUESTION)
+    assert f"plumbing (zone 3B): 'acknowledged' {label} [{evidence['source_ref']}]" in answer.text
+    assert evidence["source_ref"] in answer.source_refs
+    assert "Recorded receipt evidence for Rev D: none recorded" not in answer.text
+    assert "not proof of implementation or clearance" in answer.text
+
+
+def test_receipt_recorded_before_revision_registration_keeps_its_review_status(initialized, api_transport, monkeypatch):
+    with monkeypatch.context() as receipt_patch:
+        evidence_id = receipt(initialized, receipt_patch)
+    ingest(initialized, **json.loads((BACKEND / "demo" / "revision-note.json").read_text(encoding="utf-8")))
+    assert decision(initialized, evidence_id, "confirmed").status_code == 200
+    answer = ask(REVISION_QUESTION)
+    assert "plumbing (zone 3B): 'acknowledged' confirmed" in answer.text
+
+
+@pytest.mark.parametrize("status", ["confirmed", "rejected"])
+def test_latest_source_labels_use_current_human_evidence_review(hero, initialized, status):
+    assert decision(initialized, hero["inspection"], status).status_code == 200
+    answer = ask(STATUS_QUESTION, "superintendent")
+    latest = next(line for line in answer.text.splitlines()
+                  if line.startswith("Latest:") and "inspection_result" in line)
+    assert f"extracted statement; Evidence: 'passed' {status}" in latest
+    assert "unconfirmed" not in latest.lower()
+    assert f"'passed' {status}" in answer.text
+
+
+def test_current_revision_and_source_survive_a_truncated_timeline(hero, initialized, engine):
+    baseline = next(item for item in initialized.get("/evidence").json()
+                    if item["origin"] == "seed_baseline" and item["scope"]["revision_id"] == "A-103-C")
+    stamp = datetime(2026, 11, 13, 8, 0, tzinfo=UTC)
+    # A long real review history must not hide the later-issued Rev D. Seed receipt
+    # review times here are before Rev D and independent of the newly ingested sources.
+    with engine.begin() as connection:
+        connection.execute(insert(models.EvidenceReview), [dict(
+            evidence_id=baseline["id"], sequence=2+i,
+            status="rejected" if i % 2 == 0 else "confirmed", actor_type="human",
+            reviewer_id="synthetic-superintendent", reviewer_role="superintendent",
+            decided_at=stamp, recorded_at=stamp, reason="Synthetic receipt review history",
+        ) for i in range(205)])
+    timeline = initialized.get("/context/timeline", params={"zone_id": "3B", "limit": 200}).json()
+    assert timeline["truncated"]
+    assert not any(item["kind"] == "revision" and item["record"]["id"] == "A-103-D"
+                   for item in timeline["entries"])
+    answer = ask(REVISION_QUESTION)
+    assert "Rev D is the latest recorded revision" in answer.text
+    assert "Rev C is the latest recorded revision" not in answer.text
+    assert f"source:{hero['note']['source']['id']}" in answer.source_refs
+    assert "from architect" in answer.text
