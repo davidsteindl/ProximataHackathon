@@ -24,6 +24,14 @@ No LLM call is used to interpret free-text feedback as executable instructions.
   Evidence are not rewritten. Corrected Event `details.learning` exposes the
   knowledge, feedback, original source/Event and Flag references for explanations,
   including the existing zone-context and timeline MCP tools via the REST API.
+- Migration `0012` adds a retained SHA-256 fingerprint of the full original
+  message to correction knowledge. Exact replay matching survives Telegram raw
+  retention and deletion without retaining another raw-text copy. Role, Crew,
+  ordinal, quote and intent checks still apply. The fingerprint is not sent to
+  the LLM. Existing corrections are backfilled while their raw text is available;
+  if it was already erased, they are visibly unavailable and cannot suppress work.
+  Creating a new correction for an already-erased source is rejected atomically;
+  ordinary Flag feedback without a correction remains available.
 - Feedback without this explicit correction is viewable context, not a reason to
   suppress any future Flag. Corrections do not generalize to similar messages,
   other Crews or roles. Free-text reasons and identities are not sent to the LLM.

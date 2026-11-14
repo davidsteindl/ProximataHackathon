@@ -256,7 +256,7 @@ def test_lifecycle_migration_follows_outbox_and_round_trips(engine):
     from conftest import BACKEND
 
     config = Config(str(BACKEND / "alembic.ini"))
-    assert ScriptDirectory.from_config(config).get_heads() == ["0011"]
+    assert ScriptDirectory.from_config(config).get_heads() == ["0012"]
     with engine.begin() as connection:
         config.attributes["connection"] = connection
         command.downgrade(config, "0007")

@@ -394,6 +394,7 @@ class SiteKnowledge(Base):
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
     feedback_id: Mapped[int] = mapped_column(ForeignKey("flag_audit.id"), unique=True)
     correction_event_id: Mapped[str | None] = mapped_column(ForeignKey("events.id"))
+    source_text_sha256: Mapped[str | None] = mapped_column(String(64))
     feedback: Mapped[FlagAudit] = relationship(lazy="selectin")
     correction_event: Mapped[Event | None] = relationship(lazy="selectin")
 

@@ -1,8 +1,13 @@
+import hashlib
 from datetime import UTC, datetime, timedelta
 
 import pytest
+from alembic import command
+from alembic.config import Config
 from sqlalchemy import select
 from sqlalchemy.orm import Session
+
+from conftest import BACKEND
 
 from app import models
 from app.extraction import ExtractedBatch, ExtractedEvent, get_extractor
@@ -13,8 +18,8 @@ from test_rules import initialized, ingest, inspection_claim  # noqa: F401
 QUESTION = "Können wir morgen früh 3B zumachen?"
 
 
-def false_alarm(client, *, correct=True):
-    original = ingest(client, text=QUESTION)
+def false_alarm(client, *, correct=True, **changes):
+    original = ingest(client, text=QUESTION, **changes)
     flag = client.get("/flags").json()[0]
     delivery = client.post("/outbox/claim").json()
     assert delivery["flag_id"] == flag["id"]
@@ -217,3 +222,95 @@ def test_learning_preserves_human_confirmation_and_unresolved_counterclaim(initi
     assert initialized.get("/evidence").json() == before
     ingest(initialized, external_id="genuine-work-after-learning")
     assert initialized.get("/flags").json()[0]["evaluation"] == "contradictory"
+
+
+def expire_source(client, engine, source_id, monkeypatch):
+    with Session(engine) as session, session.begin():
+        session.get(models.SourceMessage, source_id).received_at = datetime.now(UTC) - timedelta(days=8)
+    monkeypatch.setenv("TELEGRAM_COMPLIANCE_KEY", "synthetic-learning-key")
+    result = client.post("/telegram/retention", headers={"X-Telegram-Compliance-Key": "synthetic-learning-key"})
+    assert result.status_code == 200, result.text
+    assert result.json()["raw_messages_erased"] == 1
+
+
+@pytest.mark.parametrize("cleanup", ["retention", "delete_my_data"])
+def test_correction_survives_raw_cleanup(initialized, engine, monkeypatch, cleanup):
+    original, flag = false_alarm(initialized, sender_id="123")
+    before = ingest(initialized, text=QUESTION, external_id="before-cleanup", sender_id="123")
+    assert before["events"][0]["intent"] == "question"
+    if cleanup == "retention":
+        expire_source(initialized, engine, original["source"]["id"], monkeypatch)
+    else:
+        monkeypatch.setenv("TELEGRAM_COMPLIANCE_KEY", "synthetic-learning-key")
+        response = initialized.post("/telegram/commands", headers={
+            "X-Telegram-Compliance-Key": "synthetic-learning-key",
+        }, json={"request_id": "delete-learning", "sender_id": "123", "chat_id": "123", "command": cleanup})
+        assert response.status_code == 200, response.text
+    replay = ingest(initialized, text=QUESTION, external_id="after-cleanup", sender_id="123")
+    event = replay["events"][0]
+    assert event["intent"] == "question"
+    assert event["details"]["learning"]["event_id"] == original["events"][0]["id"]
+    assert event["evidence"] == []
+    assert initialized.get("/flags").json() == []
+    assert initialized.get(f"/flags/{flag['id']}").json()["sources"][0]["intent"] == "planned_work"
+    with Session(engine) as session:
+        assert session.get(models.SourceMessage, original["source"]["id"]).text == ""
+        knowledge = session.scalars(select(models.SiteKnowledge)).one()
+        assert knowledge.source_text_sha256 == hashlib.sha256(QUESTION.encode("utf-8")).hexdigest()
+
+
+def test_same_quote_in_different_message_is_not_corrected_after_retention(initialized, engine, monkeypatch):
+    original, _ = false_alarm(initialized)
+    expire_source(initialized, engine, original["source"]["id"], monkeypatch)
+
+    class Extractor:
+        name = "test"
+
+        def extract(self, text, sender_role):
+            return ExtractedBatch(events=[ExtractedEvent(
+                intent="planned_work", quote=QUESTION, confidence=0.99, zones=["3B"],
+                activity="closing_work", trade="drywall",
+            )])
+
+    monkeypatch.setattr("app.ingestion.get_extractor", Extractor)
+    result = ingest(initialized, text=QUESTION + " Jetzt wirklich.", external_id="different-full-text")
+    assert result["events"][0]["intent"] == "planned_work"
+    assert "learning" not in result["events"][0]["details"]
+    assert len(initialized.get("/flags").json()) == 1
+
+
+@pytest.mark.parametrize("raw_expired", [False, True])
+def test_fingerprint_migration_preserves_existing_feedback(initialized, engine, monkeypatch, raw_expired):
+    original, _ = false_alarm(initialized)
+    config = Config(str(BACKEND / "alembic.ini"))
+    with engine.begin() as connection:
+        config.attributes["connection"] = connection
+        command.downgrade(config, "0011")
+    if raw_expired:
+        expire_source(initialized, engine, original["source"]["id"], monkeypatch)
+    with engine.begin() as connection:
+        config.attributes["connection"] = connection
+        command.upgrade(config, "head")
+    with Session(engine) as session:
+        knowledge = session.scalars(select(models.SiteKnowledge)).one()
+        expected = None if raw_expired else hashlib.sha256(QUESTION.encode("utf-8")).hexdigest()
+        assert knowledge.source_text_sha256 == expected
+    if raw_expired:
+        assert "unavailable" in initialized.get("/site-knowledge").json()[0]["correction"]
+    else:
+        expire_source(initialized, engine, original["source"]["id"], monkeypatch)
+    result = ingest(initialized, text=QUESTION, external_id="after-migration")
+    assert result["events"][0]["intent"] == ("planned_work" if raw_expired else "question")
+
+
+def test_expired_source_cannot_create_inert_correction(initialized, engine, monkeypatch):
+    original = ingest(initialized, text=QUESTION)
+    flag = initialized.get("/flags").json()[0]
+    signal(engine, flag["id"], "notified")
+    flag = initialized.get(f"/flags/{flag['id']}").json()
+    expire_source(initialized, engine, original["source"]["id"], monkeypatch)
+    response = action(initialized, flag, "false_alarm", correction_event_id=original["events"][0]["id"])
+    assert response.status_code == 422
+    assert initialized.get("/site-knowledge").json() == []
+    assert initialized.get(f"/flags/{flag['id']}").json()["state"] == "notified"
+    assert action(initialized, flag, "false_alarm").status_code == 200
