@@ -318,7 +318,7 @@ escalates at most once: one `escalation` outbox message to
 `transition_flag`, keeping the state. Delivering an escalation does not mark the
 Flag `notified`; only the Crew Lead warning does.
 
-Migration `0010` adds `outbox_messages.kind` (`warning` | `escalation`, exposed
+Migration `0011` adds `outbox_messages.kind` (`warning` | `escalation`, exposed
 in `OutboxView`) and makes the unique notification constraint per Flag and kind.
 
 Worker config: `MORNING_SCAN_TIME` (HH:MM site time, default 06:00) and
