@@ -108,6 +108,17 @@ Migration `0005` ergänzt Flags, Quellenverknüpfungen und Audit; der Seed-Reset
 entfernt diese Daten mit. Die REST-Endpunkte sind lesend. Details zu Regel,
 Nachweisgültigkeit und Integration für #8/#9/#14: [docs/FLAGS.md](docs/FLAGS.md).
 
+### Outbox-Vertrag (Issue #10)
+
+Migration `0006` ergänzt optionale `crew_leads.email` (auch im Seed-/Crew-REST-Vertrag)
+und eine transaktionale Outbox: genau eine faktische Gmail-Warnung pro neuem Flag.
+`GET /outbox?flag_id=…` zeigt Status und Versuche. Der Worker reserviert über
+`POST /outbox/claim` eine Nachricht für fünf Minuten und meldet mit Lease-Token
+über `POST /outbox/{id}/result` Erfolg oder Fehler. Fehler werden mit Backoff
+(60 Sekunden bis eine Stunde) erneut versucht. Nur bestätigter Versand setzt
+einen noch `detected` Flag auf `notified`; menschliche Zustände bleiben erhalten.
+Versandversuche und Ergebnisse stehen im Flag-Audit. Der Demo-Reset leert die Outbox.
+
 ### Gmail-Eingang (Issue #11)
 
 Der optionale Worker-Adapter liest ein verifiziertes Projekt-Testpostfach/Label
