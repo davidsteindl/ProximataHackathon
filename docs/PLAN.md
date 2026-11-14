@@ -165,7 +165,7 @@ Details und Grenzen: [CAD-PIPELINE.md](CAD-PIPELINE.md#plan-diff-17).
 11. REST-API und **MCP-Server** (inkl. Abfragen zu Plänen und Plan-Diffs)
 12. Learning Loop (§3.4)
 13. Replay-Skript mit Reset
-14. Chat (Dashboard und Telegram-Q&A) über die eigenen MCP-Tools. **Erst nach Abnahme der kritischen Pakete.**
+14. **Q&A-Kern** in `api` für Telegram (Crew-Fragen, Raumstatus für den Superintendent) über die eigenen MCP-Tools (§5). **Erst nach Abnahme der kritischen Pakete.**
 
 ### Stretch (nur wenn das MVP zuverlässig läuft)
 - Konflikttyp C (falsche Reihenfolge)
@@ -179,6 +179,7 @@ Details und Grenzen: [CAD-PIPELINE.md](CAD-PIPELINE.md#plan-diff-17).
 - PDF-Pläne und Vergleich von Plänen per Vision (wir vergleichen CAD-Geometrie, siehe §3.5)
 - WhatsApp (Twilio-Sandbox kann keine Gruppen). In Production über denselben Adapter wie Telegram.
 - Echtes Nachtrainieren von Modellen
+- Chat-Fenster im Dashboard. *Begründung:* Kein Schritt im Hero-Szenario braucht es, der Talona-Brief verortet Fragen bei den Crews (Telegram), und Raumansicht, Flag-Detail und Feed zeigen dieselben Inhalte schon mit Quellen. Dass jeder Agent andocken kann, zeigt die Demo mit einem externen MCP-Client (§1).
 - Vollständiges Auth- und Rechte-System im Dashboard. Im MVP gibt es einen Rollen-Umschalter (Superintendent / Crew Lead), in `COMPLIANCE.md` als Production-Lücke dokumentiert.
 
 ---
@@ -191,7 +192,7 @@ Details und Grenzen: [CAD-PIPELINE.md](CAD-PIPELINE.md#plan-diff-17).
 | `api` | REST-API, Regel-Engine, Flag-Lebenszyklus, Learning Loop, CAD-Pipeline (DXF-Parsing, Plan-Diff) | Python, FastAPI |
 | `worker` | Gmail- und Telegram-Polling, Morgen-Scan, Eskalationstimer | Python, gleiche Codebasis wie `api` |
 | `mcp` | MCP-Server für externe Agents. Spricht **nur über die REST-API**, nie direkt mit der DB | Python, offizielles MCP-SDK |
-| `web` | Dashboard, Chat, 3D-Ansicht | Next.js, React, Three.js |
+| `web` | Dashboard, 3D-Ansicht | Next.js, React, Three.js |
 
 Grundsätze:
 - **Alles startet per `docker compose up`.** Die Jury muss es nach README nachvollziehen können.
@@ -203,12 +204,13 @@ Grundsätze:
 - **Ingestion-Vertrag (#6):** `Source Message` speichert Kanal, Quellkonto/Chat, externe ID, Zeit, Text und Originalanhänge. `(channel, source_key, external_id)` ist eindeutig. Extrahierte `Event`s verweisen mit Zitat auf diese Quelle; erfüllungsrelevante Aussagen verweisen auf separate, zunächst unbestätigte `Evidence`. Tabellen und REST-Vertrag sind in [INGESTION.md](INGESTION.md) dokumentiert.
 - **Gmail inbound (#11):** Der `worker` liest nur das verifizierte Projektkonto/Label mit `gmail.readonly` und übergibt Betreff, Text und Originalanhänge an die Ingestion. Die exakte Quellenabfrage (`GET /source-messages`) überspringt verarbeitete Quellen ohne Worker-DB-Zugriff. Vertrag: [INGESTION.md](INGESTION.md#gmail-adapter-identity-lookup-11); Setup: [GMAIL.md](GMAIL.md).
 - **Ausgehende Nachrichten laufen über eine Outbox:** `api` legt jede Nachricht an, `worker` versendet sie und meldet den Status zurück. Keine Benachrichtigung geht verloren, jede steht im Audit-Trail.
-- **Der Chat-Agent lebt in `api` als MCP-Client** des eigenen `mcp`-Servers. Er nutzt dieselben Tools wie externe Agents.
+- **Der Q&A-Kern (#19) lebt in `api` als MCP-Client** des eigenen `mcp`-Servers und nutzt dieselben Tools wie externe Agents. Die Frage wird per [OpenAI Decisions API](https://developers.openai.com/api/docs/guides/decisions) (`POST /v1/decisions`, `gpt-6-luna`) nur klassifiziert: Fragetyp und Zone aus einer festen Auswahl, mit Wahrscheinlichkeiten. Den Antworttext setzt `api` deterministisch aus den MCP-Ergebnissen samt Quellen zusammen; das LLM formuliert keine Antwort.
+  *Begründung:* Das Routing ist eine geschlossene Auswahl, und genau dafür ist die Decisions API gebaut (kein Output-Text, laut OpenAI etwa 10× schneller als die Responses API). Ohne frei formulierten Text kann keine Antwort eine Freigabe behaupten, die der Record nicht hergibt (§3.2). Unter einer Konfidenzschwelle fragt der Bot nach, statt zu raten. Extraktion (#6) und Proposals (#13) brauchen Zitate, Zeitangaben bzw. Begründungstext und bleiben beim `openai_compatible`-Provider. Offline und in CI kommt das Routing aus einem Cache.
 - **Kanal-Zugangsdaten** (Gmail, Telegram) liegen nur im `worker`, der LLM-Key nur in `api`.
 - **Diagramme:** siehe [README → Architektur](../README.md#architektur). Plan und Diagramme werden gemeinsam geändert.
 - **CAD-Eingang im MVP: DXF direkt in die Extraktion.** Für die spätere DWG-Erweiterung ist LibreDWG (`dwg2dxf`, GPL-3.0-or-later) als separates Programm in einem optionalen Container vorbereitet. Entscheidung, Testanleitung und bekannte Grenzen: [CAD-Konverter](CAD-CONVERTER.md). Die Extraktion bleibt unabhängig davon, ob eine DXF-Datei direkt geliefert oder konvertiert wurde.
 - **Polling statt Webhooks** (keine öffentliche URL nötig, lokales Deployment).
-- **LLM-Provider austauschbar über die Konfiguration.** Voraussetzungen: strukturierte Ausgaben und Tool-Calling; bevorzugt mit EU-Region.
+- **LLM-Provider austauschbar über die Konfiguration.** Voraussetzungen: strukturierte Ausgaben und Tool-Calling; bevorzugt mit EU-Region. Ausnahme: Das Q&A-Routing (#19) braucht einen OpenAI-Key (Decisions API, EU-Verarbeitung verfügbar); ohne Key läuft es im Cache-Modus.
 - **Für die Demo funktioniert alles auch offline:** Replay direkt in den Ingestion-Eingang, LLM-Antworten des Demo-Szenarios gecacht.
 
 ---
@@ -285,7 +287,7 @@ Keine feste Rollenverteilung, jeder nimmt sich Issues selbst. Die Abhängigkeite
 | WP8 | Dashboard: Übersicht, Flag-Inbox, Detail mit Quellen, Feedback, separate Nachweisprüfung auch ohne Flag, Freigabe, Timeline | WP1 (Vertrag), WP5 | M1 (Grundversion) / M2 |
 | WP9 | 3D-Ansicht: extrudiert aus der Plan-Geometrie der API (Wände auf Etagenhöhe), Färbung nach Flag-Status, Klick öffnet Detail. Prototyp mit Mock-Geometrie sofort möglich | WP16 (Geometrie), WP5 | M2 |
 | WP10 | MCP-Server: Tools u. a. Zonenstatus, offene Flags, Änderungshistorie, Plan-Inhalt einer Zone, Plan-Diff, Suche/Frage, Proposal anlegen; Prüfstatus in Antworten, keine Nachweisbestätigung durch Agents | WP1, WP5, WP16 | M2 |
-| WP11 | Chat-Agent für Dashboard und Telegram-Q&A über die eigenen MCP-Tools | WP10, WP7 | M3 |
+| WP11 | Q&A-Kern für Telegram über die eigenen MCP-Tools: Routing per Decisions API, Antwort deterministisch aus dem Record; kein Dashboard-Chat | WP10, WP7 | M3 |
 | WP12 | Learning Loop: Feedback → Site Knowledge → fallbezogene Extraktionskorrektur; keine automatische Abschwächung von Sicherheitsregeln; Kennzahl im Dashboard | WP3, WP4, WP5 | M2/M3 |
 | WP13 | Replay-Skript mit simulierter Uhr, Reset, Offline-Modus; menschliche Nachweisbestätigung und unsichere Gegenbeispiele | WP2, WP6, WP7 | M2 |
 | WP14 | Research, Mentor-Interview, Pitch, 3-Min-Video, `COMPLIANCE.md`, finale README, Abgabe | läuft parallel | M4 |
@@ -327,7 +329,7 @@ Approval-Integration bleibt #13. Seed-Reset löscht auch diese Vorschläge.
 | **M0 Fundament** | Fr ~19:30 | WP0–WP2 gemergt; synthetische DXFs (WP15) liegen vor; Accounts, Keys und Konverter-Wahl geklärt |
 | **M1 Tracer Bullet** | Sa ~01:00 | Mail rein → Event → Flag → sichtbar im Dashboard → Warnmail raus, einmal durchgehend; Plan-Geometrie über die API abrufbar |
 | **M2 Breite** | Sa ~09:00 | Telegram, Lebenszyklus komplett, 3D eingebunden, MCP, Replay, Morgen-Scan, Eskalation |
-| **M3 Feature Freeze** | Sa 12:00 | Chat, Learning Loop, Stretch falls Zeit. **Danach keine neuen Features.** |
+| **M3 Feature Freeze** | Sa 12:00 | Q&A-Kern (Telegram), Learning Loop, Stretch falls Zeit. **Danach keine neuen Features.** |
 | **M4 Abgabe** | Sa 14:30 | Bugfixes, Video (bis ~13:30), README, `COMPLIANCE.md`, `.env.example`, Submission |
 
 Schlaf in Schichten, sodass nachts immer jemand reviewen und mergen kann.
