@@ -1,6 +1,8 @@
 import Link from "next/link";
+import { getFeed } from "../../lib/feed.mjs";
 import { getHealth } from "../../lib/health.mjs";
 import { flattenZones, getSiteOverview, label, scenarioTime } from "../../lib/site.mjs";
+import ActivityFeed from "../activity-feed";
 import EventTimeline from "../event-timeline";
 import SiteKnowledge from "../site-knowledge";
 import { StatePanel, WorkShell } from "../shell";
@@ -12,9 +14,11 @@ export default async function ActivityPage({ searchParams }) {
   const params = await searchParams;
   const single = (value) => (typeof value === "string" ? value : "");
   const filters = { zoneId: single(params?.zone), fromDate: single(params?.from), toDate: single(params?.to) };
-  const [health, overview] = await Promise.all([
+  const feedFilters = { zoneId: single(params?.feed_zone), fromDate: single(params?.feed_from), toDate: single(params?.feed_to) };
+  const [health, overview, feed] = await Promise.all([
     getHealth(process.env.API_BASE_URL),
     getSiteOverview(process.env.API_BASE_URL, filters),
+    getFeed(process.env.API_BASE_URL, feedFilters),
   ]);
   const data = overview.data;
   return (
@@ -28,17 +32,21 @@ export default async function ActivityPage({ searchParams }) {
         <section className="panel"><StatePanel kind="error" title="Site data unavailable" action={<Link className="btn btn-acc" href="/activity">Clear filters and retry</Link>}>{overview.error}</StatePanel></section>
       ) : !data.site ? (
         <section className="panel"><StatePanel title="No site data loaded yet">Run the seed import, then reload.</StatePanel></section>
-      ) : <Activity data={data} filters={filters} />}
+      ) : <Activity data={data} filters={filters} feed={feed} feedFilters={feedFilters} />}
     </WorkShell>
   );
 }
 
-function Activity({ data, filters }) {
+function Activity({ data, filters, feed, feedFilters }) {
   const { site, zones, tasks, crews, plans, inspections, events } = data;
   const crewNames = Object.fromEntries(crews.map((crew) => [crew.id, crew.name]));
   const at = (value) => scenarioTime(value, site);
   return (
     <div className="stack" style={{ gap: 16 }}>
+      {feed.error ? (
+        <section className="panel"><StatePanel kind="error" title="Activity feed unavailable" action={<Link className="btn" href="/activity">Clear feed filters</Link>}>{feed.error}</StatePanel></section>
+      ) : <ActivityFeed key={JSON.stringify(feedFilters)} initial={feed.data} filters={feedFilters} site={site} zones={flattenZones(zones)} />}
+
       <form method="get" className="panel pad" aria-label="Schedule and timeline filters" style={{ display: "flex", gap: 14, flexWrap: "wrap", alignItems: "flex-end" }}>
         <label className="field">Zone and descendants
           <select name="zone" defaultValue={filters.zoneId}>

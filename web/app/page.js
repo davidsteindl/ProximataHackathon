@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { fetchAll, getSiteModel } from "../lib/site-data.mjs";
 import { floorOf, indexZones, upcoming } from "../lib/site-model.mjs";
-import { SEVERITY, flagTitle, label, scenarioTime } from "../lib/site.mjs";
+import { getFeed } from "../lib/feed.mjs";
+import { SEVERITY, flagTitle, scenarioTime } from "../lib/site.mjs";
+import ActivityFeed from "./activity-feed";
 import AutoRefresh, { HashRedirect } from "./auto-refresh";
 import { StatePanel, WorkShell } from "./shell";
 import ModelPreview from "./site-view/model-preview";
@@ -9,13 +11,12 @@ import { Chip, EVALUATION } from "./site-view/zone-panel";
 
 export const dynamic = "force-dynamic";
 
-const CHANNEL = { telegram: "TG", gmail: "MAIL" };
-
 export default async function Home() {
   const base = process.env.API_BASE_URL;
-  const [records, model] = await Promise.all([
+  const [records, model, feed] = await Promise.all([
     fetchAll(base, { site: "/site", flags: "/flags", evidence: "/evidence", inspections: "/inspections", plans: "/plans", tasks: "/tasks", crews: "/crews", events: "/events" }),
     getSiteModel(base),
+    getFeed(base),
   ]);
   const data = records.data;
   if (records.error || !data.site) {
@@ -32,10 +33,10 @@ export default async function Home() {
       </WorkShell>
     );
   }
-  return <Dashboard data={data} model={model} />;
+  return <Dashboard data={data} model={model} feed={feed} />;
 }
 
-function Dashboard({ data, model }) {
+function Dashboard({ data, model, feed }) {
   const { site, flags, evidence, events } = data;
   const index = indexZones(model.data?.zones);
   const building = model.data?.zones?.[0];
@@ -104,24 +105,9 @@ function Dashboard({ data, model }) {
       </div>
 
       <div className="grid-main">
-        <section className="panel" aria-labelledby="act-h">
-          <div className="panel-head"><h2 id="act-h">Activity</h2><Link className="link small" href="/activity">All activity →</Link></div>
-          {recent.length === 0 ? <p className="pad small muted" style={{ margin: 0 }}>No messages ingested yet.</p> : recent.map((event) => {
-            const flag = flags.find((item) => item.sources.some((source) => source.id === event.id));
-            const pending = event.evidence.find((record) => record.review_status === "unconfirmed");
-            return (
-              <div key={event.id} className="row">
-                <span className="when" style={{ flexBasis: 120 }}>{scenarioTime(event.source.sent_at, site)} · {CHANNEL[event.source.channel] || event.source.channel.toUpperCase()}</span>
-                <span className="small" style={{ flex: 1, minWidth: 0 }}>
-                  {label(event.source.sender_role)}: “{event.quote}”
-                  {flag ? <> → <Link className="link" href={`/flags/${flag.id}`}>{SEVERITY[flag.severity].text.toLowerCase()} flag</Link></>
-                    : pending ? <> · unconfirmed, <Link className="link" href={`/evidence?id=${encodeURIComponent(pending.id)}`}>awaiting review</Link></>
-                      : event.origin === "deterministic_plan_diff" ? " · plan diff" : ""}
-                </span>
-              </div>
-            );
-          })}
-        </section>
+        {feed.error ? (
+          <section className="panel" aria-label="Activity"><StatePanel kind="error" title="Activity feed unavailable">{feed.error}</StatePanel></section>
+        ) : <ActivityFeed compact initial={feed.data} site={site} />}
 
         <section className="panel" aria-labelledby="next-h">
           <h2 id="next-h">Next 48 h</h2>

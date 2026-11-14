@@ -128,6 +128,7 @@ table.t tr:last-child td { border-bottom: 0; }
 .advisory { margin-top: 12px; padding: 10px 12px; border: 1px solid var(--info-bd); background: var(--info-bg); border-radius: 10px; color: var(--text-2); }
 .lead-flag a { text-decoration: none; }
 .plain { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; overflow-wrap: anywhere; }
+.feed { list-style: none; margin: 0; padding: 0; }
 .facts { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 6px 14px; margin: 0; }
 .facts dt { color: var(--muted); }
 .facts dd { margin: 0; overflow-wrap: anywhere; }
