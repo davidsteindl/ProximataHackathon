@@ -236,7 +236,7 @@ def test_relationship_review_reevaluates_atomically_with_correct_audit(initializ
     assert initialized.get("/flags").json()[0] == flag
 
 
-@pytest.mark.parametrize("claim_zone", ["F3", "3B"])
+@pytest.mark.parametrize("claim_zone", ["F3", "3B", "3B-BATH", "3B-BATH-WALL"])
 def test_new_llm_counterclaim_triggers_review_without_changing_confirmation(initialized, engine, monkeypatch, claim_zone):
     from unittest.mock import Mock
     from app import ingestion
@@ -307,3 +307,47 @@ def test_migration_matches_models_and_downgrades(engine):
         config.attributes["connection"] = connection
         command.downgrade(config, "0004")
         command.upgrade(config, "head")
+
+
+@pytest.mark.parametrize("zone,kind", [("3A-BATH", "rough_in"), ("3B-BATH", "insulation")])
+def test_unrelated_counterclaims_do_not_invalidate_confirmed_inspection(initialized, engine, monkeypatch, zone, kind):
+    from unittest.mock import Mock
+    from app import ingestion
+    from app.extraction import ExtractedBatch, ExtractedEvent
+
+    evidence_id = inspection_claim(initialized)
+    review(engine, evidence_id, "confirmed")
+    ingest(initialized)
+    extractor = Mock()
+    extractor.name = "test"
+    extractor.extract.return_value = ExtractedBatch(events=[ExtractedEvent(
+        intent="inspection_result", quote="Synthetic unrelated inspection failed.", confidence=1,
+        zones=[zone], inspection_kind=kind, claim="failed",
+    )])
+    monkeypatch.setattr(ingestion, "get_extractor", lambda: extractor)
+    ingest(initialized, external_id="unrelated-counterclaim", text="Synthetic unrelated inspection failed.")
+    assert initialized.get("/flags").json() == []
+
+
+def test_confirmed_descendant_claim_cannot_certify_ancestor_inspection(initialized, engine, monkeypatch):
+    from unittest.mock import Mock
+    from app import ingestion
+    from app.extraction import ExtractedBatch, ExtractedEvent
+
+    original = ingestion.get_extractor
+    extractor = Mock()
+    extractor.name = "test"
+    extractor.extract.return_value = ExtractedBatch(events=[ExtractedEvent(
+        intent="inspection_result", quote="Synthetic bathroom inspection passed.", confidence=1,
+        zones=["3B-BATH"], inspection_kind="rough_in", claim="passed",
+    )])
+    monkeypatch.setattr(ingestion, "get_extractor", lambda: extractor)
+    result = ingest(initialized, external_id="descendant-pass", text="Synthetic bathroom inspection passed.")
+    evidence = result["events"][0]["evidence"][0]
+    assert evidence["scope"]["inspection_id"] is None
+    review(engine, evidence["id"], "confirmed")
+    monkeypatch.setattr(ingestion, "get_extractor", original)
+    ingest(initialized)
+    flag = initialized.get("/flags").json()[0]
+    assert flag["evaluation"] == "unknown"
+    assert flag["evidence"][0]["id"] == evidence["id"]

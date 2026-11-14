@@ -10,7 +10,7 @@ from app.ingestion_schemas import EventView
 from app.ingestion import event_views
 from app.schemas import EvidenceView, Identifier, Record, Timestamp
 from app.site_api import Database
-from app.rules import ancestors, inspection_evidence
+from app.rules import inspection_evidence, inspection_evidence_scope
 
 router = APIRouter(tags=["Flags"])
 
@@ -54,7 +54,7 @@ def flag_view(session, flag):
     return FlagView.model_validate({
         **{key: getattr(flag, key) for key in FlagView.model_fields if key not in {"sources", "evidence"}},
         "sources": event_views(session, [link.event for link in flag.sources]),
-        "evidence": inspection_evidence(session, inspection, ancestors(flag.zone_id, zones)) if inspection else [],
+        "evidence": inspection_evidence(session, inspection, inspection_evidence_scope(flag.zone_id, zones)) if inspection else [],
     })
 
 

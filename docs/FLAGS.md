@@ -33,9 +33,11 @@ Confidence and `Inspection.status` alone never satisfy it. An LLM success claim
 whose Source Message predates the required Inspection's scheduled time is stale.
 This is a conservative freshness boundary using the current Site Record fields;
 there is no invented expiry period or automatic certification from CAD.
-Source-backed claims in the work Zone/ancestors with the same inspection kind
-but an unresolved Inspection ID are also shown for review. Such claims cannot
-satisfy the requirement; an unresolved negative can contradict a confirmed pass.
+Source-backed claims in the work Zone, its ancestors and its descendants with
+the same inspection kind but an unresolved Inspection ID are also shown for
+review. Sibling zones remain outside this scope. Such claims cannot satisfy the
+requirement; a relevant unresolved negative can contradict a confirmed pass.
+The Flag details expose the same overlapping scope used by the evaluator.
 
 - `satisfied`: valid confirmed passed proof, with no unresolved counterclaim.
 - `not_satisfied`: confirmed failed or pending proof without a conflicting pass.

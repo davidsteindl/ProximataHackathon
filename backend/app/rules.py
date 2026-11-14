@@ -37,6 +37,13 @@ def ancestors(zone_id, zones):
     return result
 
 
+def inspection_evidence_scope(zone_id, zones):
+    """Overlapping work scope: ancestors and descendants, never sibling zones."""
+    return set(ancestors(zone_id, zones)) | {
+        candidate for candidate in zones if zone_id in ancestors(candidate, zones)
+    }
+
+
 def inspection_evidence(session, inspection, zone_ids):
     """Exact proof plus relevant unresolved claims to expose for human review."""
     records = session.scalars(select(models.Evidence).where(
@@ -80,7 +87,7 @@ class InspectionPassed:
         inspection = matches[0]
         # Exact Evidence scope must match the selected inspection, whose zone
         # may cover the work's descendant zone. Sibling evidence never applies.
-        records = inspection_evidence(session, inspection, scope)
+        records = inspection_evidence(session, inspection, inspection_evidence_scope(work.zone_id, zones))
         relevant, confirmed = [], []
         for item in records:
             if item.review_status == "rejected":
