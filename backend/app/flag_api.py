@@ -14,6 +14,7 @@ from app.site_api import Database
 from app.rules import inspection_evidence, inspection_evidence_scope
 from app.lifecycle import InvalidTransition, transition_flag
 from app.review_api import HumanAction, Reason, validate_person
+from app.learning import record_knowledge, validate_correction
 
 router = APIRouter(tags=["Flags"])
 
@@ -99,6 +100,7 @@ def get_flag(flag_id: str, session: Database):
 
 
 class FlagAction(HumanAction):
+    correction_event_id: Identifier | None = None
     action: Literal["acknowledge", "resolved", "false_alarm"]
     feedback: Literal["confirmed", "resolved", "false_alarm"]
     reason: Reason
@@ -116,11 +118,13 @@ def act_on_flag(flag_id: str, action: FlagAction, session: Database):
         raise HTTPException(403, "Only the responsible Crew Lead may act on this Flag")
     if flag.state != action.expected_state:
         raise HTTPException(409, "Flag changed; inspect its current state")
+    validate_correction(flag, action)
     try:
         transition_flag(session, flag, action=action.action, actor=action.actor,
                         actor_type="human", role=action.role, channel=action.channel,
                         source_ref=f"flag:{flag.id}", feedback=action.feedback, reason=action.reason)
     except InvalidTransition as error:
         raise HTTPException(409, str(error)) from error
+    record_knowledge(session, flag, action.correction_event_id)
     session.commit()
     return flag_view(session, flag)

@@ -9,6 +9,7 @@ from sqlalchemy import select
 from app import models
 from app.extraction import resolve_time
 from app.revision_rules import register_note
+from app.learning import extraction_correction
 
 
 def normalized(label):
@@ -64,6 +65,9 @@ def _build_events(session, source, statements):
     revisions = session.scalars(select(models.Revision)).all()
     result = []
     for ordinal, statement in enumerate(statements):
+        knowledge = extraction_correction(session, source, statement, ordinal)
+        if knowledge:
+            statement = statement.model_copy(update={"intent": "question", "claim": None})
         zone_ids, unresolved = resolve_zones(statement.zones, zones)
         crew = resolve_named(statement.crew, crews)
         if statement.crew is None and source.sender_crew_id:
@@ -80,6 +84,14 @@ def _build_events(session, source, statements):
             details=statement.model_dump(mode="json", include={"claim", "inspection_kind", "task_reference", "plan_reference", "revision_label", "crew"}),
             created_at=datetime.now(UTC), zones=[zone_by_id[key] for key in sorted(zone_ids)],
         )
+        if knowledge:
+            event.details = {**event.details, "learning": {
+                "knowledge_id": knowledge.id, "feedback_id": knowledge.feedback_id,
+                "flag_id": knowledge.feedback.flag_id,
+                "source_message_id": knowledge.correction_event.source_message_id,
+                "event_id": knowledge.correction_event_id,
+                "original_intent": "planned_work", "corrected_intent": "question",
+            }}
         register_note(session, event, source, revisions, zone_by_id)
         session.add(event)
         result.append(event)

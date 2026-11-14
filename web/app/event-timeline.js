@@ -27,6 +27,9 @@ export default function EventTimeline({ events, timezone, crewNames }) {
                   {event.activity && ` · ${event.activity.replaceAll("_", " ")}`}
                   {event.trade && ` · ${event.trade}`}</p>
                 <blockquote>{event.quote}</blockquote>
+                {event.details.learning && <p>Extraction corrected: planned work → question. <a href={`/#knowledge-${event.details.learning.knowledge_id}`}>Site Knowledge {event.details.learning.knowledge_id}</a>
+                  {" · "}Feedback: {event.details.learning.feedback_id} · Original source: {event.details.learning.source_message_id}
+                </p>}
                 {event.unresolved_zones.length > 0 && <p>Unresolved zones: {event.unresolved_zones.join(", ")}</p>}
                 {event.starts_at ? (
                   <p>Reported time: {formatTime(event.starts_at, timezone)}

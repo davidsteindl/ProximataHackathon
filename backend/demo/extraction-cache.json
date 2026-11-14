@@ -3,6 +3,21 @@
   "provenance": "Explicit synthetic extraction fixtures for the hero demo; not human-reviewed evidence.",
   "entries": [
     {
+      "text": "Können wir morgen früh 3B zumachen?",
+      "sender_role": "crew_lead",
+      "result": {
+        "events": [{
+          "quote": "Können wir morgen früh 3B zumachen?",
+          "confidence": 0.98,
+          "intent": "planned_work",
+          "zones": ["3B"],
+          "activity": "closing_work",
+          "trade": "drywall",
+          "time": {"expression": "morgen früh", "day_offset": 1, "part_of_day": "morning"}
+        }]
+      }
+    },
+    {
       "text": "Plan A-103 Rev D: Badwand 3B um 30 cm verschoben, Abwasserleitung neu geführt.",
       "sender_role": "architect",
       "result": {
