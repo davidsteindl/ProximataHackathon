@@ -21,7 +21,7 @@ router = APIRouter(tags=["Outbox"])
 class OutboxView(Record):
     id: Identifier
     flag_id: Identifier | None
-    kind: Literal["warning", "escalation", "approval_request", "proposal_followup", "compliance_reply"]
+    kind: Literal["warning", "escalation", "approval_request", "proposal_followup", "compliance_reply", "qa_reply", "decision_request"]
     recipient: str | None
     channel: Literal["gmail", "telegram"]
     subject: str
@@ -185,7 +185,9 @@ def delivery_result(message_id: str, result: DeliveryResult, session: Database):
                 transition_flag(session, flag, action="notified", actor="worker",
                                 actor_type="system", channel=message.channel,
                                 source_ref=f"outbox:{message.id}")
-            if message.channel == "telegram" and message.flag_id is None:
+            if message.kind in {"qa_reply", "decision_request"}:
+                message.content = f"[delivered {message.kind}]"
+            elif message.channel == "telegram" and message.flag_id is None:
                 message.content = "[delivered compliance reply]"
         else:
             message.available_at = now + timedelta(seconds=min(60 * 2 ** min(message.attempts - 1, 6), 3600))

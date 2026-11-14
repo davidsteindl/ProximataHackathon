@@ -44,8 +44,12 @@ class ScenarioAPI:
         return self.api.get(path, **kwargs)
 
     def post(self, path, **kwargs):
+        if (path == "/telegram/qa" and self.result is not None
+                and kwargs.get("json", {}).get("source_id") == self.result["source"]["id"]
+                and self.result["source"]["channel"] == "telegram"):
+            return self.api.post(path, **kwargs)
         if path != "/ingestion/messages":
-            raise ReplayError("Online replay adapter may only ingest source messages")
+            raise ReplayError("Online replay adapter may only ingest source messages or ask about its own Telegram source")
         source = SourceMessageInput.model_validate(kwargs["json"])
         if not matches(source, self.step):
             raise ReplayError("Received message does not match the current scenario step")

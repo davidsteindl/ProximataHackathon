@@ -169,6 +169,15 @@ isolierte Test-DB, ohne LLM-/Gmail-/Telegram-Zugang):
 PYTHONPATH=backend python -m pytest backend/tests/test_mcp_server.py backend/tests/test_context_api.py backend/tests/test_agent_proposals.py
 ```
 
+### Telegram-Q&A (Issue #20)
+
+Der erlaubte Telegram-Chat verwendet den Q&A-Kern aus #19. Record-Antworten und
+Entscheidungsweiterleitungen laufen ueber die Outbox; Chat kann keine Nachweise
+bestaetigen oder Entscheidungen freigeben. API-Vertrag: `POST /telegram/qa`
+mit `source_id` und Worker-Key, auf Basis einer bereits ingestierten Quelle.
+Migration `0015` ergaenzt die Outbox-Arten `qa_reply` und `decision_request`.
+Einrichtung, Nachrichten-Erkennung und Grenzen: [TELEGRAM.md](docs/TELEGRAM.md).
+
 ### Q&A-Kern (Issue #19)
 
 `POST /qa` mit `{"text": "...", "sender_role": "crew_lead"}` beantwortet eine Frage

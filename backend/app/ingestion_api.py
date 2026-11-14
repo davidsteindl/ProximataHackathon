@@ -64,6 +64,7 @@ def get_source_attachment(source_id: str, attachment_id: str, session: Database)
 def list_events(
     session: Database, zone_id: str | None = None, include_descendants: bool = True,
     from_time: schemas.Timestamp | None = None, to_time: schemas.Timestamp | None = None,
+    source_id: str | None = None,
 ):
     """Timeline ordered by source message time, source ID and statement ordinal."""
     if from_time is not None and to_time is not None and from_time >= to_time:
@@ -71,6 +72,8 @@ def list_events(
     statement = select(models.Event).join(models.SourceMessage).order_by(
         models.SourceMessage.sent_at, models.SourceMessage.id, models.Event.ordinal,
     )
+    if source_id is not None:
+        statement = statement.where(models.Event.source_message_id == source_id)
     if zone_id is not None:
         ids = zone_scope(session, zone_id, include_descendants)
         statement = statement.where(models.Event.zones.any(models.Zone.id.in_(ids)))

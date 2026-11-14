@@ -32,6 +32,29 @@
         "question_type": {"value": "evidence_confirmation_request", "confidence": 0.93, "probabilities": {"evidence_confirmation_request": 0.93, "decision_request": 0.06, "not_a_question": 0.01}},
         "zone": {"value": "3B", "confidence": 0.96, "probabilities": {"3B": 0.96, "3B-BATH": 0.04}}
       }
+    },
+    {
+      "text": "Können wir morgen früh 3B zumachen?",
+      "sender_role": "crew_lead",
+      "result": {
+        "question_type": {
+          "value": "decision_request",
+          "confidence": 0.9,
+          "probabilities": {
+            "decision_request": 0.9,
+            "zone_status": 0.07,
+            "evidence_confirmation_request": 0.03
+          }
+        },
+        "zone": {
+          "value": "3B",
+          "confidence": 0.95,
+          "probabilities": {
+            "3B": 0.95,
+            "3B-BATH": 0.05
+          }
+        }
+      }
     }
   ]
 }

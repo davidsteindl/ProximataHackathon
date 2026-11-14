@@ -16,7 +16,7 @@ from test_rules import initialized, ingest
 
 def test_outbox_migration_extends_revision_notes_and_round_trips(engine):
     config = Config(str(BACKEND / "alembic.ini"))
-    assert ScriptDirectory.from_config(config).get_heads() == ["0014"]
+    assert ScriptDirectory.from_config(config).get_heads() == ["0015"]
     with engine.begin() as connection:
         config.attributes["connection"] = connection
         command.downgrade(config, "0006")

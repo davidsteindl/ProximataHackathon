@@ -99,6 +99,22 @@ class TelegramClient:
         return str(result["message_id"])
 
 
+QUESTION_START = re.compile(
+    r"^(?:welch\w*|wie|was|wer|wo\w*|wann|warum|wieso|ist|sind|gibt|hat|haben|kann|k\u00f6nn\w*|"
+    r"darf|d\u00fcrf\w*|soll\w*|muss|m\u00fcss\w*|what|which|where|when|why|who|how|can|may|should|is|are|do|does)\b",
+    re.IGNORECASE,
+)
+CONFIRMATION = re.compile(r"\b(?:best\u00e4tig\w*|confirm\w*|approv\w*)\b", re.IGNORECASE)
+
+
+def is_question(text):
+    """Select plain-text questions; the API router, never this heuristic, decides their kind."""
+    text = text.strip()
+    return bool("?" in text or QUESTION_START.match(text) or
+                CONFIRMATION.match(text) or
+                text.lower().startswith(("bitte ", "please ")) and CONFIRMATION.search(text))
+
+
 def handle_update(telegram, api, update):
     message = update.get("message") or update.get("my_chat_member") or {}
     chat = message.get("chat", {})
@@ -126,6 +142,7 @@ def handle_update(telegram, api, update):
         })
         response.raise_for_status()
         existing = response.json()
+        result = None
         if not existing or existing["status"] != "processed":
             source = SourceMessageInput(
                 channel="telegram", source_key=chat_id, external_id=str(message["message_id"]),
@@ -134,9 +151,32 @@ def handle_update(telegram, api, update):
                 sent_at=datetime.fromtimestamp(message["date"], UTC), text=text,
             )
             response = api.post("/ingestion/messages", json=source.model_dump(mode="json"))
+            # Extraction failure still has a durable source. Q&A routing is separate
+            # and must support questions absent from the extraction cache.
+            if response.status_code != 502:
+                response.raise_for_status()
+            result = response.json()
+            existing = result["source"]
+        # Revisit processed sources on retries: ingestion success alone does not mean
+        # Q&A has been queued. Deleted raw data remains an identity tombstone.
+        candidate = bool(existing["text"].strip()) and is_question(existing["text"])
+        if existing["text"].strip() and not candidate:
+            if result is None:
+                response = api.get("/events", params={"source_id": existing["id"]})
+                response.raise_for_status()
+                events = response.json()
+            else:
+                events = result["events"]
+            candidate = any(event["intent"] == "question" for event in events)
+        if candidate:
+            response = api.post("/telegram/qa", headers={
+                "X-Telegram-Compliance-Key": telegram.settings.compliance_key,
+            }, json={"source_id": existing["id"]})
             response.raise_for_status()
-            if response.json()["source"]["status"] != "processed":
-                raise TelegramError("ingestion_pending")
+            if response.json()["handled"]:
+                return
+        if existing["status"] != "processed":
+            raise TelegramError("ingestion_pending")
     if command:
         response = api.post("/telegram/commands", headers={
             "X-Telegram-Compliance-Key": telegram.settings.compliance_key,

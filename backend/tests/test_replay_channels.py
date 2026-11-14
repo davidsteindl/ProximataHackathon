@@ -5,6 +5,7 @@ import json
 from datetime import UTC, datetime
 from email.message import EmailMessage
 from types import SimpleNamespace
+from unittest.mock import AsyncMock
 
 import httpx
 import pytest
@@ -60,7 +61,17 @@ def test_online_mail_passes_mime_adapter_and_preserves_provider_identity_and_clo
     assert audit["step"] == step.id
 
 
-def test_online_telegram_uses_human_allowlist_and_distinct_provider_message_ids(client):
+@pytest.fixture
+def no_qa_answer(monkeypatch):
+    # These tests isolate transport/compliance; real MCP Q&A is tested in test_telegram_qa.
+    from app import qa
+    from test_qa import routing
+    monkeypatch.setenv("TELEGRAM_COMPLIANCE_KEY", "synthetic-key")
+    monkeypatch.setattr(qa, "ask", AsyncMock(return_value=qa.Answer(
+        kind="not_a_question", text="", routing=routing("not_a_question", "none"))))
+
+
+def test_online_telegram_uses_human_allowlist_and_distinct_provider_message_ids(client, no_qa_answer):
     replay, _ = build_replay(client, pause=lambda _: "q")
     replay.reset()
     before, after = scenario_step("learning_before"), scenario_step("learning_after")
@@ -156,7 +167,7 @@ def test_missing_real_recipient_is_not_reported_as_a_successful_delivery(client)
     assert all(flag["state"] == "detected" for flag in client.get("/flags").json())
 
 
-def test_compliance_commands_still_reach_the_api_while_waiting_for_a_step(client, monkeypatch):
+def test_compliance_commands_still_reach_the_api_while_waiting_for_a_step(client, monkeypatch, no_qa_answer):
     monkeypatch.setenv("TELEGRAM_COMPLIANCE_KEY", "synthetic-key")
     replay, _ = build_replay(client, pause=lambda _: "q")
     replay.reset()

@@ -227,6 +227,8 @@ def test_timeline_orders_by_message_time_and_filters_zones_and_half_open_dates(i
         assert initialized.post("/ingestion/messages", json=message_payload(external_id=external_id, sent_at=sent_at)).status_code == 201
     events = initialized.get("/events").json()
     assert [event["source"]["external_id"] for event in events] == ["earlier", "later"]
+    assert initialized.get("/events", params={"source_id": events[0]["source_message_id"]}).json() == [events[0]]
+    assert initialized.get("/events", params={"source_id": "missing"}).json() == []
     assert len(initialized.get("/events", params={"zone_id": "F3"}).json()) == 2
     assert initialized.get("/events", params={"zone_id": "F3", "include_descendants": False}).json() == []
     assert initialized.get("/events", params={"zone_id": "3A"}).json() == []

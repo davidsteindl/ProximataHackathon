@@ -255,7 +255,7 @@ class Replay:
             self.require(result["events"] and all(event["intent"] == "question" for event in result["events"]),
                          "Crew question was not extracted as a question")
             context = self.get("/context/zones/3B-BATH")
-            self.output("Read-only record context (Telegram Q&A delivery belongs to #20): " +
+            self.output("Read-only record context (separate from Telegram Q&A delivery): " +
                         json.dumps({key: context[key] for key in ("zone", "preconditions", "source_refs")}, ensure_ascii=False))
 
     def decision(self, step):
@@ -322,7 +322,7 @@ class Replay:
                 self.service()
                 self.check_message(step)
         self.log("complete", flag_ids=self.flags, telegram_answers_verified=False)
-        self.output("Hero inputs and dashboard decisions replayed. Telegram answers require #20; the record snapshots above are not chat replies. Deliveries are recorded in the transcript.")
+        self.output("Hero inputs and dashboard decisions replayed. Online Telegram questions use the Q&A worker path; offline mode shows record context only. Answer contents are not asserted by this replay. Deliveries are recorded in the transcript.")
 
 
 def main():

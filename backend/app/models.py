@@ -372,13 +372,13 @@ class OutboxMessage(Base):
         CheckConstraint("status IN ('pending','sending','sent','failed','cancelled')", name="outbox_status"),
         CheckConstraint("channel IN ('gmail','telegram')", name="outbox_channel"),
         CheckConstraint("attempts >= 0", name="outbox_attempts"),
-        CheckConstraint("kind IN ('warning','escalation','approval_request','proposal_followup','compliance_reply')", name="outbox_kind"),
+        CheckConstraint("kind IN ('warning','escalation','approval_request','proposal_followup','compliance_reply','qa_reply','decision_request')", name="outbox_kind"),
     )
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
     flag_id: Mapped[str | None] = mapped_column(ForeignKey("flags.id"))
     flag: Mapped[Flag | None] = relationship()
     kind: Mapped[str] = mapped_column(String(30), server_default="warning")
-    # warning:<flag> | approval:<advice> | followup:<proposal>:<crew lead>; NULL for compliance replies.
+    # warning:<flag> | approval:<advice> | followup:<proposal>:<lead> | telegram-<kind>:<source>.
     dedup_key: Mapped[str | None] = mapped_column(String(200))
     recipient: Mapped[str | None] = mapped_column(String(254))
     channel: Mapped[str] = mapped_column(String(32))

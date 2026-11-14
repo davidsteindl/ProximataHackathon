@@ -6,12 +6,14 @@ vier Rev-C-Plaene und startet die Nachrichtenfolge. Rev D kommt erst mit der
 Architekten-Mail. Der Client schreibt ausschliesslich ueber bestehende REST-APIs;
 DB-Zugriff und fachliche Regeln bleiben in der API.
 
-**Stand der Q&A-Abhaengigkeit:** #20 ist noch offen. Die beiden Hero-Fragen werden
-als Fragen ingestiert; der Client zeigt den echten, rein lesenden Record-Kontext
-fuer `3B-BATH`. Das ist keine Telegram-Antwort. Versand und Inhalt echter
-Chat-Antworten sind damit noch nicht end-to-end verifiziert. Das Abschlussprotokoll
-weist dies mit `telegram_answers_verified: false` aus. Der Replay implementiert
-keinen Ersatz fuer #20.
+**Telegram-Q&A (#20):** Online laufen die Hero-Fragen durch den bestehenden
+Telegram-Worker und den Q&A-Kern; Antworten und Entscheidungsweiterleitungen
+werden ueber die Outbox versendet. Dafuer Q&A/MCP und die Superintendent-Adresse
+wie in [TELEGRAM.md](TELEGRAM.md) einrichten. Bei `QA_ROUTER_PROVIDER=cached`
+sind beide Hero-Fragen und die Lernfrage enthalten. Offline zeigt der Replay
+nur rein lesenden Record-Kontext und erzeugt keine Chat-Antworten. Der Replay
+prueft Antwortinhalte nicht automatisch; das Abschlussprotokoll behaelt daher
+`telegram_answers_verified: false`. Echte Zustellungen stehen im Transcript.
 
 ## Vorbereitung
 
@@ -141,7 +143,7 @@ oder schliesst nichts. Bei noch fehlender Entscheidung wartet der Client erneut.
 | Warnung gesehen | Keine automatische Kenntnisnahme der Revision. Mensch quittiert Flag B separat; kein Erledigt-Status. |
 | Tag 2: Abnahme verschoben, danach "Abnahme duerfte passen" | Beide Aussagen bleiben unbestaetigt; die mehrdeutige Aussage erfuellt keine Precondition. |
 | Trockenbau angekuendigt | Flag A trotz mehrdeutiger Erfolgsmeldung. Mensch quittiert und genehmigt den Verschiebe-Proposal separat; erst danach geht das Follow-up raus. |
-| Zwei Hero-Fragen | Frage-Events und echter Record-Kontext; Telegram-Antworten warten auf #20. |
+| Zwei Hero-Fragen | Frage-Events und echter Record-Kontext; online zusaetzlich Telegram-Q&A ueber die Outbox. |
 | Tag 3: Arbeit verschoben | Mensch schliesst das erste A mit Feedback. Keine Abnahme wird dadurch bestaetigt. |
 | Lernmoment: Frage als Ankuendigung missverstanden | Mensch setzt den neuen Flag auf Fehlalarm und waehlt explizit das fehlerhafte Event als Extraktionskorrektur. |
 | Dieselbe Frage erneut | Frage statt Arbeitsankuendigung; Site Knowledge verweist sichtbar auf Originalquelle und Feedback. Kein neuer A-Flag. |

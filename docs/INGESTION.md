@@ -153,7 +153,8 @@ channel adapters and pauses for human decisions remain in #22.
   or channel polling in #6.
 
 `GET /events` orders by Source Message `sent_at`, source ID and extraction ordinal.
-Filters: `zone_id`, `include_descendants` (default true), `from_time` inclusive,
+Filters: `source_id` (exact Source Message ID; no matches returns an empty list),
+`zone_id`, `include_descendants` (default true), `from_time` inclusive,
 `to_time` exclusive. Time filters apply to the original message timestamp, not
 the claimed future activity time. Unknown zones return `404`; naive timestamps
 or non-increasing ranges return `422`. Unknown source/attachment IDs return `404`.
