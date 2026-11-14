@@ -294,8 +294,9 @@ async def answer(text, sender_role, tools, qa_router):
                      "revision in force or the status of a zone; for anything else ask the Superintendent.",
                      zone_id=zone_id)
     if zone_id is None:
-        suggestions = [value for value, _ in sorted(zone.probabilities.items(), key=lambda item: -item[1])
-                       if value in zones][:3]
+        # ponytail: fixed 5% floor so near-zero zones are not offered as "did you mean".
+        suggestions = [value for value, probability in sorted(zone.probabilities.items(), key=lambda item: -item[1])
+                       if value in zones and probability >= 0.05][:3]
         return reply("clarification", "I could not match a zone in the record." + (
             f" Did you mean {', '.join(suggestions)}?" if suggestions else " Which zone do you mean, e.g. 3B?"),
             suggestions=suggestions)

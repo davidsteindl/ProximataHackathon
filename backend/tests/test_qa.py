@@ -117,6 +117,7 @@ def test_low_type_confidence_asks_back(hero, result):
      ["3B-BATH", "3B"]),
     (routing("zone_status", "3B", zone_confidence=0.4, probabilities={"3B": 0.4, "3C": 0.35}), ["3B", "3C"]),
     (routing("revision_in_force", "9Z", probabilities={"9Z": 0.95}), []),
+    (routing("revision_in_force", "none", zone_confidence=1.0, probabilities={"none": 0.99, "B1": 0.001}), []),
 ])
 def test_unknown_or_uncertain_zone_is_not_guessed(hero, result, suggestions):
     answer = ask("wie ist der Stand im Bad 9Z?", qa_router=FixedRouter(result))
