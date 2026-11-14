@@ -135,9 +135,10 @@ def test_mismatched_ambiguous_or_stale_success_is_not_proof(sequence_site, monke
     assert sequence_flag(sequence_site)["evaluation"] == "unknown"
 
 
-def test_counterclaim_preserves_confirmation_until_human_rejection(sequence_site, monkeypatch):
+@pytest.mark.parametrize("reference", ["plumbing-F3", None])
+def test_counterclaim_preserves_confirmation_until_human_rejection(sequence_site, monkeypatch, reference):
     proof = decision(sequence_site, completion(sequence_site, monkeypatch))
-    counterclaim = completion(sequence_site, monkeypatch, claim="not_completed", external_id="counterclaim")
+    counterclaim = completion(sequence_site, monkeypatch, claim="not_completed", external_id="counterclaim", reference=reference)
     ingest(sequence_site)
     assert sequence_flag(sequence_site)["evaluation"] == "contradictory"
     evidence = {item["id"]: item for item in sequence_flag(sequence_site)["evidence"]}
@@ -161,6 +162,9 @@ def test_all_predecessors_must_have_confirmed_evidence(sequence_site, engine, mo
     flag = sequence_flag(sequence_site)
     assert flag["evaluation"] == "unknown"
     assert {item["evaluation"] for item in flag["context"]["predecessors"]} == {"satisfied", "unknown"}
+    decision(sequence_site, completion(sequence_site, monkeypatch, zone="F2", reference="plumbing-F2",
+                                      external_id="cross-zone-predecessor"))
+    assert sequence_flag(sequence_site)["evaluation"] == "satisfied"
 
 
 def test_schedule_scan_uses_same_rule_and_rechecks_reviews(sequence_site, engine, monkeypatch):
