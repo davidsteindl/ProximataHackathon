@@ -1,7 +1,7 @@
 """Transactional factual Flag warnings; only the worker performs delivery."""
 
-import os
 import json
+import os
 from datetime import UTC, datetime, timedelta
 from typing import Literal
 from uuid import uuid4

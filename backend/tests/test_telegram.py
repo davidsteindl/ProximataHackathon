@@ -66,6 +66,9 @@ def test_non_allowlisted_messages_and_commands_are_not_processed(telegram_api, s
     assert telegram.offset == 3
     assert telegram_api.get("/events").json() == []
     assert telegram_api.get("/outbox").json() == []
+    assert telegram_api.get("/source-messages", params={
+        "channel": "telegram", "source_key": str(chat), "external_id": "1",
+    }).json() is None
     assert [name for name, _ in calls] == ["getUpdates"]
 
 
@@ -340,3 +343,70 @@ def test_worker_runs_delivery_even_after_poll_failure(monkeypatch):
         worker.main()
     delivery.assert_called_once()
     worker.time.sleep.assert_called_once_with(2)
+
+
+def test_worker_keeps_retention_running_with_bot_disabled(monkeypatch):
+    from app import worker
+
+    calls = []
+
+    def handle(request):
+        calls.append(request)
+        return httpx.Response(200, json={"raw_messages_erased": 0})
+
+    factory = httpx.Client
+    monkeypatch.setattr(worker.httpx, "Client", lambda *args, **kwargs: factory(
+        *args, **kwargs, transport=httpx.MockTransport(handle)))
+    monkeypatch.setenv("API_BASE_URL", "http://api.test")
+    monkeypatch.setenv("GMAIL_ENABLED", "false")
+    monkeypatch.setenv("TELEGRAM_ENABLED", "false")
+    monkeypatch.setenv("TELEGRAM_COMPLIANCE_KEY", "synthetic-worker-key")
+    monkeypatch.setattr(worker, "check_api", Mock())
+    monkeypatch.setattr(worker.time, "sleep", Mock(side_effect=StopIteration))
+    with pytest.raises(StopIteration):
+        worker.main()
+    assert len(calls) == 1 and calls[0].url.path == "/telegram/retention"
+    assert calls[0].headers["X-Telegram-Compliance-Key"] == "synthetic-worker-key"
+
+
+def test_seed_reset_replays_sources_without_confirming_evidence(telegram_api, seed):
+    telegram, http, _ = bot([message("Abnahme dürfte passen")])
+    with http:
+        poll_telegram(telegram, telegram_api)
+        original = telegram_api.get("/events").json()[0]
+        assert original["evidence"][0]["review_status"] == "unconfirmed"
+        command(telegram_api, "my_data")
+        assert telegram_api.post("/seed/import", json=seed.model_dump(mode="json")).status_code == 200
+        assert telegram_api.get("/outbox").json() == []
+        poll_telegram(telegram, telegram_api)
+    replay = telegram_api.get("/events").json()[0]
+    assert replay["id"] != original["id"]
+    assert replay["evidence"][0]["review_status"] == "unconfirmed"
+
+
+def test_lost_command_response_does_not_duplicate_private_exports(telegram_api):
+    telegram, http, _ = bot([message("/my_data", chat=123)])
+    api = Mock(wraps=telegram_api)
+
+    def post(path, **kwargs):
+        response = telegram_api.post(path, **kwargs)
+        if path == "/telegram/commands":
+            raise httpx.ReadTimeout("synthetic lost response")
+        return response
+
+    api.post.side_effect = post
+    with http:
+        with pytest.raises(TelegramError):
+            poll_telegram(telegram, api)
+        poll_telegram(telegram, telegram_api)
+    assert len(telegram_api.get("/outbox").json()) == 1
+
+
+def test_revoked_private_user_never_receives_pending_export(telegram_api):
+    command(telegram_api, "my_data")
+    telegram, http, calls = bot([])
+    telegram.settings.users.clear()
+    with http:
+        deliver_telegram_outbox(telegram, telegram_api)
+    assert calls == []
+    assert telegram_api.get("/outbox").json()[0]["status"] == "failed"

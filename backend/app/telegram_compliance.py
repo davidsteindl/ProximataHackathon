@@ -86,10 +86,12 @@ def privacy_command(command: PrivacyCommand, session: Database):
         ).order_by(models.SourceMessage.received_at).with_for_update()).all()
         if command.command == "notice":
             owner = os.environ.get("TELEGRAM_RESPONSIBLE", "SiteMind demo team")
-            text = (f"SiteMind verarbeitet Texte und Rollen freigegebener Team-Testaccounts zur Erkennung "
-                    f"von Baukonflikten (keine Personenkennzahlen). Rohdaten: {retention_days()} Tage. "
+            text = (f"SiteMind verarbeitet Texte, numerische Chat-/Nutzer-/Nachrichten-IDs, Zeitpunkte "
+                    f"und Rollen freigegebener Team-Testaccounts zur Erkennung "
+                    f"von Baukonflikten (keine Personenkennzahlen). Rohtexte/Anhänge: {retention_days()} Tage. "
                     f"Verantwortlich: {owner}. Nur synthetische Daten! "
-                    "Abgeleitete Events, Nachweise und relevante Flag-Zitate bleiben als Baustellenrecord erhalten. "
+                    "Quellmetadaten, abgeleitete Events, Nachweise und relevante Flag-Zitate bleiben "
+                    "als Baustellenrecord erhalten. "
                     "Im privaten Bot-Chat: /my_data für Auskunft, /delete_my_data für Rohdatenlöschung. "
                     "Telegram ist nicht Ende-zu-Ende-verschlüsselt. Keine Freigaben per Chat.")
         elif command.command == "my_data":
