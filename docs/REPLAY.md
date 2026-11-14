@@ -65,7 +65,7 @@ Stunde eine Sekunde. Dashboard-Pausen zaehlen nicht mit. Ohne `--output` entsteh
 Nur auf Seed und Rev-C-Geometrie zuruecksetzen:
 
 ```sh
-docker compose run --rm --no-deps -v ./cad:/cad:ro worker python -m app.replay --reset-only
+docker compose run --rm --no-deps -v ./cad:/cad:ro -v ./.replay:/replay-output worker python -m app.replay --reset-only --output /replay-output/reset.jsonl
 ```
 
 Das entfernt auch gelernte Korrekturen und stellt die synthetischen
@@ -119,8 +119,13 @@ Szenariouhr und legt die originale Transportzeit sowie Szenariozeit, Run-ID und
 Schritt als `replay-transport.json`-Quellanhang ab. Ausgehende Warnungen,
 Freigabeanfragen und freigegebene Follow-ups verwenden die bestehenden
 Outbox-Sender. `real_delivery` wird erst nach erfolgreicher Provider-Quittierung
-protokolliert. Fehlende Empfaenger oder Versandfehler brechen ab; sie werden
-nicht als Zustellung simuliert.
+protokolliert. Fehlende Empfaenger oder Versandfehler werden nicht als Zustellung
+simuliert: Der Client pausiert, nach Korrektur und Backoff versucht Enter die
+Zustellung erneut, `q` stoppt. Eine Mail ohne die unveraenderte DXF wird
+ignoriert, die Mail kann im selben Schritt erneut gesendet werden.
+Telegram-Befehle (`/privacy`, `/my_data`, `/delete_my_data`) und Beitritts-Hinweise
+zugelassener Nutzer gehen waehrend des Replay normal an die API; andere, nicht
+zum Schritt passende Nachrichten werden nicht ingestiert.
 
 ## Ablauf und menschliche Entscheidungen
 
@@ -134,13 +139,13 @@ oder schliesst nichts. Bei noch fehlender Entscheidung wartet der Client erneut.
 | --- | --- |
 | Tag 1: Rev D mit DXF | C-zu-D-Diff betrifft 3B; Flag B warnt ueber fehlenden Crew-Erhalt. |
 | Warnung gesehen | Keine automatische Kenntnisnahme der Revision. Mensch quittiert Flag B separat; kein Erledigt-Status. |
-| Tag 2: Abnahme verschoben, danach ?Abnahme duerfte passen? | Beide Aussagen bleiben unbestaetigt; die mehrdeutige Aussage erfuellt keine Precondition. |
+| Tag 2: Abnahme verschoben, danach "Abnahme duerfte passen" | Beide Aussagen bleiben unbestaetigt; die mehrdeutige Aussage erfuellt keine Precondition. |
 | Trockenbau angekuendigt | Flag A trotz mehrdeutiger Erfolgsmeldung. Mensch quittiert und genehmigt den Verschiebe-Proposal separat; erst danach geht das Follow-up raus. |
 | Zwei Hero-Fragen | Frage-Events und echter Record-Kontext; Telegram-Antworten warten auf #20. |
 | Tag 3: Arbeit verschoben | Mensch schliesst das erste A mit Feedback. Keine Abnahme wird dadurch bestaetigt. |
 | Lernmoment: Frage als Ankuendigung missverstanden | Mensch setzt den neuen Flag auf Fehlalarm und waehlt explizit das fehlerhafte Event als Extraktionskorrektur. |
 | Dieselbe Frage erneut | Frage statt Arbeitsankuendigung; Site Knowledge verweist sichtbar auf Originalquelle und Feedback. Kein neuer A-Flag. |
-| Echte Ankuendigung ?heute frueh ?? | Echter Konflikt erzeugt weiterhin A. ?Heute? referenziert den im Seed fuer Tag 3 geplanten Trockenbau. |
+| Echte Ankuendigung "heute frueh ..." | Echter Konflikt erzeugt weiterhin A. "Heute" referenziert den im Seed fuer Tag 3 geplanten Trockenbau. |
 | Tag 4: konkretes Abnahmeergebnis | Zunaechst unbestaetigt. Mensch prueft und bestaetigt genau dessen Evidence. Auch das negative synthetische Widerspruchsbeispiel `example-contradictory-negative` im Seed muss explizit geprueft/abgelehnt werden. Erst dann ist die Precondition erfuellt; A bleibt offen. |
 | Expliziter Rev-D-Erhalt | Mensch bestaetigt genau den Plumbing-Erhalt fuer A-103-D/3B. B bleibt quittiert/offen; Erhalt beweist keine bauliche Umsetzung. |
 | Abschluss | Mensch quittiert den verbleibenden A, genehmigt dessen Proposal separat und schliesst A separat. B bleibt offen bei erfuellter Precondition. |
@@ -149,7 +154,7 @@ Die widerspruechlichen Seed-Beispiele werden weder beim Replay noch beim Reset
 heimlich entfernt oder bestaetigt. Die Pruefung einer anderen positiven
 Seed-Aussage ersetzt nicht die verlangte Pruefung der konkreten Tag-4-Quelle.
 
-`q`, EOF, fehlende Voraussetzungen oder Providerfehler stoppen mit erhaltenem
+`q`, EOF, fehlende Voraussetzungen oder nicht behebbare Providerfehler stoppen mit erhaltenem
 Zwischenstand. Es gibt kein Resume: Ein neuer kompletter Aufruf beginnt wieder
 mit Reset. Der lokale JSONL-Transcript enthaelt Reset, Nachrichtenreferenzen,
 Zustellungen, menschliche Checkpoints und Abschluss; er ersetzt nicht den

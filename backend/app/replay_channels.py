@@ -26,6 +26,14 @@ def matches(source, step):
             and source.sender_crew_id == step.sender_crew_id)
 
 
+def has_attachment(source, step, plans):
+    if not step.attachment:
+        return True
+    expected = (plans / step.attachment).read_bytes()
+    return any(item.file_name == step.attachment and base64.b64decode(item.content_base64) == expected
+               for item in source.attachments)
+
+
 class ScenarioAPI:
     """Keep real provider identities, simulated source time and the original transport time."""
     def __init__(self, api, step, sent_at, run_id, plans):
@@ -41,11 +49,8 @@ class ScenarioAPI:
         source = SourceMessageInput.model_validate(kwargs["json"])
         if not matches(source, self.step):
             raise ReplayError("Received message does not match the current scenario step")
-        if self.step.attachment:
-            expected = (self.plans / self.step.attachment).read_bytes()
-            if not any(item.file_name == self.step.attachment and base64.b64decode(item.content_base64) == expected
-                       for item in source.attachments):
-                raise ReplayError(f"Expected exact synthetic attachment {self.step.attachment}; resend the test mail")
+        if not has_attachment(source, self.step, self.plans):
+            raise ReplayError(f"Expected exact synthetic attachment {self.step.attachment}")
         provenance = {"mode": "online", "run_id": self.run_id, "step": self.step.id,
                       "transport_sent_at": source.sent_at.isoformat(), "scenario_sent_at": self.sent_at.isoformat()}
         attachments = [item.model_dump() for item in source.attachments] + [{
@@ -99,11 +104,19 @@ class OnlineChannels:
                     if identity in self.used:
                         continue
                     source = self.gmail.read_message(identifier, label)
-                    if source is not None and source.sent_at >= since and matches(source, step):
-                        poll_gmail(SingleMail(self.gmail, source), proxy)
-                        if proxy.result is not None:
-                            self.used.add(identity)
-                            return proxy.result
+                    # A mail read once that is old or does not match can never match a later
+                    # step either (each step only accepts mails sent after its prompt).
+                    if source is None or source.sent_at < since or not matches(source, step):
+                        self.used.add(identity)
+                        continue
+                    if not has_attachment(source, step, self.plans):
+                        self.used.add(identity)
+                        self.output(f"Mail lacks the unchanged {step.attachment}; resend it with the exact file")
+                        continue
+                    poll_gmail(SingleMail(self.gmail, source), proxy)
+                    if proxy.result is not None:
+                        self.used.add(identity)
+                        return proxy.result
             else:
                 for update in self.telegram.updates():
                     message = update.get("message", {})
@@ -118,6 +131,10 @@ class OnlineChannels:
                         and datetime.fromtimestamp(message.get("date", 0), UTC) >= since)
                     if eligible:
                         handle_update(self.telegram, proxy, update)
+                    elif update.get("my_chat_member") or message.get("text", "").startswith("/"):
+                        # Compliance commands/notices still reach the API; confirming the offset
+                        # below would otherwise drop them for good while the worker is stopped.
+                        handle_update(self.telegram, self.api, update)
                     self.telegram.offset = update["update_id"] + 1
                     if proxy.result is not None:
                         self.used.add(identity)
@@ -128,7 +145,7 @@ class OnlineChannels:
     def deliver(self):
         for _ in range(200):
             before = request(self.api, "get", "/outbox")
-            pending = [item for item in before if item["status"] != "sent"]
+            pending = [item for item in before if item["status"] not in {"sent", "cancelled"}]
             if not pending:
                 return
             deliver_outbox(self.gmail, self.api)

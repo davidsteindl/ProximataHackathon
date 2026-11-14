@@ -154,3 +154,89 @@ def test_missing_real_recipient_is_not_reported_as_a_successful_delivery(client)
         channels.deliver()
     assert all(item["status"] == "failed" and not item["provider_message_id"] for item in client.get("/outbox").json())
     assert all(flag["state"] == "detected" for flag in client.get("/flags").json())
+
+
+def test_compliance_commands_still_reach_the_api_while_waiting_for_a_step(client, monkeypatch):
+    monkeypatch.setenv("TELEGRAM_COMPLIANCE_KEY", "synthetic-key")
+    replay, _ = build_replay(client, pause=lambda _: "q")
+    replay.reset()
+    step = scenario_step("learning_before")
+    settings = TelegramSettings(token="synthetic-token", chats={"100"}, users={"100"},
+        compliance_key="synthetic-key", roles={"100": "crew_lead"}, crews={"100": "drywall"})
+    now = int(datetime.now(UTC).timestamp())
+    batch = [
+        {"update_id": 10, "message": {"message_id": 10, "date": now, "from": {"id": 100, "is_bot": False},
+            "chat": {"id": 100}, "text": "/privacy"}},
+        {"update_id": 11, "message": {"message_id": 11, "date": now, "from": {"id": 100, "is_bot": False},
+            "chat": {"id": 100}, "text": step.text}},
+    ]
+    with httpx.Client(transport=httpx.MockTransport(
+            lambda request: httpx.Response(200, json={"ok": True, "result": batch}))) as http:
+        telegram = TelegramClient(settings, http)
+        channels = OnlineChannels(client, None, telegram, "compliance", CAD, lambda *args, **kwargs: None,
+                                  timeout=1, output=lambda _: None)
+        result = channels.receive(step, replay.clock.timestamp(step))
+    assert result["source"]["external_id"] == "11" and telegram.offset == 12
+    # The confirmed /privacy update was handled, not dropped: its notice is queued.
+    assert any(item["channel"] == "telegram" and item["flag_id"] is None and item["recipient"] == "100"
+               for item in client.get("/outbox").json())
+
+
+def test_mail_without_exact_drawing_is_skipped_and_can_be_resent_in_the_same_step(client):
+    replay, _ = build_replay(client, pause=lambda _: "q")
+    replay.reset()
+    step = scenario_step("revision")
+    settings = GmailSettings(mailbox="project@example.test", sender_roles={"architect@example.test": "architect"})
+
+    def mail(identifier, attach):
+        message = EmailMessage()
+        message["From"], message["To"], message["Subject"] = "architect@example.test", settings.mailbox, step.subject
+        message.set_content(step.text)
+        if attach:
+            message.add_attachment((CAD / step.attachment).read_bytes(), maintype="image", subtype="vnd.dxf",
+                                   filename=step.attachment)
+        return decode_message({"id": identifier, "internalDate": str(int(datetime.now(UTC).timestamp() * 1000) + 5000),
+                               "raw": base64.urlsafe_b64encode(message.as_bytes()).decode()}, settings)
+
+    wrong, right = mail("wrong", False), mail("right", True)
+    polls, reads, output = [], [], []
+
+    class Mailbox:
+        def __init__(self):
+            self.settings = settings
+
+        def message_ids(self):
+            polls.append(1)
+            yield wrong.external_id, "INBOX"
+            if len(polls) > 1:
+                yield right.external_id, "INBOX"
+
+        def read_message(self, identifier, label):
+            reads.append(identifier)
+            return wrong if identifier == "wrong" else right
+
+    channels = OnlineChannels(client, Mailbox(), None, "resend", CAD, lambda *args, **kwargs: None,
+                              timeout=5, output=output.append, sleep=lambda _: None)
+    result = channels.receive(step, replay.clock.timestamp(step))
+    assert result["source"]["external_id"] == "right"
+    assert reads == ["wrong", "right"]  # a non-matching mail is fetched once, not on every poll
+    assert any("resend" in line for line in output)
+
+
+def test_failed_delivery_pauses_for_retry_instead_of_ending_the_run(client):
+    prompts = []
+    replay, _ = build_replay(client, pause=lambda text: prompts.append(text) or "")
+    calls = []
+
+    def deliver():
+        calls.append(1)
+        if len(calls) == 1:
+            raise ReplayError("Outbox delivery is pending or failed")
+
+    replay.channels = SimpleNamespace(deliver=deliver)
+    replay.deliver()
+    assert len(calls) == 2 and len(prompts) == 1
+    replay.pause = lambda _: "q"
+    calls.clear()
+    with pytest.raises(ReplayError, match="pending or failed"):
+        replay.deliver()

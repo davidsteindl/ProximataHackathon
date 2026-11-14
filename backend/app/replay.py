@@ -192,7 +192,17 @@ class Replay:
             if (flag["type"] == "A" and flag["zone_id"] == "3B"
                     and flag["task_id"] == "drywall-F3" and flag["advice"] is None):
                 request(self.api, "post", f"/flags/{flag['id']}/advice")
-        self.channels.deliver()
+        self.deliver()
+
+    def deliver(self):
+        # A transient send failure must not throw away a guided run that has no resume.
+        while True:
+            try:
+                return self.channels.deliver()
+            except ReplayError as error:
+                self.output(f"Delivery not complete: {error}")
+                if self.pause("Fix delivery, wait for the backoff, then Enter to retry (q to stop): ").strip().lower() == "q":
+                    raise
 
     def remember_flag(self, key, step, kind, crew=None):
         source_id = self.results[step]["source"]["id"]
@@ -270,7 +280,7 @@ class Replay:
             answer = self.pause("Complete the documented dashboard decisions, then Enter to verify (q to stop): ")
             if answer.strip().lower() == "q":
                 raise ReplayError("Stopped at a human checkpoint; state preserved")
-            self.channels.deliver()
+            self.deliver()
             current = self.flag(key)
             if name in {"confirm_inspection", "confirm_revision"}:
                 source_step = "concrete_result" if name == "confirm_inspection" else "revision_receipt"
