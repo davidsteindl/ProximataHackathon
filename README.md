@@ -355,6 +355,8 @@ for its exact commit.
 
 ## Further documentation
 
+- [Written submission: project description under 1,000 characters](SUBMISSION.md)
+
 - [Project plan, glossary and hero acceptance scenario](docs/PLAN.md)
 - [Site Record, seed and Evidence contract](docs/SITE_RECORD.md)
 - [Ingestion and extraction](docs/INGESTION.md)
