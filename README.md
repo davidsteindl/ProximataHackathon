@@ -65,9 +65,9 @@ Stoppen: `docker compose down`. Die Daten bleiben im Volume `db-data` erhalten.
 Enthalten sind Infrastruktur, Health-Prüfungen, der statische Site Record aus
 Issue #5, Nachrichten-Ingestion, Event-Extraktion und Timeline aus #6 sowie
 DXF-Extraktion und Geometrie-API aus #15, Conflict A und Flag-Inbox aus #7,
-Conflict B aus Revisionsnotizen (#8), Gmail-Eingang aus #11 sowie die
-3D-Ansicht aus #16. Plan-Diff,
-Telegram-Adapter, Gmail-Versand, MCP-Tools, Authentifizierung
+Conflict B aus Revisionsnotizen (#8), Gmail-Eingang aus #11,
+Outbox-/Gmail-Versand aus #10 sowie die 3D-Ansicht aus #16. Plan-Diff,
+Telegram-Adapter, MCP-Tools, Authentifizierung
 und Hosting folgen in ihren eigenen Issues.
 
 ### Nachricht → Event → Timeline (Issue #6)
@@ -135,6 +135,23 @@ Migration `0006` erlaubt `file_name: null` für reine Notizrevisionen und ergän
 CAD-Import kann die vorläufigen Metadaten derselben Revision vervollständigen;
 dabei entstehen weder geometrische Änderungszonen noch Empfangsbestätigungen.
 Details und Tests: [docs/FLAGS.md](docs/FLAGS.md).
+
+### Outbox-Vertrag (Issue #10)
+
+Migration `0007` ergänzt optionale `crew_leads.email` (auch im Seed-/Crew-REST-Vertrag)
+und eine transaktionale Outbox: genau eine faktische Gmail-Warnung pro neuem Flag.
+`GET /outbox?flag_id=…` zeigt Status und Versuche. Der Worker reserviert über
+`POST /outbox/claim` eine Nachricht für fünf Minuten und meldet mit Lease-Token
+über `POST /outbox/{id}/result` Erfolg oder Fehler. Fehler werden mit Backoff
+(60 Sekunden bis eine Stunde) erneut versucht. Nur bestätigter Versand setzt
+einen noch `detected` Flag auf `notified`; menschliche Zustände bleiben erhalten.
+Versandversuche und Ergebnisse stehen im Flag-Audit. Der Demo-Reset leert die Outbox.
+
+Versand aktivieren: Crew-Lead-Testadresse im Seed hinterlegen, OAuth mit
+`python -m app.gmail_auth --send` erneut autorisieren und `GMAIL_SEND_ENABLED=true`
+setzen. Fehlende Adressen werden als Versandfehler sichtbar. Einrichtung, Hero-Test
+und Grenzen (Gmail-Annahme, mögliche Duplikate bei unklarem Versandresultat):
+[docs/GMAIL.md](docs/GMAIL.md#factual-flag-warnings-outbox).
 
 ### Gmail-Eingang (Issue #11)
 

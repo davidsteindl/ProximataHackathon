@@ -1,4 +1,4 @@
-# Gmail inbound (#11)
+# Gmail inbound (#11) and outbox sending (#10)
 
 The worker polls a dedicated **team project test account**, optionally restricted
 by a label, and forwards source messages through `POST /ingestion/messages`.
@@ -8,9 +8,9 @@ health-only worker and offline ingestion continue to work without Google access.
 ## Google Cloud and OAuth (one-time local setup)
 
 1. In Google Cloud Console, create/select the team's project and enable **Gmail
-   API**. This Cloud project can also serve outbound Gmail in #10; this issue
-   requests **only** `https://www.googleapis.com/auth/gmail.readonly`.
-   `gmail.metadata` cannot read message bodies/attachments. No modify, send,
+   API**. Inbound requests only `https://www.googleapis.com/auth/gmail.readonly`.
+   Optional outbox sending adds only `https://www.googleapis.com/auth/gmail.send`.
+   `gmail.metadata` cannot read message bodies/attachments. No modify,
    full-mailbox management, password, service account or domain delegation is used.
 2. Configure the **Google Auth platform / OAuth consent screen**: app name,
    support/contact details, audience **External**, publishing status **Testing**
@@ -91,10 +91,9 @@ worktree has its own `.gmail/`; copy/setup the authorized files locally as neede
 - The command requests offline access and explicit consent. If no refresh token
   is returned, remove the team's app grant in the project account's Google
   Account connections and authorize again. Do not print tokens for diagnosis.
-- The inbound worker requires a token requested with exactly `gmail.readonly`;
-  a broader existing grant/token must be replaced with the inbound grant. #10
-  can reuse the Cloud project/client setup and decide its minimal sending scopes
-  in that issue; inbound does not request sending in advance.
+- The worker requires exactly `gmail.readonly` in inbound-only mode, or exactly
+  `gmail.readonly` + `gmail.send` when `GMAIL_SEND_ENABLED=true`. Reauthorize when
+  changing modes; broad mailbox/modify grants are rejected.
 - Messages that cannot be decoded or exceed ingestion's existing limits (5
   attachments, 2,000,000 bytes each, 50,000 text characters) are deferred as a
   whole, without silently truncating content or dropping an attachment. Move/fix
@@ -174,3 +173,70 @@ Official setup/protocol references:
 - https://developers.google.com/identity/protocols/oauth2#expiration
 - https://developers.google.com/workspace/gmail/api/reference/rest/v1/users.messages/list
 - https://developers.google.com/workspace/gmail/api/reference/rest/v1/users.messages/get
+
+## Factual Flag warnings (outbox)
+
+Sending is independently opt-in within the Gmail worker. No LLM is involved in
+composing or dispatching warnings. To enable it:
+
+1. Set the relevant Crew Lead's optional `email` field in `backend/seed/crews.json`
+   to a **team test address** before importing the seed. The committed seed has no
+   delivery addresses. Example: `{"id":"lead-drywall","name":"Sam Example",
+   "email":"<actual team test address>"}`. Use a separate Crew Lead test inbox,
+   rather than the dedicated sender mailbox. Existing seed clients can omit email.
+2. Run `PYTHONPATH=backend python -m app.gmail_auth --send` (PowerShell: set
+   `$env:PYTHONPATH = 'backend'` first). Re-consent is required for existing
+   read-only tokens. This reuses #11's Cloud project and client, adding only
+   `gmail.send`; do not use full Gmail access. The same test-user and seven-day
+   refresh-token limits apply.
+3. Set `GMAIL_ENABLED=true`, `GMAIL_SEND_ENABLED=true`, and the verified
+   `GMAIL_MAILBOX` in `.env`. Set `DASHBOARD_BASE_URL` to the browser-accessible
+   dashboard origin (default `http://localhost:3000`; adapt for `WEB_PORT`).
+   Recreate API and worker after configuration changes.
+4. On a fresh demo stack, import the seed and ingest
+   `backend/demo/closing-work.json` as documented in README. **Seed import resets
+   all demo data including outbox and Flags**; do not use it to patch a live demo.
+   The new hero Flag queues a warning; the worker sends one due message per pass.
+   Reload the dashboard to see `notified` and Gmail warning `sent`; follow the
+   email link directly to the Flag. Verify receipt in the Crew Lead test inbox.
+
+`GET /outbox` (optionally `?flag_id=...`) exposes recipient, channel, immutable
+subject/content snapshot, related Flag, status, attempts, next availability, safe
+error code, Gmail message ID and timestamps. `GET /flags/{id}` includes the same
+records as `notifications`; the dashboard displays status, attempts and failures.
+Pending messages remain visible even when sending is disabled.
+
+Set `GMAIL_SEND_ENABLED=false` and recreate the worker to pause outbound delivery
+while retaining inbound polling. A previously authorized token with exactly
+`gmail.readonly` + `gmail.send` remains usable for reading; the disabled sending
+guard prevents outbound requests. A read-only token still works in this mode.
+Missing read permission and broader scopes remain rejected. This switch does not
+revoke Google's send permission; use read-only OAuth consent if that permission
+also needs to be removed. Queued warnings remain in the outbox for later delivery.
+
+The worker uses only REST: `POST /outbox/claim` atomically leases one due message
+for five minutes with a new token and increments attempts. PostgreSQL row locks
+with `SKIP LOCKED` prevent simultaneous claims. `POST /outbox/{id}/result` accepts
+that lease token and either `status=sent` + `provider_message_id`, or
+`status=failed` + `error_code` (`gmail_error` / `missing_recipient`). Stale tokens
+return 409; replaying a successful report is idempotent. These are worker
+transport endpoints, not exposed as MCP/chat tools; like existing internal APIs,
+they do not claim production authentication.
+
+Failures remain `failed` and retry after 60 seconds, doubling up to one hour,
+without a silent terminal drop. Missing recipient addresses produce a visible
+`missing_recipient` failure without a Gmail request; configure the Site Record
+before starting the demo. A worker crash or lost result report leaves `sending`
+until lease expiry, then another attempt can claim it. Delivery attempts/results
+are recorded in the Flag audit with worker, time, Gmail channel and outbox source.
+Only a successful report changes `detected` to `notified`. It never acknowledges,
+approves, confirms Evidence or closes a Flag, and never regresses a human state.
+
+**Delivery semantics:** Gmail success means the Gmail API accepted the message;
+it does not prove inbox receipt or detect later bounces. This is at-least-once
+sending: a timeout/crash after Gmail accepted the email but before API persistence
+can cause a duplicate on retry. Retries use a stable RFC Message-ID, but Gmail
+provides no exactly-once guarantee. Keep the demo mailbox and queue small. The
+warning describes the facts **at detection**, labels the work source as an
+unconfirmed statement and links to current details in the dashboard. Escalation,
+proposals, human lifecycle actions and bounce ingestion are outside #10.

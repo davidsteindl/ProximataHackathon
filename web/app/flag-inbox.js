@@ -15,7 +15,7 @@ export default function FlagInbox({ flags, timezone }) {
       {flags.length === 0 ? <p>No open flags.</p> : (
         <ol className="flag-inbox">
           {flags.map((flag) => (
-            <li key={flag.id}>
+            <li key={flag.id} id={`flag-${flag.id}`}>
               <article>
                 <h3>Flag {flag.type} · {flag.zone_id} · {flag.severity} severity</h3>
                 <p>{evaluationLabels[flag.evaluation] || flag.evaluation}</p>
@@ -33,6 +33,12 @@ export default function FlagInbox({ flags, timezone }) {
                   </div>
                 )}
                 <p>State: {flag.state.replaceAll("_", " ")} · Detected {formatTime(flag.created_at, timezone)}</p>
+                {(flag.notifications || []).map((message) => (
+                  <p key={message.id} role={message.status === "failed" ? "alert" : undefined}>
+                    Gmail warning: {message.status} · Attempts: {message.attempts}
+                    {message.status === "failed" && message.error_code ? ` · ${message.error_code.replaceAll("_", " ")} · Retry scheduled` : ""}
+                  </p>
+                ))}
                 <details>
                   <summary>Flag details · {flag.sources.length} source(s)</summary>
                   <p>Last updated: {formatTime(flag.updated_at, timezone)}</p>

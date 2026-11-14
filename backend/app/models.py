@@ -38,6 +38,7 @@ class CrewLead(Base):
     __tablename__ = "crew_leads"
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
     name: Mapped[str] = mapped_column(String(200))
+    email: Mapped[str | None] = mapped_column(String(254))
 
 
 class Crew(Base):
@@ -315,6 +316,31 @@ class Flag(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     sources: Mapped[list["FlagSource"]] = relationship(lazy="selectin", order_by="FlagSource.attached_at, FlagSource.event_id")
     audit: Mapped[list["FlagAudit"]] = relationship(lazy="selectin", order_by="FlagAudit.id")
+
+
+class OutboxMessage(Base):
+    __tablename__ = "outbox_messages"
+    __table_args__ = (
+        UniqueConstraint("flag_id", name="outbox_flag_notification"),
+        CheckConstraint("status IN ('pending','sending','sent','failed')", name="outbox_status"),
+        CheckConstraint("channel = 'gmail'", name="outbox_channel"),
+        CheckConstraint("attempts >= 0", name="outbox_attempts"),
+    )
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    flag_id: Mapped[str] = mapped_column(ForeignKey("flags.id"))
+    flag: Mapped[Flag] = relationship()
+    recipient: Mapped[str | None] = mapped_column(String(254))
+    channel: Mapped[str] = mapped_column(String(32))
+    subject: Mapped[str] = mapped_column(String(200))
+    content: Mapped[str] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(String(20))
+    attempts: Mapped[int] = mapped_column(Integer)
+    available_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    lease_token: Mapped[str | None] = mapped_column(String(64))
+    error_code: Mapped[str | None] = mapped_column(String(40))
+    provider_message_id: Mapped[str | None] = mapped_column(String(200))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class FlagSource(Base):

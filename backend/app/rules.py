@@ -225,6 +225,8 @@ def evaluate_site(session, *, source_ref="rules:scan", actor="rule_engine", chan
                     )
                     session.add(flag)
                     flags[key] = flag
+                    from app.outbox import enqueue_flag_warning
+                    enqueue_flag_warning(session, flag, statement, work.crew, now)
                 elif (flag.evaluation != result.status or flag.explanation != result.explanation
                       or flag.inspection_id != result.inspection_id or flag.context != result.context):
                     flag.evaluation, flag.explanation = result.status, result.explanation
