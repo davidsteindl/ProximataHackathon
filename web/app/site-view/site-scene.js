@@ -2,13 +2,15 @@
 // meshes, camera animation and per-frame overlay placement (kept out of React state on purpose).
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
+import { floorVisible as isFloorVisible } from "../../lib/site-model.mjs";
 import { buildSiteContext } from "./site-context";
 
 const C = {
-  bg: 0x22251F,
-  chalk: 0xEDEAE0,
-  shell: 0xE4E0D3,
-  slab: 0xCFC9BA,
+  bg: 0x1D1F1A,
+  chalk: 0xEFEBE1,
+  shell: 0xDCE3E2,
+  slab: 0xC9C2B1,
   line: 0x191813,
   conflict: 0xFF5C49,
   open: 0xE8B04B,
@@ -34,7 +36,7 @@ export function createSiteScene(container, { geometry, zones, changes, onHover, 
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.75));
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.05;
+  renderer.toneMappingExposure = 1.0;
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   renderer.domElement.setAttribute("aria-hidden", "true");
@@ -42,14 +44,17 @@ export function createSiteScene(container, { geometry, zones, changes, onHover, 
 
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(C.bg);
-  scene.fog = new THREE.Fog(C.bg, 110, 260);
-  const camera = new THREE.PerspectiveCamera(32, 1, 0.3, 700);
+  scene.fog = new THREE.Fog(C.bg, 110, 260); // near/far follow the camera distance, see loop()
+  const pmrem = new THREE.PMREMGenerator(renderer);
+  scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+  scene.environmentIntensity = 0.35;
+  const camera = new THREE.PerspectiveCamera(32, 1, 0.5, 1200);
   const controls = new OrbitControls(camera, renderer.domElement);
   controls.enableDamping = true;
   controls.dampingFactor = 0.09;
   controls.maxPolarAngle = Math.PI * 0.47;
   controls.minDistance = 4;
-  controls.maxDistance = 190;
+  controls.maxDistance = 520; // the narrow-FOV overhead plan view sits far away
   controls.screenSpacePanning = true;
 
   const pb = planBounds(geometry);
@@ -60,9 +65,10 @@ export function createSiteScene(container, { geometry, zones, changes, onHover, 
   const topElevation = floors.length ? Math.max(...floors.map((f) => f.floor_elevation_m + f.floor_height_m)) : 3;
 
   // Lights.
-  scene.add(new THREE.HemisphereLight(0xF6F0E2, 0x2A2C25, 1.25));
-  const sun = new THREE.DirectionalLight(0xFFF0DA, 2.3);
-  sun.position.set(-34, 52, 30);
+  // Low warm key from the south-west for long shadows, cool sky fill.
+  scene.add(new THREE.HemisphereLight(0xE9EEF0, 0x2B2A22, 0.95));
+  const sun = new THREE.DirectionalLight(0xFFE2BC, 2.6);
+  sun.position.set(-40, 38, 34);
   sun.castShadow = true;
   sun.shadow.mapSize.set(2048, 2048);
   Object.assign(sun.shadow.camera, { left: -55, right: 55, top: 55, bottom: -55, near: 1, far: 160 });
@@ -74,10 +80,15 @@ export function createSiteScene(container, { geometry, zones, changes, onHover, 
   const std = (color, extra = {}) => new THREE.MeshStandardMaterial({ color, roughness: 0.85, metalness: 0, ...extra });
   const M = {
     wall: std(C.chalk),
-    shell: std(C.shell, { transparent: true, opacity: 0.3, depthWrite: false }),
-    shellSolid: std(C.shell),
-    slab: std(C.slab),
-    conflict: std(C.conflict, { emissive: C.conflict, emissiveIntensity: 0.35 }),
+    shell: std(C.shell, { transparent: true, opacity: 0.2, depthWrite: false, roughness: 0.15, metalness: 0.1 }),
+    shellSolid: std(0xE4E0D3),
+    slab: std(C.slab, { roughness: 0.95 }),
+    conflict: std(C.conflict, { emissive: C.conflict, emissiveIntensity: 0.9, roughness: 0.6 }),
+    // Flag markers: drawn on top so the flagged element is never hidden behind slabs or scenery.
+    xray: new THREE.MeshBasicMaterial({ color: C.conflict, transparent: true, opacity: 0.85, depthTest: false, depthWrite: false }),
+    halo: new THREE.MeshBasicMaterial({ color: C.conflict, transparent: true, opacity: 0.5, depthWrite: false }),
+    volume: new THREE.MeshBasicMaterial({ color: C.conflict, transparent: true, opacity: 0.16, depthTest: false, depthWrite: false, side: THREE.DoubleSide }),
+    volumeBar: new THREE.MeshBasicMaterial({ color: C.conflict, transparent: true, opacity: 0.7 }),
     selectedWall: std(C.selected, { emissive: C.selected, emissiveIntensity: 0.3 }),
     fixture: std(C.fixture, { roughness: 0.4 }),
     pipe: std(C.pipe, { roughness: 0.5, emissive: C.pipe, emissiveIntensity: 0.15 }),
@@ -86,7 +97,7 @@ export function createSiteScene(container, { geometry, zones, changes, onHover, 
     ghostLine: new THREE.LineDashedMaterial({ color: C.ghost, dashSize: 0.18, gapSize: 0.12, transparent: true, opacity: 0.9 }),
     edges: new THREE.LineBasicMaterial({ color: C.line, transparent: true, opacity: 0.28 }),
     unitLine: new THREE.LineBasicMaterial({ color: 0x5F5B52, transparent: true, opacity: 0.75 }),
-    highlight: new THREE.MeshBasicMaterial({ color: C.selected }),
+    highlight: new THREE.MeshBasicMaterial({ color: C.selected, polygonOffset: true, polygonOffsetFactor: -2 }),
   };
 
   const building = new THREE.Group();
@@ -133,7 +144,7 @@ export function createSiteScene(container, { geometry, zones, changes, onHover, 
     const group = new THREE.Group();
     const elev = plan.floor_elevation_m;
     const wallHeight = plan.floor_height_m - SLAB;
-    group.userData = { floorId: plan.floor_id, elevation: elev };
+    group.userData = { floorId: plan.floor_id, elevation: elev, wallHeight };
     edgePositions.length = 0;
 
     // Slab (from the plan's extent) with the floor top at the floor elevation.
@@ -157,14 +168,14 @@ export function createSiteScene(container, { geometry, zones, changes, onHover, 
           const mesh = wallBox(segment, shape.thickness_m || 0.1, elev, wallHeight);
           if (exterior) {
             mesh.material = M.shell;
-            mesh.castShadow = true;
+            mesh.castShadow = mesh.receiveShadow = false; // thin glass shell: no shadow acne, interiors stay lit
             shellWalls.push(mesh);
           } else {
             pickables.push(mesh);
           }
           if (zoneId) {
             mesh.userData.zoneId = zoneId;
-            zoneWalls.push({ mesh, zoneId, key, base: mesh.material });
+            zoneWalls.push({ mesh, zoneId, key, base: mesh.material, floorId: plan.floor_id, segment, thickness: shape.thickness_m || 0.1 });
           }
           pushEdges(mesh.geometry, mesh.matrix);
           group.add(mesh);
@@ -254,23 +265,79 @@ export function createSiteScene(container, { geometry, zones, changes, onHover, 
   const context = buildSiteContext({ minX: -half.x, maxX: half.x, minZ: -half.z, maxZ: half.z, height: topElevation });
   scene.add(context.group);
   const highlightGroup = new THREE.Group();
-  scene.add(highlightGroup);
+  const markerGroup = new THREE.Group();
+  scene.add(highlightGroup, markerGroup);
 
   // ---------- state ----------
   let dirty = true;
   let tween = null;
   let view = { floorId: null, mode: "orbit", highlight: null, focus: null };
-  let status = { rooms: new Map(), walls: new Map() };
+  let status = { rooms: new Map(), walls: new Map(), flagZones: new Set() };
   let filters = { status: true, context: true, changes: true };
   let hovered = null;
   let overlays = [];
   const invalidate = () => { dirty = true; };
   controls.addEventListener("change", invalidate);
 
-  function floorVisible(floorId) {
-    if (!view.floorId) return true;
-    const iso = floorGroups.get(view.floorId)?.userData.elevation ?? Infinity;
-    return (floorGroups.get(floorId)?.userData.elevation ?? 0) <= iso;
+  const floorVisible = (floorId) => isFloorVisible(view.floorId, floorId);
+
+  // Open-Flag markers: the flagged element gets a solid red wall, an x-ray copy (overview) and a glow band;
+  // the flagged unit gets a restrained red volume outline from its plan outline and floor height.
+  function rebuildMarkers() {
+    for (const child of markerGroup.children) if (child.geometry !== boxGeom) child.geometry.dispose();
+    markerGroup.clear();
+    if (!filters.status) return;
+    const overview = !view.floorId;
+    for (const wall of zoneWalls) {
+      if (status.walls.get(wall.key) !== "conflict" || !floorVisible(wall.floorId)) continue;
+      const { elevation, wallHeight } = floorGroups.get(wall.floorId).userData;
+      if (overview) {
+        const xray = new THREE.Mesh(boxGeom, M.xray);
+        xray.matrixAutoUpdate = false;
+        xray.matrix.copy(wall.mesh.matrix);
+        xray.renderOrder = 30;
+        markerGroup.add(xray);
+      }
+      const [a, b] = wall.segment;
+      const pa = P(a[0], a[1]);
+      const pbb = P(b[0], b[1]);
+      const halo = new THREE.Mesh(new THREE.PlaneGeometry(pa.distanceTo(pbb) + 0.7, wall.thickness + 0.7), M.halo);
+      halo.rotation.set(-Math.PI / 2, 0, -Math.atan2(pbb.z - pa.z, pbb.x - pa.x));
+      halo.position.set((pa.x + pbb.x) / 2, elevation + wallHeight + 0.03, (pa.z + pbb.z) / 2);
+      halo.renderOrder = 25;
+      markerGroup.add(halo);
+    }
+    for (const zoneId of status.flagZones) {
+      const outline = outlines.get(zoneId);
+      if (!outline || !floorVisible(outline.floorId)) continue;
+      const { elevation, wallHeight } = floorGroups.get(outline.floorId).userData;
+      const shape = new THREE.Shape(outline.points.map(([x, y]) => new THREE.Vector2(x - cx, y - cy)));
+      const solid = new THREE.ExtrudeGeometry(shape, { depth: wallHeight, bevelEnabled: false });
+      solid.rotateX(-Math.PI / 2);
+      solid.translate(0, elevation, 0);
+      if (overview) {
+        const fill = new THREE.Mesh(solid, M.volume);
+        fill.renderOrder = 22;
+        markerGroup.add(fill);
+      }
+      // Edges as thin bars (WebGL lines are 1px): readable at overview distance.
+      const edges = new THREE.EdgesGeometry(solid);
+      const pos = edges.attributes.position;
+      const a = new THREE.Vector3();
+      const b = new THREE.Vector3();
+      for (let i = 0; i < pos.count; i += 2) {
+        a.fromBufferAttribute(pos, i);
+        b.fromBufferAttribute(pos, i + 1);
+        const bar = new THREE.Mesh(boxGeom, overview ? M.xray : M.volumeBar);
+        bar.position.copy(a).add(b).multiplyScalar(0.5);
+        bar.quaternion.setFromUnitVectors(new THREE.Vector3(1, 0, 0), b.clone().sub(a).normalize());
+        bar.scale.set(a.distanceTo(b) + 0.08, 0.08, 0.08);
+        bar.renderOrder = 24;
+        markerGroup.add(bar);
+      }
+      edges.dispose();
+      if (!overview) solid.dispose();
+    }
   }
 
   function rebuildHighlight() {
@@ -279,18 +346,21 @@ export function createSiteScene(container, { geometry, zones, changes, onHover, 
     if (!target) return;
     const outline = outlines.get(target);
     const wall = zoneWalls.find((w) => w.zoneId === target);
-    const ribbon = (a, b, y, width = 0.14) => {
+    const ribbon = (a, b, y, width) => {
       const mesh = new THREE.Mesh(boxGeom, M.highlight);
-      mesh.scale.set(a.distanceTo(b) + width, 0.04, width);
+      mesh.renderOrder = 26;
+      mesh.scale.set(a.distanceTo(b) + width, 0.06, width);
       mesh.position.set((a.x + b.x) / 2, y, (a.z + b.z) / 2);
       mesh.rotation.y = -Math.atan2(b.z - a.z, b.x - a.x);
       highlightGroup.add(mesh);
     };
     if (outline) {
-      const elev = floorGroups.get(outline.floorId).userData.elevation + 0.05;
+      // Along the wall tops, so the outline reads from above and is not hidden inside the walls.
+      const { elevation, wallHeight } = floorGroups.get(outline.floorId).userData;
+      const y = elevation + wallHeight + 0.05;
       outline.points.forEach((p, i) => {
         const q = outline.points[(i + 1) % outline.points.length];
-        ribbon(P(p[0], p[1], elev), P(q[0], q[1], elev), elev);
+        ribbon(P(p[0], p[1], y), P(q[0], q[1], y), y, 0.24);
       });
     } else if (wall) {
       const box = new THREE.Box3().setFromObject(wall.mesh);
@@ -310,11 +380,11 @@ export function createSiteScene(container, { geometry, zones, changes, onHover, 
       const s = filters.status ? status.rooms.get(plate.zoneId) : null;
       let color = C.open;
       let opacity = 0;
-      if (s === "conflict") { color = C.conflict; opacity = 0.3; }
-      else if (s === "open") { color = C.open; opacity = 0.16; }
-      else if (s === "ok") { color = C.ok; opacity = 0.16; }
-      if (plate.zoneId === view.highlight) { color = C.selected; opacity = 0.5; }
-      else if (selectedUnit && plate.unitId === selectedUnit) { color = C.selected; opacity = Math.max(opacity, 0.26); }
+      if (s === "conflict") { color = C.conflict; opacity = 0.14; }
+      else if (s === "open") { color = C.open; opacity = 0.12; }
+      else if (s === "ok") { color = C.ok; opacity = 0.14; }
+      if (plate.zoneId === view.highlight) { color = C.selected; opacity = 0.42; }
+      else if (selectedUnit && plate.unitId === selectedUnit) { color = C.selected; opacity = Math.max(opacity, 0.22); }
       if (plate.zoneId === hovered) opacity = Math.min(0.75, opacity + 0.22) || 0.18;
       plate.mesh.material.color.setHex(color);
       plate.mesh.material.opacity = opacity;
@@ -328,6 +398,7 @@ export function createSiteScene(container, { geometry, zones, changes, onHover, 
     scene.traverse((o) => {
       if (o.material === M.ghost || o.material === M.ghostLine) o.visible = filters.changes;
     });
+    rebuildMarkers();
     invalidate();
   }
 
@@ -339,16 +410,19 @@ export function createSiteScene(container, { geometry, zones, changes, onHover, 
     const min = P(bounds.minX, bounds.maxY);
     const max = P(bounds.maxX, bounds.minY);
     const center = new THREE.Vector3((min.x + max.x) / 2, elevation, (min.z + max.z) / 2);
-    const sx = Math.max(max.x - min.x, 14);
-    const sz = Math.max(max.z - min.z, 10);
+    const room = bounds !== pb;
+    const sx = Math.max(max.x - min.x, room ? 15 : 14);
+    const sz = Math.max(max.z - min.z, room ? 11 : 10);
     if (mode === "top") {
-      const fov = 16; // narrow FOV from far away reads almost like an orthographic plan
-      const needed = Math.max(sz, sx / aspect) * 1.3;
+      // Straight down with a very narrow FOV: reads as an orthographic plan, wall sides stay hidden.
+      const fov = 8;
+      const pad = room ? 1.6 : 1.4;
+      const needed = Math.max(sz * pad, (sx * pad * 0.9) / aspect) + (aspect < 1 ? 4 : 2); // room for the floating chrome
       const dist = needed / 2 / Math.tan(THREE.MathUtils.degToRad(fov / 2));
-      return { target: center, position: center.clone().add(new THREE.Vector3(0, dist, 0.001)), fov };
+      return { target: center, position: center.clone().add(new THREE.Vector3(0, dist, 0.0001)), fov };
     }
     const fov = 32;
-    const radius = Math.max(Math.hypot(sx, sz), 8) * (aspect < 1 ? 1.8 : 1.3) / Math.tan(THREE.MathUtils.degToRad(fov / 2)) * 0.62;
+    const radius = Math.max(Math.hypot(sx, sz), 8) * (aspect < 1 ? 1.8 : 1.3) / Math.tan(THREE.MathUtils.degToRad(fov / 2)) * (view.floorId ? 0.6 : 0.5);
     const polar = THREE.MathUtils.degToRad(view.floorId ? 50 : 62);
     const azimuth = THREE.MathUtils.degToRad(38);
     const offset = new THREE.Vector3().setFromSphericalCoords(radius, polar, azimuth);
@@ -360,6 +434,10 @@ export function createSiteScene(container, { geometry, zones, changes, onHover, 
     const bounds = view.focus || pb;
     const elevation = iso ? iso.userData.elevation : topElevation * 0.38;
     const goal = frame(bounds, elevation, view.mode);
+    // Flush leftover damping momentum so the camera ends exactly on the goal (no drift off true overhead).
+    controls.enableDamping = false;
+    controls.update();
+    controls.enableDamping = true;
     tween = {
       start: performance.now(), duration: 950,
       from: { position: camera.position.clone(), target: controls.target.clone(), fov: camera.fov },
@@ -411,17 +489,50 @@ export function createSiteScene(container, { geometry, zones, changes, onHover, 
   ro.observe(container);
   resize();
 
+  // Callout layout: each card stays inside the stage, avoids the floating chrome ([data-reserve]) and the
+  // cards placed before it (Flags first), flipping above/below its anchor and lengthening the stem if needed.
   const v = new THREE.Vector3();
+  const EDGE = 8;
+  const overlap = (a, b) => Math.max(0, Math.min(a.r, b.r) - Math.max(a.l, b.l)) * Math.max(0, Math.min(a.b, b.b) - Math.max(a.t, b.t));
   function placeOverlays() {
     const w = container.clientWidth;
     const h = container.clientHeight;
-    for (const o of overlays) {
-      const pos = anchors.get(o.anchor);
-      if (!pos || !o.el) continue;
-      v.copy(pos).project(camera);
-      const shown = v.z < 1 && Math.abs(v.x) < 1.05 && Math.abs(v.y) < 1.05 && (!o.floorId || floorVisible(o.floorId));
-      o.el.style.visibility = shown ? "visible" : "hidden";
-      if (shown) o.el.style.transform = `translate(${((v.x + 1) / 2) * w}px, ${((1 - v.y) / 2) * h}px)`;
+    const stage = container.getBoundingClientRect();
+    const taken = [...(container.parentElement?.querySelectorAll("[data-reserve]") || [])].map((el) => {
+      const r = el.getBoundingClientRect();
+      return { l: r.left - stage.left - 6, t: r.top - stage.top - 6, r: r.right - stage.left + 6, b: r.bottom - stage.top + 6 };
+    }).filter((r) => r.r > r.l);
+    // Read every size first, then write, so the browser lays out once.
+    const items = overlays.filter((o) => o.el && anchors.has(o.anchor)).map((o) => {
+      v.copy(anchors.get(o.anchor)).project(camera);
+      const x = ((v.x + 1) / 2) * w;
+      const y = ((1 - v.y) / 2) * h;
+      const button = o.el.firstElementChild;
+      const shown = v.z < 1 && x > EDGE && x < w - EDGE && y > EDGE && y < h - EDGE && (!o.floorId || floorVisible(o.floorId));
+      return { o, x, y, button, shown, bw: button.offsetWidth, bh: button.offsetHeight };
+    });
+    for (const it of items) {
+      if (!it.shown) { it.o.el.style.visibility = "hidden"; continue; }
+      const options = it.o.below ? [[1, 34], [-1, 34], [1, 76], [-1, 76]] : [[-1, 34], [1, 34], [-1, 76], [1, 76]];
+      let best = null;
+      for (const [dir, stem] of options) {
+        const lo = Math.max(EDGE, it.x - it.bw + 14);
+        const hi = Math.min(w - it.bw - EDGE, it.x - 14);
+        const left = Math.min(Math.max(it.x - it.bw / 2, lo), hi);
+        const top = dir < 0 ? it.y - stem - it.bh : it.y + stem;
+        const rect = { l: left, t: top, r: left + it.bw, b: top + it.bh };
+        const outside = Math.max(0, EDGE - rect.t) + Math.max(0, rect.b - (h - EDGE));
+        const cost = outside * 1e4 + taken.reduce((sum, r) => sum + overlap(rect, r), 0);
+        if (!best || cost < best.cost) best = { cost, dir, stem, rect };
+        if (cost === 0) break;
+      }
+      taken.push(best.rect);
+      const { el } = it.o;
+      el.style.visibility = "visible";
+      el.style.transform = `translate(${it.x}px, ${it.y}px)`;
+      el.dataset.dir = best.dir < 0 ? "up" : "down";
+      el.style.setProperty("--stem", `${best.stem}px`);
+      it.button.style.transform = `translate(${best.rect.l - it.x}px, ${best.rect.t - it.y}px)`;
     }
   }
 
@@ -440,6 +551,9 @@ export function createSiteScene(container, { geometry, zones, changes, onHover, 
       dirty = true;
     }
     controls.update();
+    const distance = camera.position.distanceTo(controls.target);
+    scene.fog.near = distance * 1.15;
+    scene.fog.far = distance * 3.2 + 40;
     if (pointer && pointer !== lastPointer && !down) {
       lastPointer = pointer;
       const id = pick(pointer.x, pointer.y);
@@ -474,6 +588,7 @@ export function createSiteScene(container, { geometry, zones, changes, onHover, 
     setStatus(next) { status = next; applyMaterials(); },
     setFilters(next) { filters = next; applyMaterials(); },
     setOverlays(next) { overlays = next; invalidate(); },
+    refresh: invalidate,
     hasAnchor: (key) => anchors.has(key),
     zoom(factor) {
       const offset = camera.position.clone().sub(controls.target).multiplyScalar(factor);

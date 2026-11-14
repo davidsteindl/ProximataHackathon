@@ -4,9 +4,10 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  changedElements, elementStatus, elementZone, flagsForZone, floorOf, indexZones, viewForZone,
-  zoneBounds, zoneDetails, zoneStatus,
+  changedElements, elementStatus, elementZone, flagsForZone, floorOf, indexZones, inspectionConfirmedPassed,
+  inspectionKindLabel, viewForZone, zoneBounds, zoneDetails, zoneStatus,
 } from "../../lib/site-model.mjs";
+import SiteNav from "./site-nav";
 import { Chip, STATUS, Widget, ZonePanel } from "./zone-panel";
 import "./site-view.css";
 
@@ -165,6 +166,8 @@ export default function SiteView({ model, initialState, error }) {
   const [panelOpen, setPanelOpen] = useState(true);
   const [copied, setCopied] = useState(false);
   const [webglError, setWebglError] = useState(null);
+  // Key: collapsed by default (its summary still discloses that scenery is decorative); opening it re-lays out the callouts.
+  const [legendOpen, setLegend] = useState(false);
 
   const stageRef = useRef(null);
   const sceneRef = useRef(null);
@@ -229,10 +232,12 @@ export default function SiteView({ model, initialState, error }) {
       const s = element.kind === "wall" ? elementStatus(index, state, element) : null;
       if (s) walls.set(`${plan.floor_id}:${element.element_id}`, s);
     }
-    sceneRef.current.setStatus({ rooms, walls });
+    const flagZones = new Set((state.flags || []).map((flag) => flag.zone_id));
+    sceneRef.current.setStatus({ rooms, walls, flagZones });
   }, [state, index, geometry, sceneReady]);
 
   useEffect(() => { sceneRef.current?.setFilters(filters); }, [filters, sceneReady]);
+  useEffect(() => { sceneRef.current?.refresh(); }, [legendOpen]); // re-layout callouts around the key
 
   // Anchored callouts: open Flags (on their flagged element if there is one) and revision changes.
   const callouts = useMemo(() => {
@@ -251,17 +256,21 @@ export default function SiteView({ model, initialState, error }) {
     }
     const floors = new Set((state.flags || []).map((flag) => floorOf(index, flag.zone_id)));
     if (route.floorId) floors.add(route.floorId);
-    for (const inspection of state.inspections || []) {
-      if (!floors.has(inspection.zone_id) || inspection.kind !== "rough_in" || route.highlight && route.highlight !== route.floorId) continue;
-      const evidence = (state.evidence || []).filter((record) => record.scope.inspection_id === inspection.id);
-      const unconfirmed = evidence.filter((record) => record.review_status === "unconfirmed").length;
-      list.push({ key: `insp-${inspection.id}`, anchor: inspection.zone_id, floorId: inspection.zone_id, tone: "warn", title: `Rough-in ${inspection.zone_id} · ${inspection.status}`, text: unconfirmed ? `${unconfirmed} unconfirmed claim${unconfirmed === 1 ? "" : "s"} awaiting review` : "No confirmed result yet", target: inspection.zone_id });
+    // One callout per floor: the earliest inspection there whose pass is not confirmed and that has claims to review.
+    if (!route.highlight || route.highlight === route.floorId) for (const floorId of floors) {
+      const pending = (state.inspections || [])
+        .filter((inspection) => inspection.zone_id === floorId && !inspectionConfirmedPassed(inspection, state.evidence || []))
+        .map((inspection) => ({ inspection, unconfirmed: (state.evidence || []).filter((record) => record.scope.inspection_id === inspection.id && record.review_status === "unconfirmed").length }))
+        .sort((a, b) => b.unconfirmed - a.unconfirmed || a.inspection.scheduled_at.localeCompare(b.inspection.scheduled_at))[0];
+      if (!pending) continue;
+      const { inspection, unconfirmed } = pending;
+      list.push({ key: `insp-${inspection.id}`, anchor: inspection.zone_id, floorId: inspection.zone_id, tone: "warn", title: `${inspectionKindLabel(inspection.kind)} ${inspection.zone_id} · ${inspection.status}`, text: unconfirmed ? `${unconfirmed} unconfirmed claim${unconfirmed === 1 ? "" : "s"} awaiting review` : "No confirmed pass yet", target: inspection.zone_id });
     }
     return list;
   }, [state, geometry, index, changes, filters.changes, route]);
 
   useEffect(() => {
-    sceneRef.current?.setOverlays(callouts.map((c) => ({ el: calloutRefs.current.get(c.key), anchor: c.anchor, floorId: c.floorId })));
+    sceneRef.current?.setOverlays(callouts.map((c) => ({ el: calloutRefs.current.get(c.key), anchor: c.anchor, floorId: c.floorId, below: c.below })));
   }, [callouts, sceneReady]);
 
   // Briefly mark Flags that appeared while the page was open.
@@ -269,6 +278,7 @@ export default function SiteView({ model, initialState, error }) {
   const newFlagIds = useMemo(() => new Set((state.flags || []).map((flag) => flag.id).filter((id) => !seenFlags.has(id))), [state.flags, seenFlags]);
 
   const details = zoneId && route.known ? zoneDetails(index, state, zoneId) : null;
+  const building = model?.zones?.[0];
   const timezone = state?.site?.timezone || "Europe/Vienna";
   const floorsDesc = [...geometry].sort((a, b) => b.floor_elevation_m - a.floor_elevation_m);
   const plansLabel = geometry.map((plan) => `${plan.plan_id} Rev ${plan.label}`).join(" · ");
@@ -294,21 +304,21 @@ export default function SiteView({ model, initialState, error }) {
           )}
           {webglError && <div className="sv-state overlay"><h1>3D view unavailable</h1><p>{webglError}. Zone details stay available in the side panel.</p></div>}
 
-          <div className={`callouts${route.highlight && route.highlight !== route.floorId ? " compact" : ""}`} aria-label="Plan callouts">
+          {route.known && <div className={`callouts${route.highlight && route.highlight !== route.floorId ? " compact" : ""}`} aria-label="Plan callouts">
             {callouts.map((c) => (
-              <div key={c.key} ref={(el) => (el ? calloutRefs.current.set(c.key, el) : calloutRefs.current.delete(c.key))} className={`callout t-${c.tone}${c.below ? " below" : ""}`} style={{ visibility: "hidden" }}>
+              <div key={c.key} ref={(el) => (el ? calloutRefs.current.set(c.key, el) : calloutRefs.current.delete(c.key))} className={`callout t-${c.tone}`} style={{ visibility: "hidden" }}>
                 <button type="button" onClick={() => selectZone(c.target)}>
                   <strong>{c.title}</strong><span>{c.text}</span>
                 </button>
               </div>
             ))}
-          </div>
+          </div>}
           <div ref={tipRef} className="hover-tip" hidden><strong /><span /></div>
 
-          <div className="stage-card">
+          <div className="stage-card" data-reserve>
             {zoneId && !route.known ? (
               <>
-                <p className="crumbs mono"><Link href="/site">B1</Link> / ?</p>
+                <p className="crumbs mono"><Link href="/site">{building?.id}</Link> / ?</p>
                 <h1>Unknown zone</h1>
               </>
             ) : details ? (
@@ -325,13 +335,13 @@ export default function SiteView({ model, initialState, error }) {
             ) : (
               <>
                 <p className="crumbs mono">{state.site?.name || "Site"}</p>
-                <h1>Building B1</h1>
+                <h1>{building?.name || "Building"}</h1>
                 <p className="meta mono">{plansLabel}</p>
               </>
             )}
           </div>
 
-          <nav className="floor-rail" aria-label="Floor isolation">
+          <nav className="floor-rail" data-reserve aria-label="Floor isolation">
             <Link href="/site" className={!route.floorId ? "cur" : ""} aria-current={!route.floorId ? "page" : undefined} title="Whole building">All</Link>
             {floorsDesc.map((plan) => (
               <Link key={plan.floor_id} href={`/zones/${plan.floor_id}`} className={route.floorId === plan.floor_id ? "cur" : ""}
@@ -341,7 +351,7 @@ export default function SiteView({ model, initialState, error }) {
             ))}
           </nav>
 
-          <div className="toolbar" role="toolbar" aria-label="View">
+          <div className="toolbar" data-reserve role="toolbar" aria-label="View">
             <div className="seg">
               <button type="button" aria-pressed={mode === "orbit"} onClick={() => setMode("orbit")}>3D</button>
               <button type="button" aria-pressed={mode === "top"} onClick={() => setMode("top")}>Top-down</button>
@@ -358,14 +368,20 @@ export default function SiteView({ model, initialState, error }) {
             ))}
           </div>
 
-          <div className="legend" aria-label="Legend">
-            <span><i className="sw crit" />Open Flag</span>
-            <span><i className="sw warn" />Inspection not confirmed</span>
-            <span><i className="sw sel" />Selected</span>
-            <span><i className="sw ghost" />Previous revision</span>
-            <span><i className="sw pipe" />Drain</span>
-            <p>Building, rooms, doors, fixtures and drains: imported DXF geometry ({geometry.length} plans). Fixture sizes are schematic. Cranes, scaffold, fence, trees and containers are decorative context, not plan data.</p>
-          </div>
+          <details className="legend" data-reserve open={legendOpen} onToggle={(event) => setLegend(event.currentTarget.open)}>
+            <summary>
+              <span className="sw-row" aria-hidden="true"><i className="sw crit" /><i className="sw warn" /><i className="sw sel" /><i className="sw pipe" /></span>
+              Key<span className="meta"> · scenery is decorative</span>
+            </summary>
+            <div className="legend-body">
+              <span><i className="sw crit" />Open Flag</span>
+              <span><i className="sw warn" />Inspection not confirmed</span>
+              <span><i className="sw sel" />Selected</span>
+              <span><i className="sw ghost" />Previous revision</span>
+              <span><i className="sw pipe" />Drain</span>
+              <p>Building, rooms, doors, fixtures and drains: imported DXF geometry ({geometry.length} plans). Fixture sizes are schematic. Cranes, scaffold, fence, trees and containers are decorative context, not plan data.</p>
+            </div>
+          </details>
 
           {zoneId && !route.known && (
             <div className="sv-state overlay" role="alert">
@@ -381,11 +397,11 @@ export default function SiteView({ model, initialState, error }) {
             <button type="button" className="ghost-btn" aria-expanded={panelOpen} onClick={() => setPanelOpen((open) => !open)}>
               {panelOpen ? "Hide panel" : "Show panel"}
             </button>
-            {!panelOpen && <span className="pill-sum">{zoneId || "B1"} · {(state.flags || []).length} open</span>}
+            {!panelOpen && <span className="pill-sum">{zoneId || building?.id} · {(state.flags || []).length} open</span>}
           </div>
           {panelOpen && (
             <div className="side-scroll">
-              {details ? <ZonePanel details={details} timezone={timezone} changes={changes} newFlagIds={newFlagIds} />
+              {details ? <ZonePanel details={details} timezone={timezone} changes={changes} newFlagIds={newFlagIds} now={live.at} />
                 : <OverviewPanel index={index} state={state} geometry={geometry} changes={changes} />}
               <ZoneBrowser zones={model.zones} index={index} state={state} current={zoneId} />
             </div>
@@ -399,20 +415,7 @@ export default function SiteView({ model, initialState, error }) {
 function Shell({ live, children }) {
   return (
     <div className="sv">
-      <header className="sv-nav">
-        <Link href="/site" className="brand" aria-label="Site model home">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/groundiq-logo-white.svg" alt="GroundIQ" />
-        </Link>
-        <nav aria-label="Main">
-          <Link href="/">Dashboard</Link>
-          <Link href="/site" className="cur" aria-current="page">Site model</Link>
-        </nav>
-        <div className="nav-right">
-          <LiveBadge live={live} />
-          <span className="demo">Synthetic demo data</span>
-        </div>
-      </header>
+      <SiteNav current="site"><LiveBadge live={live} /></SiteNav>
       {children}
     </div>
   );

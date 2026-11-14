@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { formatTime } from "../../lib/site.mjs";
+import { inspectionKindLabel, splitTasks } from "../../lib/site-model.mjs";
 
 const label = (value) => (value || "").replaceAll("_", " ");
 
@@ -10,7 +11,7 @@ export const STATUS = {
   unknown: { text: "Unknown zone", tone: "unk" },
 };
 
-const EVALUATION = {
+export const EVALUATION = {
   satisfied: { text: "Satisfied", tone: "ok", note: "Precondition satisfied. The Flag stays open until a person closes it." },
   not_satisfied: { text: "Not satisfied", tone: "crit", note: "Confirmed evidence says the precondition is not met." },
   unknown: { text: "Unknown", tone: "unk", note: "Proof is missing, unconfirmed, stale or mismatched." },
@@ -21,7 +22,7 @@ export function Chip({ tone, children }) {
   return <span className={`chip t-${tone}`}>{children}</span>;
 }
 
-function reviewTone(status) {
+export function reviewTone(status) {
   return status === "confirmed" ? "ok" : status === "rejected" ? "unk" : "warn";
 }
 
@@ -96,33 +97,70 @@ export function Widget({ title, aside, wide, children }) {
   );
 }
 
-export function ZonePanel({ details, timezone, changes, newFlagIds }) {
+function InspectionRow({ summary }) {
+  const { inspection, counts, confirmedPassed } = summary;
+  return (
+    <li className="pc-row">
+      <div className="pc-main">
+        <strong>{inspectionKindLabel(inspection.kind)} inspection</strong>
+        <span className="meta mono">{inspection.id} · recorded {label(inspection.status)}</span>
+      </div>
+      <div className="pc-chips">
+        {counts.confirmed > 0 && <Chip tone="ok">{counts.confirmed} confirmed</Chip>}
+        {counts.unconfirmed > 0 && <Chip tone="warn">{counts.unconfirmed} unconfirmed</Chip>}
+        {counts.rejected > 0 && <Chip tone="unk">{counts.rejected} rejected</Chip>}
+        {!counts.confirmed && !counts.unconfirmed && !counts.rejected && <Chip tone="unk">no evidence</Chip>}
+        <Chip tone={confirmedPassed ? "ok" : "warn"}>{confirmedPassed ? "confirmed pass" : "pass not confirmed"}</Chip>
+      </div>
+    </li>
+  );
+}
+
+function TaskList({ tasks, flags, timezone }) {
+  return (
+    <ol className="tasks">
+      {tasks.map((task) => {
+        const flagged = flags.find((flag) => flag.task_id === task.id);
+        return (
+          <li key={task.id}>
+            <div className="task-name">{task.name}{flagged && <Chip tone="crit">Flag {flagged.type}</Chip>}</div>
+            <p className="meta"><span className="mono">{formatTime(task.starts_at, timezone)}</span> · {task.crew?.name || task.crew_id}</p>
+            {task.predecessor_ids.length > 0 && <p className="meta">after {task.predecessor_ids.join(", ")}</p>}
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
+
+export function ZonePanel({ details, timezone, changes, newFlagIds, now }) {
   const { zone, flags, tasks, inspections, unresolvedEvidence, plan, revisions } = details;
   const status = STATUS[details.status];
   const floorChanges = changes.filter((change) => change.floorId === details.floorId);
+  const { current, earlier } = splitTasks(tasks, now);
   return (
     <div className="widgets">
       <Widget wide title="Status" aside={<Chip tone={status.tone}>{status.text}</Chip>}>
-        {flags.length === 0 ? (
-          <p className="empty">No open Flag for {zone.id}, its parents or its rooms. Rules check work as soon as it is announced.</p>
-        ) : flags.map((flag) => <FlagCard key={flag.id} flag={flag} timezone={timezone} isNew={newFlagIds.has(flag.id)} />)}
+        {flags.map((flag) => <FlagCard key={flag.id} flag={flag} timezone={timezone} isNew={newFlagIds.has(flag.id)} />)}
+        {flags.length === 0 && (
+          <p className="empty">No open Flag for {zone.id}, its parents or its rooms. That is not a pass: rules evaluate a Precondition when work is announced, and only confirmed evidence can satisfy it.</p>
+        )}
+        {inspections.length > 0 && (
+          <div className="pc">
+            <h4>Inspection evidence in scope</h4>
+            <ul>{inspections.map((summary) => <InspectionRow key={summary.inspection.id} summary={summary} />)}</ul>
+          </div>
+        )}
         <p className="fineprint">Evidence review, Flag acknowledgment and Flag closure are separate human decisions. This view only reads them.</p>
       </Widget>
 
-      <Widget title="Upcoming tasks" aside={<span className="meta">{tasks.length}</span>}>
-        {tasks.length === 0 ? <p className="empty">No scheduled tasks in this zone.</p> : (
-          <ol className="tasks">
-            {tasks.map((task) => {
-              const flagged = flags.find((flag) => flag.task_id === task.id);
-              return (
-                <li key={task.id}>
-                  <div className="task-name">{task.name}{flagged && <Chip tone="crit">Flag {flagged.type}</Chip>}</div>
-                  <p className="meta"><span className="mono">{formatTime(task.starts_at, timezone)}</span> · {task.crew?.name || task.crew_id}</p>
-                  {task.predecessor_ids.length > 0 && <p className="meta">after {task.predecessor_ids.join(", ")}</p>}
-                </li>
-              );
-            })}
-          </ol>
+      <Widget title="Tasks" aside={<span className="meta">{current.length} current or upcoming</span>}>
+        {current.length === 0 ? <p className="empty">No running or upcoming task in this zone.</p> : <TaskList tasks={current} flags={flags} timezone={timezone} />}
+        {earlier.length > 0 && (
+          <details className="earlier">
+            <summary>{earlier.length} ended task{earlier.length === 1 ? "" : "s"}</summary>
+            <TaskList tasks={earlier} flags={flags} timezone={timezone} />
+          </details>
         )}
       </Widget>
 
@@ -162,7 +200,7 @@ export function ZonePanel({ details, timezone, changes, newFlagIds }) {
         {inspections.map(({ inspection, evidence }) => (
           <div className="insp" key={inspection.id}>
             <div className="rev-head">
-              <strong>{label(inspection.kind)} inspection</strong>
+              <strong>{inspectionKindLabel(inspection.kind)} inspection</strong>
               <span className="mono meta">{inspection.zone_id}</span>
             </div>
             <p className="meta">Recorded: {inspection.status} · scheduled {formatTime(inspection.scheduled_at, timezone)}</p>

@@ -23,6 +23,23 @@ export function descendants(index, zoneId) {
   return zone ? zone.childIds.flatMap((id) => [id, ...descendants(index, id)]) : [];
 }
 
+/** True floor isolation: with a floor isolated, only that floor is shown (no stack below it). */
+export function floorVisible(isolatedFloorId, floorId) {
+  return !isolatedFloorId || isolatedFloorId === floorId;
+}
+
+/** Tasks that have not ended yet (running or upcoming) versus tasks that ended before `now`. */
+export function splitTasks(tasks, now) {
+  const ended = (task) => Date.parse(task.ends_at || task.starts_at) < now;
+  return { current: tasks.filter((task) => !ended(task)), earlier: tasks.filter(ended) };
+}
+
+/** "rough_in" -> "Rough-in". */
+export function inspectionKindLabel(kind) {
+  const text = (kind || "inspection").replaceAll("_", "-");
+  return text[0].toUpperCase() + text.slice(1);
+}
+
 export function floorOf(index, zoneId) {
   return ancestors(index, zoneId).find((id) => index.get(id).kind === "floor") || null;
 }
@@ -90,7 +107,12 @@ export function zoneDetails(index, state, zoneId) {
   const crews = Object.fromEntries((state.crews || []).map((crew) => [crew.id, crew]));
   const inspections = (state.inspections || [])
     .filter((inspection) => scope.has(inspection.zone_id))
-    .map((inspection) => ({ inspection, evidence: evidenceFor(evidence, inspection) }));
+    .map((inspection) => {
+      const records = evidenceFor(evidence, inspection);
+      const counts = { confirmed: 0, unconfirmed: 0, rejected: 0 };
+      for (const record of records) counts[record.review_status] = (counts[record.review_status] || 0) + 1;
+      return { inspection, evidence: records, counts, confirmedPassed: inspectionConfirmedPassed(inspection, evidence) };
+    });
   const unresolvedEvidence = evidence.filter((record) => record.scope.kind === "inspection"
     && !record.scope.inspection_id && (!record.scope.zone_id || scope.has(record.scope.zone_id)));
   const plan = (state.plans || []).find((candidate) => candidate.floor_id === floorId) || null;

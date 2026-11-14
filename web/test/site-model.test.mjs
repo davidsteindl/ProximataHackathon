@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
-  ancestors, changedElements, describeChange, elementStatus, flagsForZone, floorOf, indexZones,
-  inspectionConfirmedPassed, viewForZone, zoneBounds, zoneDetails, zoneStatus,
+  ancestors, changedElements, describeChange, elementStatus, flagsForZone, floorOf, floorVisible, indexZones,
+  inspectionConfirmedPassed, inspectionKindLabel, splitTasks, viewForZone, zoneBounds, zoneDetails, zoneStatus,
 } from "../lib/site-model.mjs";
 
 const zone = (id, kind, children = []) => ({ id, kind, name: id, children });
@@ -112,4 +112,34 @@ test("zone bounds and route-derived view", () => {
   assert.deepEqual(viewForZone(index, null), { known: true, floorId: null, mode: "orbit", highlight: null });
   assert.equal(viewForZone(index, "XX-404").known, false);
   assert.equal(viewForZone(index, "B1").floorId, null);
+});
+
+test("isolating a floor shows only that floor, not the floors below it", () => {
+  const floors = ["F1", "F2", "F3", "F4"];
+  assert.deepEqual(floors.filter((id) => floorVisible("F3", id)), ["F3"]);
+  assert.deepEqual(floors.filter((id) => floorVisible("F1", id)), ["F1"]);
+  assert.deepEqual(floors.filter((id) => floorVisible(null, id)), floors, "the whole building without isolation");
+});
+
+test("tasks split into running/upcoming and already ended; nothing past is called upcoming", () => {
+  const now = Date.parse("2026-11-14T12:00:00Z");
+  const tasks = [
+    { id: "plumbing-F3", starts_at: "2026-11-13T07:00:00Z", ends_at: "2026-11-13T16:00:00Z" },
+    { id: "insulation-F3", starts_at: "2026-11-14T08:00:00Z", ends_at: "2026-11-14T17:00:00Z" },
+    { id: "drywall-F3", starts_at: "2026-11-15T06:00:00Z", ends_at: "2026-11-15T15:00:00Z" },
+    { id: "no-end", starts_at: "2026-11-13T06:00:00Z" },
+  ];
+  const { current, earlier } = splitTasks(tasks, now);
+  assert.deepEqual(current.map((t) => t.id), ["insulation-F3", "drywall-F3"], "a running task still counts");
+  assert.deepEqual(earlier.map((t) => t.id), ["plumbing-F3", "no-end"]);
+  assert.equal(inspectionKindLabel("rough_in"), "Rough-in");
+});
+
+test("inspection summaries count review states and never treat unconfirmed passes as passed", () => {
+  const records = [evidence("seed", "pending", "confirmed", "seed_baseline"), evidence("llm1", "passed", "unconfirmed"), evidence("llm2", "failed", "unconfirmed"), evidence("x", "passed", "rejected")];
+  const [summary] = zoneDetails(index, state({ flags: [], evidence: records }), "3A").inspections;
+  assert.deepEqual(summary.counts, { confirmed: 1, unconfirmed: 2, rejected: 1 });
+  assert.equal(summary.confirmedPassed, false);
+  const [passed] = zoneDetails(index, state({ flags: [], evidence: [evidence("human", "passed", "confirmed")] }), "3A").inspections;
+  assert.equal(passed.confirmedPassed, true);
 });
