@@ -59,6 +59,20 @@ export function EvidenceItem({ record, timezone, href }) {
   );
 }
 
+export function BlockedTasks({ flag }) {
+  const tasks = flag.blocked_tasks || [];
+  if (tasks.length === 0) return null;
+  return (
+    <div className="stack small">
+      <strong>Tasks affected by the open Precondition</strong>
+      <ul className="plain">{tasks.map((task) => (
+        <li key={task.id}><span className="mono">{task.id}</span> · {task.name} · {task.zone_id} · Crew {task.crew_id}</li>
+      ))}</ul>
+      <p className="meta">Check with the Superintendent before starting. A pause instruction requires separate Proposal approval.</p>
+    </div>
+  );
+}
+
 function FlagCard({ flag, timezone, isNew }) {
   const evaluation = EVALUATION[flag.evaluation] || { text: label(flag.evaluation), tone: "unk" };
   const announcement = flag.sources[0];
@@ -75,6 +89,7 @@ function FlagCard({ flag, timezone, isNew }) {
         <Chip tone={evaluation.tone} glyph>{evaluation.text}</Chip>
       </div>
       <p>{flag.explanation}</p>
+      <BlockedTasks flag={flag} />
       {announcement && (
         <figure className="source">
           <blockquote>{announcement.quote}</blockquote>
@@ -163,7 +178,7 @@ function TaskList({ tasks, flags, timezone }) {
   return (
     <ol className="tasks">
       {tasks.map((task) => {
-        const flagged = flags.find((flag) => flag.task_id === task.id);
+        const flagged = flags.find((flag) => flag.task_id === task.id || flag.blocked_tasks?.some((blocked) => blocked.id === task.id));
         return (
           <li key={task.id}>
             <div className="task-name">{task.name}{flagged && <Chip tone="crit">Flag {flagged.type}</Chip>}</div>

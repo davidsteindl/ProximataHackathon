@@ -78,12 +78,16 @@ def enqueue_flag_warning(session, flag, statement, crew, now, task=None):
     else:
         source = (f"Source: morning scan of the site schedule, {task.id} "
                   f"starts {task.starts_at.isoformat()} (no message received).\n")
+    from app.blocked_tasks import blocked_tasks
+    affected = blocked_tasks(session, flag, statement.source.sent_at if statement is not None else flag.created_at)
     content = (
         f"Flag {flag.type}: {flag.activity} in Zone {flag.zone_id}.\n"
         f"Task: {flag.task_id or 'unresolved'}.\n"
         f"Required Precondition: {flag.precondition}; Inspection: {flag.inspection_id or 'unresolved'}.\n"
         f"Evaluation at detection: {flag.evaluation}. {flag.explanation}\n"
         f"{source}"
+        f"Affected Tasks: {', '.join(item.id for item in affected) or 'unresolved'}.\n"
+        "Check with the Superintendent before starting.\n"
         f"Current details: {dashboard_link(flag)}\n"
         "This warning conveys facts only. Work decisions require the Superintendent."
     )
@@ -176,7 +180,8 @@ def delivery_result(message_id: str, result: DeliveryResult, session: Database):
             message.sent_at = now
             flag = session.scalar(select(models.Flag).where(models.Flag.id == message.flag_id).with_for_update())
             # Only the Crew Lead warning notifies; an escalation is not that notification.
-            if flag is not None and message.kind == "warning" and flag.state == "detected":
+            if (flag is not None and message.kind == "warning" and flag.state == "detected"
+                    and message.dedup_key == f"warning:{flag.id}"):
                 transition_flag(session, flag, action="notified", actor="worker",
                                 actor_type="system", channel=message.channel,
                                 source_ref=f"outbox:{message.id}")

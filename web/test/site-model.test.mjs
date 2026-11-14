@@ -255,3 +255,27 @@ test("next 48 h: a task is blocked only by an open Flag naming it; an unconfirme
   assert.deepEqual(items.map((item) => [item.key, item.chip.text]), [["drywall-F3", "Blocked by Flag"], ["rough-in-F3", "Pass not confirmed"]]);
   assert.equal(upcoming({ tasks, inspections: [], flags: [], evidence: [], plans: [] }, index, now)[0].chip.text, "No open Flag");
 });
+
+test("a successor room shows the originating Flag and its blocked Tasks", () => {
+  const affected = { ...flagA, blocked_tasks: [{ id: "finish-3A", zone_id: "3A" }] };
+  assert.deepEqual(flagsForZone(index, [affected], "3A-BATH"), [affected]);
+  assert.deepEqual(flagsForZone(index, [affected], "2B"), []);
+  assert.deepEqual(flagsForZone(index, [{ ...affected, state: "resolved" }], "3A-BATH"), []);
+  assert.deepEqual(zoneDetails(index, state({ flags: [affected] }), "3A-BATH").flags, [affected]);
+});
+
+test("next 48 h links blocked successors to their open Flag", async () => {
+  const { upcoming } = await import("../lib/site-model.mjs");
+  const task = { id: "finish-3A", name: "Finishing", zone_id: "3A", starts_at: "2026-11-15T06:00:00Z" };
+  const affected = { ...flagA, task_id: "drywall-F3", blocked_tasks: [task] };
+  const input = { tasks: [task], inspections: [], flags: [affected], evidence: [], plans: [] };
+  const now = Date.parse("2026-11-14T17:00:00Z");
+  const [item] = upcoming(input, index, now);
+  assert.equal(item.chip.text, "Blocked by Flag");
+  assert.equal(item.href, "/flags/flag-a");
+  for (const state of ["resolved", "false_alarm"]) {
+    const [closed] = upcoming({ ...input, flags: [{ ...affected, state }] }, index, now);
+    assert.equal(closed.chip.text, "No open Flag");
+    assert.equal(closed.href, "/zones/3A");
+  }
+});

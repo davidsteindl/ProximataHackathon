@@ -173,7 +173,7 @@ def deliver_telegram_outbox(telegram, api):
         return
     result = {"lease_token": message["lease_token"]}
     try:
-        if message["flag_id"] is None:
+        if message["flag_id"] is None or str(message["recipient"]).startswith("-"):
             provider_id = telegram.send(message)
         else:
             provider_id = telegram.send_warning(message)

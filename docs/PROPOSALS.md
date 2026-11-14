@@ -91,3 +91,29 @@ holds the follow-up for `lead-drywall`.
 - Advice is generated once per Flag. It is not regenerated when the evaluation changes; `created_at` shows how old it is.
 - Site Knowledge (#21) is not part of the facts yet.
 - Approval does not change the schedule. Follow-up messages are the only effect.
+
+## Blocked Tasks and hold Proposal (#38)
+
+After validating the advisor output, the API adds a separate deterministic
+`Put blocked Tasks on hold` Proposal when the Flag has blocked Tasks. Its message
+is fixed: “Tasks on hold; do not continue without talking to your supervisor
+(Superintendent).” Its affected Tasks, Crews and Zones are a snapshot at creation,
+shown with the exact message before approval. This is additional to the advisor's
+up to three suggestions; it is not an LLM decision. Advice still follows the
+existing once-per-Flag generation and retry behavior.
+
+Only approval of this Proposal sends that instruction to its Crew Leads and the
+Crew groups configured in `TELEGRAM_CREW_GROUPS_JSON` (Crew ID → negative chat ID).
+The worker requires groups to appear in `TELEGRAM_ALLOWED_CHATS_JSON`. A rejection
+sends no instruction; approval of another measure does not approve this one.
+Group follow-ups use `followup:<proposal>:group:<crew>` dedup keys.
+
+Before any approval, each affected Crew receives a factual warning with the open
+Precondition, source and “Check with the Superintendent before starting.” It does
+not change Task dates or send a pause instruction. These use existing `warning`
+outbox rows with `blocked:<flag>:<crew>:<lead|group>` dedup keys. The responsible
+Crew Lead's original `warning:<flag>` covers that lead without an extra notice.
+Rule re-evaluation can inform newly affected Crews; it never repeats a route for
+the same Flag. Delivery and queueing are audited. `GET /flags[/{id}]` adds
+`blocked_tasks` using the existing Task response shape, also shown in Flag detail
+and affected room views. No database migration is required.

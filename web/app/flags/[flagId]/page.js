@@ -4,7 +4,7 @@ import { FLAG_STATE, LIFECYCLE, NOTIFICATION, SEVERITY, flagTitle, formatTime, i
 import Advice from "../../advice";
 import { FlagDecisions } from "../../decisions";
 import { StatePanel, WorkShell } from "../../shell";
-import { Chip, EVALUATION, EvidenceItem } from "../../site-view/zone-panel";
+import { BlockedTasks, Chip, EVALUATION, EvidenceItem } from "../../site-view/zone-panel";
 
 export const dynamic = "force-dynamic";
 
@@ -101,6 +101,13 @@ function FlagDetail({ flag, site }) {
                 <dt>Last updated</dt><dd><When value={flag.updated_at} site={site} /></dd>
               </dl>
               {flag.type === "B" && <p className="small muted" style={{ margin: 0 }}>Receipt confirms that the revision was received; implementation needs separate Evidence.</p>}
+            </div>
+          </section>
+
+          <section className="panel" aria-label="Affected Tasks">
+            <h2>Affected Tasks</h2>
+            <div className="pad"><BlockedTasks flag={flag} />
+              {!flag.blocked_tasks?.length && <p className="small muted">No Tasks currently blocked by this Flag.</p>}
             </div>
           </section>
 

@@ -304,6 +304,18 @@ betroffenen Crew Leads. Eine Ablehnung ändert nichts. Die Freigabe bestätigt k
 Nachweise und schließt keinen Flag. Migration `0014` ergänzt `flag_advice`,
 `proposals` und `outbox_messages.kind`/`dedup_key`. Details: [docs/PROPOSALS.md](docs/PROPOSALS.md).
 
+### Blockierte Tasks und Crew-Hinweise (Issue #38)
+
+Flags liefern zusätzlich `blocked_tasks`: anstehende Tasks in der Zone samt
+Unterzonen, der zugeordnete Task und deren transitive Nachfolger. Flag-Detail und
+Raumansicht zeigen diese Liste. Faktische Hinweise gehen je Flag/Crew einmal über
+die Outbox an Leads und konfigurierte Gruppen (`TELEGRAM_CREW_GROUPS_JSON`, z. B.
+`{"drywall":"-100123456"}`; Gruppe auch in `TELEGRAM_ALLOWED_CHATS_JSON` eintragen).
+Der separate Proposal „Put blocked Tasks on hold“ zeigt Empfänger, Tasks und die
+geplante Pausenanweisung. Nur seine Freigabe versendet diese Anweisung; Ablehnung
+sendet nichts. Termine und Evidence bleiben unverändert. Details und Prüfschritte:
+[Proposals](docs/PROPOSALS.md#blocked-tasks-and-hold-proposal-38).
+
 ### DXF-Plan-Diff (Issue #17)
 
 Vor dem Hero-Replay mindestens `A-103_RevC.dxf` über den CAD-Import laden.

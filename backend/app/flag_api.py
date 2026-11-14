@@ -9,7 +9,8 @@ from app import models
 from app.outbox import OutboxView
 from app.ingestion_schemas import EventView
 from app.ingestion import event_views
-from app.schemas import EvidenceView, Identifier, Record, Timestamp
+from app.schemas import EvidenceView, Identifier, Record, Task, Timestamp
+from app.blocked_tasks import blocked_tasks
 from app.site_api import Database
 from app.rules import flag_evidence
 from app.proposal_api import AdviceView, advice_view
@@ -43,6 +44,7 @@ class FlagView(Record):
     type: str
     zone_id: Identifier
     task_id: Identifier | None
+    blocked_tasks: list[Task]
     activity: str
     precondition: str
     inspection_id: Identifier | None
@@ -64,7 +66,8 @@ class FlagView(Record):
 
 def flag_view(session, flag):
     return FlagView.model_validate({
-        **{key: getattr(flag, key) for key in FlagView.model_fields if key not in {"sources", "evidence", "awaiting_human_closure", "notifications", "advice"}},
+        **{key: getattr(flag, key) for key in FlagView.model_fields if key not in {"sources", "evidence", "awaiting_human_closure", "notifications", "advice", "blocked_tasks"}},
+        "blocked_tasks": blocked_tasks(session, flag),
         "advice": advice_view(session, flag),
         "awaiting_human_closure": flag.evaluation == "satisfied" and flag.state not in {"resolved", "false_alarm"},
         "notifications": session.scalars(select(models.OutboxMessage).where(models.OutboxMessage.flag_id == flag.id)).all(),

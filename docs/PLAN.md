@@ -87,6 +87,27 @@ schließt keinen Flag. REST-, Schema- und Integrationsdetails: [FLAGS.md](FLAGS.
 - Nachweise können auch ohne bestehenden Flag geprüft werden. Nach jeder Bestätigung, Ablehnung oder Klärung wird die Regelprüfung erneut ausgeführt; Audit-Einträge enthalten Person, Zeitpunkt, Quelle, Geltungsbereich und Entscheidung. Nachweisbestätigung, Kenntnisnahme eines Flags, Proposal-Freigabe und Flag-Abschluss sind getrennte Aktionen.
 - **Seed/Replay:** Explizit gekennzeichnete synthetische Ausgangsnachweise dürfen den bestätigten Demo-Ausgangsstand herstellen; Herkunft und Import werden protokolliert, ohne eine menschliche Bestätigung zu erfinden. Neu eingespielte LLM-Aussagen bleiben auch offline unbestätigt. **Deterministische CAD-Events** dürfen Geometrie und betroffene Zonen aktualisieren und Prüfungen auslösen; sie bestätigen weder Abnahmen noch Crew-Kenntnisnahmen oder Task-Abschlüsse.
 
+### Blockierte Tasks (#38)
+
+`GET /flags` und `GET /flags/{id}` ergänzen `blocked_tasks` (Task-Objekte): Tasks
+in der Flag-Zone samt Unterzonen, der zugeordnete Task (auch bei Etagen-Scope)
+und transitive Nachfolger. Historische Tasks werden anhand des Quellzeitpunkts
+bzw. der Scan-Uhr ausgefiltert (`ends_at > as_of`); Zyklen enden über besuchte IDs.
+Erfüllte Preconditions und geschlossene Flags liefern keine blockierten Tasks.
+Pro Flag/Crew geht einmal ein faktischer Hinweis an den Crew Lead und die
+konfigurierte Telegram-Gruppe über die bestehende Outbox (`kind=warning`). Die
+bisherige Warnung übernimmt den Hinweis für den verantwortlichen Crew Lead.
+`TELEGRAM_CREW_GROUPS_JSON` ordnet Crew-IDs negativen Gruppen-Chat-IDs zu;
+der Worker verlangt weiterhin die Chat-Allowlist. Fehlende Gruppenzuordnungen
+werden ausgelassen, fehlende Lead-Adressen bleiben sichtbare Versandfehler.
+Die Task-Termine und Evidence werden dabei nicht geändert.
+Zusätzlich erhält der Superintendent einen eigenen Proposal mit einer festen Liste
+betroffener Tasks/Crews und dem Wortlaut „Tasks on hold; do not continue without
+talking to your supervisor (Superintendent).“. Nur die Freigabe genau dieses
+Proposals versendet diese Anweisung an Leads und Gruppen (`proposal_followup`).
+Andere freigegebene Maßnahmen senden sie nicht mit; Ablehnung sendet nichts.
+Die Freigabe ändert weder Termine noch Evidence und schließt keinen Flag.
+
 ### 3.3 Flag-Lebenszyklus: nichts geht verloren
 `erkannt → benachrichtigt → zur Kenntnis genommen → in Bearbeitung → erledigt | Fehlalarm`
 

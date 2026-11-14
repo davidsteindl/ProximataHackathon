@@ -336,6 +336,10 @@ def evaluate_site(session, *, source_ref="rules:scan", actor="rule_engine", chan
                 continue
             check(rule, work, None)
 
+    from app.blocked_tasks import enqueue_blocked_notices
+    for flag in flags.values():
+        enqueue_blocked_notices(session, flag, now)
+
 
 @event.listens_for(Session, "before_flush")
 def queue_rule_evaluation(session, _context, _instances):
