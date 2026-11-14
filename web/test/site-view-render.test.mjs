@@ -96,7 +96,7 @@ test("the light GroundIQ shell: active Site plan pill, 2D/3D camera modes, quick
   assert.match(html, />2D<\/button>/);
   assert.match(html, />3D<\/button>/);
   assert.match(html, /aria-label="Quick actions"/);
-  assert.match(html, /href="\/chat"[^>]*>.*Ask GroundIQ/);
+  assert.doesNotMatch(html, /href="\/chat"|Ask GroundIQ/, "no dashboard chat (#19 rescoped, PLAN §4)");
   assert.match(html, /aria-label="Collapse information panel"/);
   assert.doesNotMatch(html, /FF8A4A/i, "no orange brand accent left in the markup");
 });

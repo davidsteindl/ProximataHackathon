@@ -1,15 +1,15 @@
 import Link from "next/link";
 import { StatePanel, WorkShell } from "../shell";
 
-export const metadata = { title: "Chat" };
+export const metadata = { title: "No dashboard chat" };
 
+// Kept only for old links: #19 was rescoped to a Q&A core for Telegram, without a dashboard chat (PLAN §4).
 export default function ChatPage() {
   return (
-    <WorkShell current="chat">
-      <div className="page-head"><h1>Ask GroundIQ</h1></div>
+    <WorkShell>
       <section className="panel">
-        <StatePanel kind="unavailable" title="Chat is not available yet" action={<Link className="btn" href="/flags">Open the flag inbox</Link>}>
-          The read-only chat agent arrives with #19. It will answer from the site record through the same MCP tools as any external agent, and it cannot confirm Evidence, approve Proposals or close Flags.
+        <StatePanel kind="unavailable" heading="h1" title="There is no chat in the dashboard" action={<Link className="btn" href="/">Back to the overview</Link>}>
+          Crews ask questions in Telegram, where answers come from the site record with sources. External agents connect through the MCP endpoint. The room view, Flag details and the activity feed show the same facts here.
         </StatePanel>
       </section>
     </WorkShell>

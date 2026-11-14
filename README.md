@@ -38,9 +38,11 @@ In PowerShell statt `cp`: `Copy-Item .env.example .env`. Beim ersten Start baut 
   (Prüfung, auch ohne Flag), `/proposals` (Advisor-Proposals mit Freigabe/Ablehnung
   durch den Superintendent, #13), `/activity` (Timeline, Terminplan mit Filtern, Site
   Knowledge und Feedback-Kennzahl aus #21, Pläne, Inspections, API-/DB-Status). Links
-  aus Warnungen (`/#flag-<id>`) leiten auf `/flags/<id>` weiter. `/chat` zeigt bis #19
-  ausdrücklich „nicht verfügbar“. Der Demo-Rollenumschalter sitzt in der
-  Navigation und gilt seitenübergreifend (keine Authentifizierung). Gestaltung:
+  aus Warnungen (`/#flag-<id>`) leiten auf `/flags/<id>` weiter. Einen Chat im Dashboard
+  gibt es nicht (#19, PLAN §4): Fragen laufen über Telegram (#20) und `POST /qa`, externe
+  Agents verbinden sich über `/mcp`; alte Links auf `/chat` erklären das. Der
+  Demo-Rollenumschalter sitzt in der Navigation und gilt seitenübergreifend (keine
+  Authentifizierung). Gestaltung:
   [design/HANDOFF.md](design/HANDOFF.md).
 - Statischer Site Record (Issue #5): Nach dem Start in einem zweiten Terminal
   `docker compose exec api python -m app.seed` ausführen. Das Dashboard zeigt dann
