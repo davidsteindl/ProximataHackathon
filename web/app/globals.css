@@ -18,3 +18,12 @@ th, td { padding: 12px 8px; border-bottom: 1px solid #d9dfe5; vertical-align: to
 summary { cursor: pointer; }
 .flag-inbox { padding-left: 24px; }
 .flag-inbox > li { padding: 12px 0; border-bottom: 1px solid #d9dfe5; }
+.activity-feed { list-style: none; padding: 0; }
+.feed-entry { padding: 12px 0 12px 12px; border-bottom: 1px solid #d9dfe5; border-left: 4px solid #d9dfe5; }
+.feed-entry h3 { margin: 4px 0; font-size: 1.05rem; }
+.feed-entry p { margin: 4px 0; }
+.feed-meta, .feed-context { color: #596877; font-size: 0.9rem; }
+.feed-unconfirmed { border-left-color: #c98a1b; }
+.feed-confirmed, .feed-deterministic { border-left-color: #2f7d4f; }
+.feed-rejected { border-left-color: #b3392f; }
+.feed-advice { border-left-color: #5a6fb0; }

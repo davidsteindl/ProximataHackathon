@@ -133,6 +133,8 @@ Geometrie oder ein fehlender Vorgänger ist kein Nachweis für unveränderte Pl�
 
 REST-Erweiterungen: `GET /context/zones/<id>`, `/context/search`, `/context/timeline`,
 `POST /agent/proposals` sowie lesend `GET /proposals` und `/proposals/<id>`.
+Der Neuigkeiten-Feed (#37) liest `GET /feed` (Filter `zone_id`, `from_time`/`to_time`,
+`kind`, Paging per `cursor`); Vertrag in [PLAN §3.6](docs/PLAN.md).
 Migration `0010` persistiert ausschließlich ungeprüfte Proposals; der Seed-Reset
 entfernt sie. Es werden keine vorhandenen Evidence-/Flag-Verträge geändert.
 
