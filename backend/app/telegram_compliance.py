@@ -104,7 +104,8 @@ def privacy_command(command: PrivacyCommand, session: Database):
                     f"von Baukonflikten (keine Personenkennzahlen). Rohtexte/Anhänge: {retention_days()} Tage. "
                     f"Verantwortlich: {owner}. Nur synthetische Daten! "
                     "Quellmetadaten, abgeleitete Events, Nachweise und relevante Flag-Zitate bleiben "
-                    "als Baustellenrecord erhalten. "
+                    "als Baustellenrecord erhalten. Fragen werden aus dem Record beantwortet; "
+                    "Entscheidungsfragen gehen per E-Mail an den Superintendent. "
                     "Im privaten Bot-Chat: /my_data für Auskunft, /delete_my_data für Rohdatenlöschung. "
                     "Telegram ist nicht Ende-zu-Ende-verschlüsselt. Keine Freigaben per Chat.")
         elif command.command == "my_data":
@@ -142,7 +143,7 @@ def privacy_command(command: PrivacyCommand, session: Database):
             text = ("Rohtexte, Anhänge und ausstehende Auskunftskopien gelöscht. Numerische Quell-IDs, "
                     "Zeitpunkte, Rollen, abgeleitete Events, Nachweise, "
                     "Audit und relevante Flag-Zitate bleiben für die Nachvollziehbarkeit erhalten. "
-                    "Keine Nachweisentscheidung oder Flag-Änderung. Bereits zugestellte Telegram-Kopien "
+                    "Keine Nachweisentscheidung oder Flag-Änderung. Bereits zugestellte Telegram-/Gmail-Kopien "
                     "werden dadurch nicht gelöscht. Weitere Löschanfragen an den Verantwortlichen.")
         else:
             text = ("Privater Bot-Chat: /my_data und /delete_my_data. /privacy zeigt die Datenschutzhinweise. "

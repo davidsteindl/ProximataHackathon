@@ -1,6 +1,7 @@
 """Telegram -> ingestion -> Q&A -> real MCP/API -> outbox -> mocked transports."""
 
 import json
+from datetime import datetime
 from contextlib import asynccontextmanager
 from unittest.mock import Mock
 
@@ -236,3 +237,38 @@ def test_decision_router_gets_redacted_text_and_role_only(qa_stack, monkeypatch)
     assert "max@example.test" not in text and "+43" not in text and role == "crew_lead"
     forward = next(row for row in api.get("/outbox").json() if row["kind"] == "decision_request")
     assert "max@example.test" not in forward["content"] and "+43" not in forward["content"]
+
+
+@pytest.mark.parametrize("step_id", ["plan_question", "learning_before"])
+def test_online_replay_routes_its_ingested_telegram_question_through_real_qa(qa_stack, step_id):
+    from app.replay import ReplayError
+    from app.replay_channels import ScenarioAPI
+    from app.telegram import handle_update
+    from test_replay import CAD, build_replay
+    from test_replay_channels import scenario_step
+
+    api, _ = qa_stack
+    note = revision(api)
+    replay, _ = build_replay(api, pause=lambda _: "q")
+    step = scenario_step(step_id)
+    proxy = ScenarioAPI(api, step, replay.clock.timestamp(step), "qa-online-test", CAD)
+    telegram, http, _ = bot([message(step.text)])
+    telegram.settings.crews["123"] = step.sender_crew_id
+    with pytest.raises(ReplayError, match="only ingest"):
+        proxy.post("/telegram/qa", headers=HEADERS, json={"source_id": note["source"]["id"]})
+    with http:
+        handle_update(telegram, proxy, message(step.text))
+    original = proxy.result["source"]
+    assert original["channel"] == "telegram" and original["external_id"] == "1"
+    assert datetime.fromisoformat(original["sent_at"]) == replay.clock.timestamp(step)
+    content = replies(api)[0]["content"]
+    if step_id == "plan_question":
+        assert "Rev D" in content and f"source:{note['source']['id']}" in content
+    else:
+        assert "queued for the Superintendent" in content
+        forward = next(row for row in api.get("/outbox").json() if row["kind"] == "decision_request")
+        assert f"source:{original['id']}" in forward["content"]
+    for path, payload in (("/telegram/qa", {"source_id": note["source"]["id"]}),
+                          ("/evidence/example/reviews", {})):
+        with pytest.raises(ReplayError, match="only ingest"):
+            proxy.post(path, headers=HEADERS, json=payload)
