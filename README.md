@@ -400,6 +400,28 @@ konfigurierbare Rohdaten-Retention. Warnungen und Compliance-Antworten laufen
 über die kanalgebundene Outbox; der Bot-Token bleibt ausschließlich im Worker.
 Setup, REST-/Schemaänderungen und Grenzen der Löschung: [Telegram](docs/TELEGRAM.md).
 
+### Fotos als Beleg (Issue #26, Stretch)
+
+Mit `TELEGRAM_PHOTOS_ENABLED=true` lädt der `worker` Fotos aus freigegebenen Chats
+herunter und übergibt sie mit der Bildunterschrift an `POST /ingestion/messages`.
+`api` lässt sie von einem Vision-LLM beschreiben (`VISION_PROVIDER`, offline
+`cached` mit [demo/vision-cache.json](backend/demo/vision-cache.json)). Jeder Befund
+wird ein unbestätigtes Event (`origin: llm_vision`, `details.visual_finding`,
+`details.attachment_id`); ein Foto einer geschlossenen Wand löst dieselbe
+deterministische Prüfung A aus und hängt am passenden Flag. Ein Abnahme-Etikett
+zählt erst nach menschlicher Evidence-Bestätigung. Offline nachstellen:
+
+```bash
+curl -X POST localhost:8000/ingestion/messages -H 'Content-Type: application/json' -d "{
+  \"channel\":\"telegram\",\"source_key\":\"-100\",\"external_id\":\"photo-1\",
+  \"sender_role\":\"crew_lead\",\"sender_crew_id\":\"drywall\",
+  \"sent_at\":\"2026-11-15T07:30:00Z\",\"text\":\"3B ist schon zu\",
+  \"attachments\":[{\"file_name\":\"wall.png\",\"media_type\":\"image/png\",
+  \"content_base64\":\"$(base64 -w0 backend/demo/photos/3B-wall-closed.png)\"}]}"
+```
+
+Gesichter/Unbeteiligte, Retention und die Nachweisgrenze: [Compliance](docs/COMPLIANCE.md).
+
 ### Lokale Checks
 
 Backend (Python 3.13, aus dem Repository-Ordner):

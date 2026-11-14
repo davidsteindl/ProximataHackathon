@@ -90,7 +90,7 @@ class EventView(Record):
     time_expression: str | None
     details: dict
     created_at: Timestamp
-    origin: Literal["llm_statement", "deterministic_plan_diff"] = "llm_statement"
+    origin: Literal["llm_statement", "llm_vision", "deterministic_plan_diff"] = "llm_statement"
     source: SourceMessageView
     evidence: list[EvidenceView] = Field(default_factory=list)
 

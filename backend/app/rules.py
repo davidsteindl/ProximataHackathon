@@ -98,7 +98,10 @@ class InspectionPassed:
         if work.event is None:
             # Morning scan: the schedule alone; the Crew trade names the activity.
             return work.task is not None and work.crew is not None and work.crew.trade in self.activities
-        return work.event.intent == "planned_work" and work.event.activity in self.activities
+        # A photo of already closed work (#26) is checked like an announcement:
+        # "too late, but now known". Both remain unconfirmed statements.
+        observed = work.event.intent == "observation" and work.event.details.get("origin") == "llm_vision"
+        return (work.event.intent == "planned_work" or observed) and work.event.activity in self.activities
 
     def evaluate(self, session, work, zones):
         scope = ancestors(work.zone_id, zones)

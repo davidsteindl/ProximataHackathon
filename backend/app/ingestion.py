@@ -16,6 +16,7 @@ from app.cad_extract import InvalidPlan
 from app.event_mapping import build_events
 from app.extraction import ExtractionError, get_extractor, redact_text, validate_quotes
 from app.ingestion_schemas import EventView, IngestionResult, SourceMessageView
+from app.vision import IMAGE_TYPES, VISION_CHANNELS, get_vision_extractor, photo_statements
 
 
 def source_identity(payload):
@@ -67,7 +68,7 @@ def store_source(session, payload):
             return existing.id, True
 
 
-def process_source(session, source_id, extractor_factory=None):
+def process_source(session, source_id, extractor_factory=None, vision_factory=None):
     token, now = uuid4().hex, datetime.now(UTC)
     with session.begin():
         claimed = session.execute(
@@ -87,10 +88,23 @@ def process_source(session, source_id, extractor_factory=None):
         source = session.get(models.SourceMessage, source_id)
         text, role, sender_id = source.text, source.sender_role, source.sender_id
         has_dxf = any(item.file_name.lower().endswith(".dxf") for item in source.attachments)
+        # Photos are interpreted together with their caption (#26).
+        photos = [(item.id, item.media_type, item.content) for item in source.attachments
+                  if source.channel in VISION_CHANNELS and item.media_type in IMAGE_TYPES] if not has_dxf else []
     # No database transaction or row lock is held during the provider call.
-    backend, extraction_error = None, None
+    backend, extraction_error, photo_details = None, None, []
     try:
-        if text.strip():
+        if photos:
+            vision = (vision_factory or get_vision_extractor)()
+            backend = vision.name
+            redacted = redact_text(text, sender_id)
+            statements = []
+            for attachment_id, media_type, content in photos:
+                for statement, details in photo_statements(
+                        vision.describe(content, media_type, redacted, role), redacted, text, attachment_id):
+                    statements.append(statement)
+                    photo_details.append(details)
+        elif text.strip():
             try:
                 extractor = (extractor_factory or get_extractor)()
                 backend = extractor.name
@@ -132,7 +146,10 @@ def process_source(session, source_id, extractor_factory=None):
                     session.info.pop("defer_rules", None)
                 rules.evaluate_site(session, source_ref=f"source:{source.id}")
             else:
-                build_events(session, source, statements)
+                events = build_events(session, source, statements)
+                for event, details in zip(events, photo_details):
+                    # Set before the flush that runs the rules on these Events.
+                    event.details = {**event.details, **details}
             source.status, source.error_code = "processed", extraction_error.code if extraction_error else None
             source.processing_token, source.processing_started_at = None, None
             source.extraction_backend = backend

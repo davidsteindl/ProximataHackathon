@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "description": "Synthetic recorded vision findings for offline demo/replay (#26). Keys: image SHA-256, redacted caption, sender role.",
+  "entries": [
+    {
+      "image_sha256": "6fdf5b112178bb9d7837623539a776b1916089702a20b5f77ee2b129a873b82c",
+      "caption": "3B ist schon zu",
+      "sender_role": "crew_lead",
+      "result": {
+        "findings": [
+          {
+            "finding": "Wall boarded with gypsum panels and screwed; no open installation visible.",
+            "confidence": 0.93,
+            "zones": [
+              "3B"
+            ],
+            "quote": "3B",
+            "work_state": "closed",
+            "inspection_kind": null,
+            "inspection_claim": null
+          }
+        ],
+        "people_visible": false
+      }
+    }
+  ]
+}

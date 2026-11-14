@@ -72,7 +72,11 @@ def enqueue(session, flag, kind, dedup_key, recipient, subject, content, now, ch
 def enqueue_flag_warning(session, flag, statement, crew, now, task=None):
     """Queue the factual warning; ``statement`` is None for schedule-only scan Flags."""
     lead = session.get(models.CrewLead, crew.lead_id) if crew else None
-    if statement is not None:
+    if statement is not None and statement.details.get("origin") == "llm_vision":
+        source = (f"Source: {statement.source.channel} photo, source:{statement.source_message_id}.\n"
+                  f"Photo finding (unconfirmed LLM interpretation, confidence {statement.confidence:.2f}): "
+                  f"{statement.details.get('visual_finding')}\n")
+    elif statement is not None:
         source = (f"Source: {statement.source.channel}, source:{statement.source_message_id}.\n"
                   f"Work announcement (unconfirmed statement): {statement.quote}\n")
     else:

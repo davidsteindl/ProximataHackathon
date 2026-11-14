@@ -37,6 +37,7 @@ async function loadPage() {
     "../../decisions": { FlagDecisions: () => null },
     "../../shell": { WorkShell: ({ children }) => React.createElement("main", null, children), StatePanel: () => null },
     "../../site-view/zone-panel": {
+      BlockedTasks: () => null,
       Chip: ({ children }) => React.createElement("span", null, children),
       EVALUATION: { not_satisfied: { text: "Not satisfied", tone: "crit", note: "" } },
       EvidenceItem: ({ record }) => React.createElement("li", null, record.quote),
