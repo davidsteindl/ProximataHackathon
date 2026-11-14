@@ -147,6 +147,13 @@ history. Confirmed current receipt without a counterclaim is `satisfied`; this
 means receipt only, not implementation. Neither Evidence confirmation nor
 “warning seen” closes a Flag or changes another confirmation.
 
+A strictly later, human-confirmed receipt supersedes an earlier non-receipt
+statement for evaluation only, matching the exact Crew, Zone and Revision.
+Compare source timestamps, never review timestamps. Both Evidence records and
+their review history remain unchanged. Simultaneous/newer negatives and
+different or unresolved scopes still require review; an unconfirmed receipt
+does not supersede anything.
+
 Migration `0006` makes revision filenames nullable and adds the JSON Flag context;
 existing Flags receive `{}`. CAD import serializes on the same Site lock and can
 replace provisional sequence/issue time with explicit CAD metadata for the same

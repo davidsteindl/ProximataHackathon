@@ -119,7 +119,7 @@ class RevisionAcknowledged:
         revision = work.revision
         crew_id = work.crew.id if work.crew else None
         records = receipt_evidence(session, work.zone_id, crew_id, revision, zones)
-        relevant, confirmed, acknowledged = [], [], []
+        relevant, confirmed, acknowledged, statement_times = [], [], [], {}
         for item in records:
             if item.review_status == "rejected":
                 continue
@@ -140,6 +140,7 @@ class RevisionAcknowledged:
                     continue
                 if statement.crew_id != item.crew_id or item.zone_id not in statement.zone_ids:
                     continue
+                statement_times[item.id] = utc(statement.source.sent_at)
             if trusted and covers and exact_crew and item.claim == "acknowledged" and item.revision_id:
                 acknowledged.append(session.get(models.Revision, item.revision_id))
             if item.revision_id != revision.id:
@@ -156,7 +157,20 @@ class RevisionAcknowledged:
                        acknowledged_revision=last.label if last else None,
                        acknowledged_revision_id=last.id if last else None,
                        affected_zones_origin="unconfirmed_revision_note")
-        claims = {item.claim for item in relevant}
+        positives = [item for item in confirmed if item.claim == "acknowledged"]
+
+        def superseded_nonreceipt(item):
+            # Receiving a revision later does not make the earlier non-receipt
+            # false. Retain both records; only supersede the earlier state for
+            # the same exact Crew/Zone/Revision using validated source times.
+            return (item.claim == "not_acknowledged" and item.id in statement_times
+                    and any(positive.id in statement_times
+                            and (item.crew_id, item.zone_id, item.revision_id)
+                            == (positive.crew_id, positive.zone_id, positive.revision_id)
+                            and statement_times[item.id] < statement_times[positive.id]
+                            for positive in positives))
+
+        claims = {item.claim for item in relevant if not superseded_nonreceipt(item)}
         if {"acknowledged", "not_acknowledged"} <= claims:
             status, explanation = "contradictory", "Revision receipt statements conflict; unresolved counterclaims require human review."
         elif any(item.claim == "acknowledged" for item in confirmed):

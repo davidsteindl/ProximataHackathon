@@ -240,3 +240,49 @@ def test_closing_one_crews_flag_does_not_skip_another_crews_review(initialized, 
     flag = next(item for item in initialized.get("/flags").json() if
                 item["type"] == "B" and item["context"]["crew_id"] == "drywall")
     assert flag["evaluation"] == "satisfied"
+
+
+@pytest.mark.parametrize("confirm_earlier", [False, True])
+def test_later_confirmed_receipt_supersedes_older_nonreceipt_without_rewriting_history(
+    initialized, engine, monkeypatch, confirm_earlier,
+):
+    statement(initialized, monkeypatch)
+    earlier = receipt(initialized, monkeypatch, external_id="not-yet", claim="not_acknowledged")
+    if confirm_earlier:
+        review(engine, earlier, "confirmed")
+    later = receipt(initialized, monkeypatch, external_id="received-later",
+                    sent_at="2026-11-13T12:00:00+01:00")
+    assert plumbing(initialized)["evaluation"] == "contradictory"
+    review(engine, later, "confirmed")
+    flag = plumbing(initialized)
+    assert flag["evaluation"] == "satisfied"
+    assert flag["state"] == "detected"
+    old = next(item for item in flag["evidence"] if item["id"] == earlier)
+    assert old["claim"] == "not_acknowledged"
+    assert old["review_status"] == ("confirmed" if confirm_earlier else "unconfirmed")
+    assert len(old["history"]) == (2 if confirm_earlier else 1)
+    review(engine, later, "rejected")
+    assert plumbing(initialized)["evaluation"] == ("not_satisfied" if confirm_earlier else "unknown")
+
+
+@pytest.mark.parametrize("negative_time", ["2026-11-13T11:00:00+01:00", "2026-11-13T12:00:00+01:00"])
+def test_simultaneous_or_newer_nonreceipt_survives_late_review_of_old_receipt(
+    initialized, engine, monkeypatch, negative_time,
+):
+    statement(initialized, monkeypatch)
+    positive = receipt(initialized, monkeypatch)
+    receipt(initialized, monkeypatch, external_id="counterclaim", claim="not_acknowledged",
+            sent_at=negative_time)
+    review(engine, positive, "confirmed")
+    assert plumbing(initialized)["evaluation"] == "contradictory"
+
+
+@pytest.mark.parametrize("negative_scope", [{"zones": ["3B-BATH"]}, {"crew": "ambiguous"}, {"label": None}])
+def test_later_receipt_does_not_erase_counterclaims_with_different_or_unresolved_scope(
+    initialized, engine, monkeypatch, negative_scope,
+):
+    statement(initialized, monkeypatch)
+    receipt(initialized, monkeypatch, external_id="counterclaim", claim="not_acknowledged", **negative_scope)
+    positive = receipt(initialized, monkeypatch, external_id="later", sent_at="2026-11-13T12:00:00+01:00")
+    review(engine, positive, "confirmed")
+    assert plumbing(initialized)["evaluation"] == "contradictory"
