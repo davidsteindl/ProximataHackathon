@@ -263,3 +263,19 @@ test("a successor room shows the originating Flag and its blocked Tasks", () => 
   assert.deepEqual(flagsForZone(index, [{ ...affected, state: "resolved" }], "3A-BATH"), []);
   assert.deepEqual(zoneDetails(index, state({ flags: [affected] }), "3A-BATH").flags, [affected]);
 });
+
+test("next 48 h links blocked successors to their open Flag", async () => {
+  const { upcoming } = await import("../lib/site-model.mjs");
+  const task = { id: "finish-3A", name: "Finishing", zone_id: "3A", starts_at: "2026-11-15T06:00:00Z" };
+  const affected = { ...flagA, task_id: "drywall-F3", blocked_tasks: [task] };
+  const input = { tasks: [task], inspections: [], flags: [affected], evidence: [], plans: [] };
+  const now = Date.parse("2026-11-14T17:00:00Z");
+  const [item] = upcoming(input, index, now);
+  assert.equal(item.chip.text, "Blocked by Flag");
+  assert.equal(item.href, "/flags/flag-a");
+  for (const state of ["resolved", "false_alarm"]) {
+    const [closed] = upcoming({ ...input, flags: [{ ...affected, state }] }, index, now);
+    assert.equal(closed.chip.text, "No open Flag");
+    assert.equal(closed.href, "/zones/3A");
+  }
+});

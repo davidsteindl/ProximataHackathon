@@ -1,6 +1,7 @@
 from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace as Row
 
+import pytest
 from sqlalchemy.orm import Session
 
 from app import models, rules
@@ -69,6 +70,31 @@ def test_updated_flag_notifies_newly_affected_crew_once(initialized, engine):
     with Session(engine) as session, session.begin():
         rules.evaluate_site(session)
     assert len(initialized.get("/outbox").json()) == 2
+
+
+@pytest.mark.parametrize("route", ["group", "successor_lead"])
+def test_only_responsible_lead_delivery_notifies_flag(initialized, engine, monkeypatch, route):
+    from test_outbox import claim, report
+
+    if route == "group":
+        monkeypatch.setenv("TELEGRAM_CREW_GROUPS_JSON", '{"drywall":"-123"}')
+    else:
+        add_successor(engine)
+        monkeypatch.setenv("TELEGRAM_CREW_LEADS_JSON", '{"lead-insulation":"123"}')
+    ingest(initialized)
+    notice = initialized.post("/outbox/claim", params={"channel": "telegram"}).json()
+    assert notice is not None
+    assert report(initialized, notice).status_code == 200
+    flag = initialized.get("/flags").json()[0]
+    assert flag["state"] == "detected"
+    assert not any(row["action"] == "notified" for row in flag["audit"])
+    lead_warning = claim(initialized)
+    assert lead_warning["channel"] == "gmail" and lead_warning["status"] == "sending"
+    assert report(initialized, lead_warning).status_code == 200
+    assert report(initialized, lead_warning).status_code == 200
+    flag = initialized.get("/flags").json()[0]
+    assert flag["state"] == "notified"
+    assert len([row for row in flag["audit"] if row["action"] == "notified"]) == 1
 
 
 def test_positive_group_contact_is_never_used(initialized, monkeypatch):

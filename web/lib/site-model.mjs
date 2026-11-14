@@ -351,7 +351,8 @@ export function upcoming({ tasks, inspections, flags, evidence, plans }, index, 
   const soon = (value) => { const t = Date.parse(value); return t >= now && t < now + 48 * 3600 * 1000; };
   return [
     ...tasks.filter((task) => soon(task.starts_at)).map((task) => {
-      const flag = flags.find((item) => item.task_id === task.id);
+      const flag = flags.find((item) => isOpenFlag(item) && (item.task_id === task.id
+        || item.blocked_tasks?.some((blocked) => blocked.id === task.id)));
       return { key: task.id, at: task.starts_at, name: task.name, zone: task.zone_id, href: flag ? `/flags/${flag.id}` : `/zones/${encodeURIComponent(task.zone_id)}`,
         chip: flag ? { tone: "crit", text: "Blocked by Flag" } : { tone: "unk", text: "No open Flag" } };
     }),

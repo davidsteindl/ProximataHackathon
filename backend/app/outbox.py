@@ -180,7 +180,8 @@ def delivery_result(message_id: str, result: DeliveryResult, session: Database):
             message.sent_at = now
             flag = session.scalar(select(models.Flag).where(models.Flag.id == message.flag_id).with_for_update())
             # Only the Crew Lead warning notifies; an escalation is not that notification.
-            if flag is not None and message.kind == "warning" and flag.state == "detected":
+            if (flag is not None and message.kind == "warning" and flag.state == "detected"
+                    and message.dedup_key == f"warning:{flag.id}"):
                 transition_flag(session, flag, action="notified", actor="worker",
                                 actor_type="system", channel=message.channel,
                                 source_ref=f"outbox:{message.id}")
