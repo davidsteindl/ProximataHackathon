@@ -214,6 +214,14 @@ Anmeldung; Refresh-Tokens für Gmail laufen nach **7 Tagen** ab. Dann die lokale
 Autorisierung erneut ausführen. Vollständige Schritte, Hero-Mails und Fehlerhilfe:
 [docs/GMAIL.md](docs/GMAIL.md).
 
+### Telegram-Ein-/Ausgang (Issue #12)
+
+Opt-in Polling im `worker`, Chat- **und** Nutzer-Allowlist, Transparenz beim
+Gruppenbeitritt, private `/my_data`- und `/delete_my_data`-Kommandos sowie
+konfigurierbare Rohdaten-Retention. Warnungen und Compliance-Antworten laufen
+über die kanalgebundene Outbox; der Bot-Token bleibt ausschließlich im Worker.
+Setup, REST-/Schemaänderungen und Grenzen der Löschung: [Telegram](docs/TELEGRAM.md).
+
 ### Lokale Checks
 
 Backend (Python 3.13, aus dem Repository-Ordner):

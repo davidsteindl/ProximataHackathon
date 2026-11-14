@@ -16,7 +16,7 @@ from test_rules import initialized, ingest
 
 def test_outbox_migration_extends_revision_notes_and_round_trips(engine):
     config = Config(str(BACKEND / "alembic.ini"))
-    assert ScriptDirectory.from_config(config).get_heads() == ["0008"]
+    assert ScriptDirectory.from_config(config).get_heads() == ["0009"]
     with engine.begin() as connection:
         config.attributes["connection"] = connection
         command.downgrade(config, "0006")
@@ -71,6 +71,23 @@ def test_warning_is_atomic_deduplicated_and_factual(initialized, engine, monkeyp
         session.rollback()
     assert initialized.get('/outbox').json() == [row]
     assert initialized.get('/outbox', params={'flag_id': row['flag_id']}).json() == [row]
+
+
+def test_telegram_routing_claim_and_audit(initialized, monkeypatch):
+    monkeypatch.setenv('TELEGRAM_CREW_LEADS_JSON', '{"lead-drywall": "123"}')
+    row = warning(initialized)
+    assert row['channel'] == 'telegram' and row['recipient'] == '123'
+    assert claim(initialized) is None
+    item = initialized.post('/outbox/claim', params={'channel': 'telegram'}).json()
+    assert report(initialized, item).status_code == 200
+    flag = initialized.get('/flags').json()[0]
+    assert flag['state'] == 'notified'
+    transition = next(row for row in flag['audit'] if row['action'] == 'notified')
+    assert (transition['from_state'], transition['to_state'], transition['channel']) == (
+        'detected', 'notified', 'telegram',
+    )
+    delivery = [entry for entry in flag['audit'] if entry['action'].startswith('delivery_')]
+    assert all(entry['channel'] == 'telegram' for entry in delivery)
 
 
 def test_recipient_comes_from_site_record_and_success_notifies_once(initialized, engine):

@@ -11,6 +11,7 @@ from app.flag_api import router as flag_router
 from app.review_api import router as review_router
 
 from app.outbox import router as outbox_router
+from app.telegram_compliance import router as telegram_router
 
 app = FastAPI(title="SiteMind API")
 app.include_router(router)
@@ -19,6 +20,7 @@ app.include_router(ingestion_router)
 app.include_router(flag_router)
 app.include_router(review_router)
 app.include_router(outbox_router)
+app.include_router(telegram_router)
 
 
 class Health(BaseModel):
