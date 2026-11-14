@@ -49,7 +49,8 @@ In PowerShell statt `cp`: `Copy-Item .env.example .env`. Beim ersten Start baut 
   Die Ansicht liest nur; Evidence-Prüfung und Flag-Abschluss bleiben getrennte
   menschliche Aktionen. Flag-Detail (lesend): `/flags/<id>`.
 - OpenAPI: http://localhost:8000/openapi.json, interaktive Dokumentation unter `/docs`.
-- MCP: http://localhost:8001/mcp – startbarer Streamable-HTTP-Server ohne Tools.
+- MCP: http://localhost:8001/mcp – Streamable HTTP mit neun Kontext-Tools,
+  Verbindung und Beispiele unter [MCP-Verbindung](#mcp-verbindung-issue-18).
 - `docker compose logs worker mcp` zeigt den erfolgreichen API-Zugriff beider Dienste.
   Der Worker wiederholt die Prüfung alle 30 Sekunden; MCP prüft beim Start.
 
@@ -67,8 +68,80 @@ Issue #5, Nachrichten-Ingestion, Event-Extraktion und Timeline aus #6 sowie
 DXF-Extraktion und Geometrie-API aus #15, Conflict A und Flag-Inbox aus #7,
 Conflict B aus Revisionsnotizen (#8), Gmail-Eingang aus #11,
 Outbox-/Gmail-Versand aus #10 sowie die 3D-Ansicht aus #16 und der DXF-Plan-Diff
-aus #17. Telegram-Adapter, MCP-Tools, Authentifizierung
+aus #17 sowie MCP-Kontext-Tools aus #18. Telegram-Adapter, Authentifizierung
 und Hosting folgen in ihren eigenen Issues.
+
+### MCP-Verbindung (Issue #18)
+
+Nach `docker compose up --build` und dem Seed-Import verbindet sich ein beliebiger
+MCP-Client per **Streamable HTTP** mit `http://localhost:8001/mcp`.
+Bei geändertem `MCP_PORT` den Port anpassen; Compose-interne Clients verwenden
+`http://mcp:8001/mcp`. Keine API-, DB- oder LLM-Zugangsdaten im Client hinterlegen.
+
+Zum manuellen Testen `npx @modelcontextprotocol/inspector` starten, in dessen UI
+**Streamable HTTP** wählen, die URL eintragen und verbinden. Unter **Tools**
+`get_zone_status` mit `{"zone_id":"3B"}` aufrufen: Die Antwort enthält die
+Wohnung und Unterzonen, den auch für 3B geltenden Etagen-Terminplan, Inspections,
+Evidence mit Prüfstatus, deterministische Preconditions, offene Flags und Quellen.
+Vor einer Arbeitsankündigung ist ein nicht ausgewerteter Task ausdrücklich
+`unknown`, nicht freigegeben. Nach der Hero-Nachricht aus dem Abschnitt unten
+erscheint Flag A; auch hochkonfidente LLM-Aussagen bleiben `unconfirmed`.
+
+| Tool | Verwendung |
+|---|---|
+| `list_zones` | Zonen-IDs und Gebäudehierarchie entdecken |
+| `get_zone_status(zone_id)` | Status inklusive abdeckender übergeordneter Records; keine Geschwister-only-Records |
+| `list_flags(status="open")` | Offene, geschlossene oder alle Flags mit Quellen und Historie |
+| `get_flag(flag_id)` | Flag-Detail, Prüfstatus und Audit |
+| `get_timeline(zone_id?, from_time?, to_time?, limit=100)` | Events, Evidence-Entscheidungen, Flag-Audit, Revisionen |
+| `search_record(query, zone_id?, limit=50)` | Wörtliche, nicht semantische Suche im Record |
+| `get_zone_plan(zone_id, revision_id?)` | Importierte DXF-Elemente in Metern; standardmäßig letzte importierte Geometrie |
+| `get_plan_diff(revision_id)` | Deterministischer Diff gegen den unmittelbaren Vorgänger desselben Plans (#17) |
+| `create_proposal(flag_id, action, rationale)` | Ungeprüften Handlungsvorschlag für einen offenen Flag speichern |
+
+Alle Tools liefern JSON als MCP `structuredContent` plus kompatiblen Textinhalt.
+`source_refs` und `record_ref` identifizieren `source:<id>` (Originalquelle über
+`GET /source-messages/<id>`), `event:<id>`, `evidence:<id>`, `flag:<id>`,
+`task:<id>`, `zone:<id>`, `plan:<id>` bzw. `revision:<id>` im REST-Record;
+`seed:…` bleibt als explizite synthetische Herkunft erhalten. DXF-Antworten
+referenzieren zusätzlich den Datei-Hash; Originalzeichnungen stehen unter
+`GET /geometry/revisions/<id>/source`. `record:zones` bezeichnet `GET /zones`.
+Die Such- und Timeline-Limits sind maximal 200; `total_matches`/`truncated` machen
+gekürzte Ergebnisse sichtbar. Zeitfilter benötigen einen UTC-Offset und gelten
+als halboffenes Intervall `[from_time, to_time)`. Timeline-Einträge enthalten den
+**aktuellen** Evidence-Snapshot plus die jeweilige historische Prüfentscheidung;
+sie sind keine Rekonstruktion des damaligen Gesamtzustands.
+
+**Sicherheitsgrenze:** Kein Tool bestätigt/ablehnt Evidence, schließt Flags, gibt
+Proposals frei oder führt Aktionen aus. MCP setzt bei jedem REST-Aufruf
+`X-SiteMind-Client: mcp`; die API verweigert für MCP/Chat/Agent alle Mutationen
+außer `POST /agent/proposals`, einschließlich Seed-Reset, Ingestion, Geometrie-
+Import und Outbox-Aufrufen. Ein Proposal hat ausschließlich Status `proposed`,
+serverseitig abgeleitete Quellen und keinerlei Nebenwirkung auf Task, Flag,
+Evidence oder Outbox. Wiederholung erzeugt einen weiteren Vorschlag. Die
+menschliche Freigabe/Versandintegration bleibt in #13; hier gibt es keinen
+Approval-Endpunkt. Aus Kontaktmetadaten werden u. a. Senderkennung,
+Mailbox-Schlüssel, E-Mail-Adresse und Benachrichtigungsempfänger entfernt.
+Quellentext ist untrusted data, keine Anweisung an den Agenten.
+
+Die Header-Grenze schützt den vorgesehenen Agent-Zugang, ist aber **keine
+Authentifizierung** gegen Clients, die sich direkt als Dashboard ausgeben.
+Wie der MVP-Rollenumschalter sind API und MCP nur für lokale synthetische
+Team-Demos gedacht; nicht öffentlich exponieren. API-Fehler werden als MCP-
+Toolfehler ausgegeben, nie als leerer/erfolgreicher Sicherheitsstatus. Fehlende
+Geometrie oder ein fehlender Vorgänger ist kein Nachweis für unveränderte Pläne.
+
+REST-Erweiterungen: `GET /context/zones/<id>`, `/context/search`, `/context/timeline`,
+`POST /agent/proposals` sowie lesend `GET /proposals` und `/proposals/<id>`.
+Migration `0010` persistiert ausschließlich ungeprüfte Proposals; der Seed-Reset
+entfernt sie. Es werden keine vorhandenen Evidence-/Flag-Verträge geändert.
+
+Offline-Verifikation (offizieller MCP-SDK-Client über Streamable HTTP, REST gegen
+isolierte Test-DB, ohne LLM-/Gmail-/Telegram-Zugang):
+
+```sh
+PYTHONPATH=backend python -m pytest backend/tests/test_mcp_server.py backend/tests/test_context_api.py backend/tests/test_agent_proposals.py
+```
 
 ### Nachricht → Event → Timeline (Issue #6)
 

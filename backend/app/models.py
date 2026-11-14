@@ -319,6 +319,19 @@ class Flag(Base):
     audit: Mapped[list["FlagAudit"]] = relationship(lazy="selectin", order_by="FlagAudit.id")
 
 
+class Proposal(Base):
+    __tablename__ = "proposals"
+    __table_args__ = (CheckConstraint("status = 'proposed'", name="proposal_status"),)
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    flag_id: Mapped[str] = mapped_column(ForeignKey("flags.id"), index=True)
+    action: Mapped[str] = mapped_column(Text)
+    rationale: Mapped[str] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(String(20), default="proposed")
+    channel: Mapped[str] = mapped_column(String(32))
+    source_refs: Mapped[list[str]] = mapped_column(JSON)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
 class OutboxMessage(Base):
     __tablename__ = "outbox_messages"
     __table_args__ = (
