@@ -3,6 +3,7 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
+import { cameraFrame, cameraViewport } from "../../lib/site-camera.mjs";
 import { leaderClash } from "../../lib/callout-layout.mjs";
 import { floorVisible as isFloorVisible, insetEdgeStrips } from "../../lib/site-model.mjs";
 import { buildSiteContext, concreteTexture, surfaceTexture, worldUV } from "./site-context";
@@ -578,53 +579,12 @@ export function createSiteScene(container, { geometry, zones, changes, onHover, 
   motion?.addEventListener?.("change", onMotion);
   controls.enableDamping = !reduced;
 
-  const half = (box) => ({ x: (box.maxX - box.minX) / 2, z: (box.maxY - box.minY) / 2 });
   function frame(bounds, elevation, mode) {
-    const w = container.clientWidth || 1;
-    const h = container.clientHeight || 1;
-    const aspect = w / h;
-    if (bounds === pb && !view.floorId && mode !== "top") {
-      // Overview: a three-quarter view framed on the building itself (the subject, with its Flag volume);
-      // the decorative crane and scenery may crop at the edges.
-      const sphere = new THREE.Box3(new THREE.Vector3(-extent.x, 0, -extent.z), new THREE.Vector3(extent.x, topElevation, extent.z))
-        .getBoundingSphere(new THREE.Sphere());
-      const fov = 30;
-      const vfov = THREE.MathUtils.degToRad(fov / 2);
-      const hfov = Math.atan(Math.tan(vfov) * aspect);
-      // ponytail: fixed fill factor, tuned by screenshots at 1280/1440/390; desktop leaves room for the chrome cards.
-      const radius = (sphere.radius / Math.sin(Math.min(vfov, hfov))) * (aspect < 1 ? 1.2 : 1.3);
-      const target = sphere.center.clone().setY(topElevation * 0.42);
-      return { target, position: target.clone().add(new THREE.Vector3().setFromSphericalCoords(radius, THREE.MathUtils.degToRad(57), THREE.MathUtils.degToRad(36))), fov };
-    }
-    const focused = bounds !== pb;
-    // A room or element keeps a modest minimum frame so its neighbours give context and callouts fit beside it.
-    const portrait = aspect < 1;
-    const sx = Math.max(bounds.maxX - bounds.minX, focused ? (portrait ? 5 : 8) : 14);
-    const sz = Math.max(bounds.maxY - bounds.minY, focused ? (portrait ? 5 : 6) : 10);
-    const center = P((bounds.minX + bounds.maxX) / 2, (bounds.minY + bounds.maxY) / 2, elevation);
-    const pad = focused ? (portrait ? 1.45 : 1.7) : 1.35;
-    const chrome = aspect < 1 ? 1.5 : 2; // floating cards on desktop; mobile controls sit below the canvas
-    if (mode === "top") {
-      // Straight down with a very narrow FOV: reads as an orthographic plan, wall sides stay hidden.
-      const fov = 8;
-      const needed = Math.max(sz * pad, (sx * pad) / aspect) + chrome;
-      // Keep the frame on the building: shift the centre inward instead of showing empty ground beside it.
-      const hb = half(pb);
-      const visible = { x: (needed * aspect) / 2, z: needed / 2 };
-      const margin = 2;
-      for (const axis of ["x", "z"]) {
-        const room = hb[axis] + margin - visible[axis];
-        center[axis] = room > 0 ? THREE.MathUtils.clamp(center[axis], -room, room) : 0;
-      }
-      const dist = needed / 2 / Math.tan(THREE.MathUtils.degToRad(fov / 2));
-      return { target: center, position: center.clone().add(new THREE.Vector3(0, dist, 0.0001)), fov };
-    }
-    const fov = 32;
-    const radius = Math.max(Math.hypot(sx, sz), 8) * (aspect < 1 ? 1.6 : 1.25) / Math.tan(THREE.MathUtils.degToRad(fov / 2)) * (focused ? 0.62 : 0.55);
-    const polar = THREE.MathUtils.degToRad(view.floorId ? 50 : 62);
-    const azimuth = THREE.MathUtils.degToRad(36);
-    const offset = new THREE.Vector3().setFromSphericalCoords(radius, polar, azimuth);
-    return { target: center, position: center.clone().add(offset), fov };
+    return cameraFrame({
+      width: container.clientWidth || 1, height: container.clientHeight || 1, coveredRight,
+      buildingBounds: pb, bounds, buildingHeight: topElevation, elevation,
+      floorId: view.floorId, mode,
+    });
   }
 
   function applyGoal(goal) {
@@ -635,16 +595,19 @@ export function createSiteScene(container, { geometry, zones, changes, onHover, 
     invalidate();
   }
 
-  function animateCamera() {
+  function animateCamera(instant = false) {
     const iso = view.floorId ? floorGroups.get(view.floorId) : null;
     const bounds = view.focus || pb;
     const elevation = iso ? iso.userData.elevation : topElevation * 0.38;
     const goal = frame(bounds, elevation, view.mode);
+    const distance = goal.position.distanceTo(goal.target);
+    controls.maxDistance = Math.max(520, distance * 1.5);
+    camera.far = Math.max(1200, distance * 3);
     // Flush leftover damping momentum so the camera ends exactly on the goal (no drift off true overhead).
     controls.enableDamping = false;
     controls.update();
     controls.enableDamping = !reduced;
-    if (reduced) { tween = null; applyGoal(goal); } else {
+    if (reduced || instant) { tween = null; applyGoal(goal); controls.update(); } else {
       tween = {
         start: performance.now(), duration: 950,
         from: { position: camera.position.clone(), target: controls.target.clone(), fov: camera.fov },
@@ -685,17 +648,18 @@ export function createSiteScene(container, { geometry, zones, changes, onHover, 
   el.addEventListener("pointerup", onUp);
 
   // ---------- loop ----------
-  // Horizontal shift of the projection centre (px): an expanded desktop Key covers the stage's right side,
-  // so the framed subject moves into the uncovered part instead of sitting under the Key.
-  let insetX = 0;
+  // Use the uncovered area for both the camera fit and its projection centre.
+  let coveredRight = 0;
   const resize = () => {
     const w = container.clientWidth;
     const h = container.clientHeight;
     if (!w || !h) return;
     renderer.setSize(w, h, false);
     camera.aspect = w / h;
-    if (insetX) camera.setViewOffset(w, h, insetX, 0, w, h); else camera.clearViewOffset();
+    const { offsetX } = cameraViewport(w, h, coveredRight);
+    if (offsetX) camera.setViewOffset(w, h, offsetX, 0, w, h); else camera.clearViewOffset();
     camera.updateProjectionMatrix();
+    animateCamera(true);
     measureDirty = true;
     invalidate();
   };
@@ -888,7 +852,7 @@ export function createSiteScene(container, { geometry, zones, changes, onHover, 
     setStatus(next) { status = next; applyMaterials(); },
     setFilters(next) { filters = next; applyMaterials(); },
     setOverlays(next) { overlays = next; measureDirty = true; invalidate(); },
-    setInset(px) { if (px !== insetX) { insetX = px; resize(); } },
+    setCoveredRight(px) { if (px !== coveredRight) { coveredRight = px; resize(); } },
     refresh: invalidate,
     hasAnchor: (key) => anchors.has(key),
     zoom(factor) {

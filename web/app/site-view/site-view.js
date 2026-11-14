@@ -262,7 +262,7 @@ export default function SiteView({ model, initialState, error }) {
   useEffect(() => {
     const legend = legendRef.current;
     const floating = legend && legendOpen && getComputedStyle(legend).position === "absolute";
-    sceneRef.current?.setInset(floating ? Math.round((legend.offsetWidth + 16) / 2) : 0);
+    sceneRef.current?.setCoveredRight(floating ? legend.offsetWidth + 16 : 0);
     sceneRef.current?.refresh();
   }, [legendOpen, sceneReady]);
 
