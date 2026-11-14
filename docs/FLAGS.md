@@ -58,9 +58,10 @@ The Flag details expose the same overlapping scope used by the evaluator.
 deduplication, audit, outbox and human-only closure as A/B. A `planned_work` Event
 mapped to a Task, or a Task checked by the morning scan, requires completion
 Evidence for every direct schedule predecessor. Tasks without predecessors do
-not have this Precondition. An explicit `task_reference` can identify a Task
-even when work starts outside its scheduled interval; otherwise the existing
-unique Crew/trade, Zone and time matching applies. Ambiguous work is not assigned
+not have this Precondition. An explicit `task_reference` that exactly names a
+Task (id or name) can identify it even when work starts outside its scheduled
+interval. A reference that names no Task (free text) is ignored, so the existing
+unique Crew/trade, Zone and time matching applies, as for conflicts A and B. Ambiguous work is not assigned
 an invented Task or predecessor list.
 
 Evidence must name the exact predecessor Task and its own Zone (which may differ
@@ -103,7 +104,9 @@ reference preserves the early start even though the scheduled start is tomorrow.
 Repeated submission deduplicates normally; reset restores the same synthetic
 baseline, never a fabricated human review. F3 predecessor Tasks have explicit
 synthetic completion baselines so the hero's unresolved inspection remains
-Conflict A, rather than an additional missing-completion Conflict C. These
+Conflict A, rather than an additional missing-completion Conflict C. Rough-in
+plumbing on F1/F2/F4 and insulation on F2/F4 have the same baselines, so a
+site-wide morning scan raises Conflict C only for `drywall-F1`. These
 baselines do not certify an Inspection or grant clearance for closing work.
 
 ## Persistence and integration

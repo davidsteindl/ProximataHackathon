@@ -231,3 +231,31 @@ def test_seed_scenario_flags_missing_predecessor_and_reset_preserves_provenance(
         assert proof["history"][0]["reviewer_id"] is None
         assert client.post("/ingestion/messages", json=payload).status_code == 200
         assert sequence_flag(client)["id"] == flag["id"]
+
+
+def test_unmatched_free_text_task_reference_keeps_crew_and_window_task(client, seed, monkeypatch):
+    """A free-text reference naming no Task must not drop the Task of conflict A (#7)."""
+    monkeypatch.setenv("LLM_PROVIDER", "cached")
+    monkeypatch.delenv("LLM_CACHE_PATH", raising=False)
+    assert client.post("/seed/import", json=seed.model_dump(mode="json")).status_code == 200
+    extractor = Mock()
+    extractor.name = "test"
+    text = "morgen früh machen wir 3B zu, platten sind da"
+    extractor.extract.return_value = ExtractedBatch(events=[ExtractedEvent(
+        intent="planned_work", quote=text, confidence=0.9, zones=["3B"], activity="closing_work",
+        trade="drywall", task_reference="Trockenbau 3B",
+    )])
+    monkeypatch.setattr(ingestion, "get_extractor", lambda: extractor)
+    ingest(client, external_id="free-text-reference")
+    flags = client.get("/flags").json()
+    assert [(flag["type"], flag["task_id"], flag["zone_id"]) for flag in flags] == [("A", "drywall-F3", "3B")]
+
+
+def test_seed_morning_scan_flags_only_the_intended_sequence_conflict(client, seed, monkeypatch):
+    monkeypatch.setenv("LLM_PROVIDER", "cached")
+    monkeypatch.delenv("LLM_CACHE_PATH", raising=False)
+    assert client.post("/seed/import", json=seed.model_dump(mode="json")).status_code == 200
+    for as_of in ("2026-11-14T05:00:00Z", "2026-11-15T05:00:00Z"):
+        assert client.post("/jobs/morning-scan", json={"as_of": as_of}).status_code == 200
+    sequence = [(flag["task_id"], flag["evaluation"]) for flag in client.get("/flags").json() if flag["type"] == "C"]
+    assert sequence == [("drywall-F1", "not_satisfied")]

@@ -88,7 +88,8 @@ class PredecessorsCompleted:
         missing = [f'{item["task_name"]} ({item["task_id"]}): {item["evaluation"]}'
                    for item in predecessors if item["evaluation"] != "satisfied"]
         explanation = ("Predecessor completion requires review: " + "; ".join(missing)
-                       + ". Missing or unconfirmed statements are not proof."
+                       + ". Missing, unconfirmed, out-of-scope statements and completion claims sent"
+                       " before the predecessor's scheduled start are not proof."
                        if missing else "Valid confirmed completion evidence for all predecessor Tasks.")
         return Evaluation(status, explanation, context={"predecessors": predecessors},
                           source_event_ids=tuple(dict.fromkeys(source_ids)))

@@ -108,6 +108,71 @@
     }
   },
   {
+    "id": "baseline-completed-plumbing-F1",
+    "origin": "seed_baseline",
+    "source_ref": "seed:schedule.csv#plumbing-F1",
+    "quote": "Explicit synthetic baseline: rough-in plumbing F1 is complete; this does not certify its inspection.",
+    "claim": "completed",
+    "review_status": "confirmed",
+    "scope": {
+      "kind": "task_completion",
+      "zone_id": "F1",
+      "task_id": "plumbing-F1"
+    }
+  },
+  {
+    "id": "baseline-completed-plumbing-F2",
+    "origin": "seed_baseline",
+    "source_ref": "seed:schedule.csv#plumbing-F2",
+    "quote": "Explicit synthetic baseline: rough-in plumbing F2 is complete; this does not certify its inspection.",
+    "claim": "completed",
+    "review_status": "confirmed",
+    "scope": {
+      "kind": "task_completion",
+      "zone_id": "F2",
+      "task_id": "plumbing-F2"
+    }
+  },
+  {
+    "id": "baseline-completed-plumbing-F4",
+    "origin": "seed_baseline",
+    "source_ref": "seed:schedule.csv#plumbing-F4",
+    "quote": "Explicit synthetic baseline: rough-in plumbing F4 is complete; this does not certify its inspection.",
+    "claim": "completed",
+    "review_status": "confirmed",
+    "scope": {
+      "kind": "task_completion",
+      "zone_id": "F4",
+      "task_id": "plumbing-F4"
+    }
+  },
+  {
+    "id": "baseline-completed-insulation-F2",
+    "origin": "seed_baseline",
+    "source_ref": "seed:schedule.csv#insulation-F2",
+    "quote": "Explicit synthetic baseline: insulation F2 is complete; its rough-in inspection is still required before closing work.",
+    "claim": "completed",
+    "review_status": "confirmed",
+    "scope": {
+      "kind": "task_completion",
+      "zone_id": "F2",
+      "task_id": "insulation-F2"
+    }
+  },
+  {
+    "id": "baseline-completed-insulation-F4",
+    "origin": "seed_baseline",
+    "source_ref": "seed:schedule.csv#insulation-F4",
+    "quote": "Explicit synthetic baseline: insulation F4 is complete; its rough-in inspection is still required before closing work.",
+    "claim": "completed",
+    "review_status": "confirmed",
+    "scope": {
+      "kind": "task_completion",
+      "zone_id": "F4",
+      "task_id": "insulation-F4"
+    }
+  },
+  {
     "id": "example-missing-scope",
     "origin": "seed_statement",
     "statement_ref": "example-statement-missing-scope",

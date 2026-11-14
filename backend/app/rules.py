@@ -177,18 +177,25 @@ def affected_work(session, statement, zones):
         crew = crews.get(statement.crew_id)
         trade = statement.trade or (crew.trade if crew else None)
         reference = statement.details.get("task_reference")
-        candidates = [task for task in tasks if
-            (crew is not None and task.crew_id == crew.id or
-             crew is None and trade is not None and crews[task.crew_id].trade == trade or
-             crew is None and trade is None and reference is not None)
-            and (reference is not None or statement.starts_at is None or
-                 utc(task.ends_at) > utc(statement.starts_at) and
-                 utc(task.starts_at) < utc(statement.ends_at or statement.starts_at))]
+
+        def same_crew(task):
+            return (crew is not None and task.crew_id == crew.id or
+                    crew is None and trade is not None and crews[task.crew_id].trade == trade)
+
+        candidates = [task for task in tasks if same_crew(task) and (
+            statement.starts_at is None or
+            utc(task.ends_at) > utc(statement.starts_at) and
+            utc(task.starts_at) < utc(statement.ends_at or statement.starts_at))]
         if reference:
+            # An exact Task reference may name an early start outside the
+            # scheduled interval. Free text that names no Task keeps the
+            # crew/trade + time-window match, so conflicts A/B keep their Task.
             from app.event_mapping import normalized
-            candidates = [task for task in candidates if normalized(reference) in {
-                normalized(task.id), normalized(task.name),
-            }]
+            referenced = [task for task in tasks
+                          if (same_crew(task) or crew is None and trade is None)
+                          and normalized(reference) in {normalized(task.id), normalized(task.name)}]
+            if referenced:
+                candidates = referenced
         task = None
         if candidates:
             nearest = min(scope.index(item.zone_id) for item in candidates)
