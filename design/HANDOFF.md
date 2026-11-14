@@ -30,14 +30,14 @@ Start page: `mockup/screenshots/Main.png`.
 | `Site3D` | light | Isometric 3D placeholder with floor rail and markers | #16, #17 |
 | `RoomView` | light | `/zones/3B`: room plan with the Rev D wall diff, status, tasks, inspections | #15, #17 |
 | `FlagInbox` | dark | Stat tiles and flag table | #9 |
+| `CrewLead` | dark | Crew Lead warning with original sources and acknowledgment only | #9 |
 | `FlagDetail` | dark | Lifecycle, precondition explanation, source quotes, timeline, acknowledge and close | #7, #8, #9 |
 | `EvidenceReview` | dark | Confirm or reject evidence. Works without a flag | #6, #30 |
 | `ProposalDetail` | dark | Approve or reject an advisory LLM proposal | #13 |
 | `SystemStates` | dark | Loading, empty and error states; Gmail and Telegram deep links into the dashboard | #10, #12 |
 
 Navigation: dark pages use the left sidebar, light plan pages use the top pill
-nav plus a bottom quick-action dock. Both carry the demo role switcher
-(`Superintendent ▾`), which is a demo mechanism and not authentication.
+nav plus a bottom quick-action dock. Both link to the Crew Lead demo view; that view links back to the Superintendent. These explicit role-view links are a demo mechanism, not authentication.
 "Ask GroundIQ" and "Chat" point to `#chat` as a placeholder for #19.
 
 ## Human actions stay separate
@@ -86,7 +86,7 @@ are 14–16 px radius, and pills and buttons are fully rounded.
 1. Three.js scope (#16): the 3D view is a static isometric SVG. Floor isolation and camera controls are still to be decided.
 2. Is the dark/light split (dark work views, light plan views) kept in the real app, or should it be one theme with a toggle?
 3. Chat placement (#19): a drawer from the dock/sidebar or a separate page.
-4. Role switcher roles beyond superintendent and crew lead, and which controls each role hides.
+4. Production role permissions need agreement in #9/#30. The mockup demonstrates Superintendent decisions and a Crew Lead who reads sources and acknowledges their warning; it does not define authorization or new API permissions.
 5. Accessibility: tab order and labels are in place, but colour contrast on glass cards over the plan still needs a check in the real build.
 
 ## Local decision walkthrough
@@ -96,3 +96,12 @@ Open the hero Flag, then Evidence review to use the Day 4 positive-result fixtur
 State is kept in browser session storage for navigation between local pages; if storage is unavailable, changes apply only to the current page and a notice explains this. No API requests, real schedule changes or notifications occur. Production actions and validation remain in #9, #13 and #30; this defines no new API contract.
 
 Collapse/reopen preserves context through separate linked fixtures: `SiteOverview` -> `SiteCollapsedNone` -> `SiteOverview` has no selected Zone; `SiteZone3B` -> `SiteCollapsed` -> `SiteZone3B` retains 3B.
+
+## Demo role actions
+
+| View | Demonstrated actions |
+|---|---|
+| Superintendent | Confirm/reject the inspection claim, approve/reject the proposal, acknowledge and close the Flag with feedback |
+| Crew Lead | Read their warning, original quotes and timeline; acknowledge the warning only |
+
+The Crew Lead fixture has no Evidence review, Proposal decision or Flag closure controls. Links explicitly switch the demo role. Production permissions remain an implementation question, not an authentication claim.

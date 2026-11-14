@@ -1,5 +1,6 @@
 // Synthetic interaction state only. No API calls, messages or real decisions.
 document.addEventListener('DOMContentLoaded', () => {
+  const role = document.body.dataset.demoRole || 'Superintendent';
   const key = 'groundiq-design-demo-v1';
   let state = {};
   try { state = JSON.parse(sessionStorage.getItem(key) || '{}'); } catch { /* file:// storage may be unavailable */ }
@@ -41,7 +42,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function save(action) {
-    state.audit = [...(state.audit || []), `${new Date().toISOString()} · Superintendent · dashboard demo · ${action}`];
+    state.audit = [...(state.audit || []), `${new Date().toISOString()} · ${role} · dashboard demo · ${action}`];
     try { sessionStorage.setItem(key, JSON.stringify(state)); } catch {
       notice.textContent += ' Browser storage unavailable; changes apply to this page only.';
     }
@@ -51,6 +52,7 @@ document.addEventListener('DOMContentLoaded', () => {
   document.querySelectorAll('[data-action]').forEach(button => {
     button.addEventListener('click', () => {
       const action = button.dataset.action;
+      if (role === 'Crew Lead' && action !== 'acknowledge') return;
       if (action === 'reset') {
         state = {};
         try { sessionStorage.removeItem(key); } catch { /* page-local fallback */ }
