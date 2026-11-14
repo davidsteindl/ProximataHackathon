@@ -1,6 +1,7 @@
 """Transactional factual Flag warnings; only the worker performs delivery."""
 
 import os
+import json
 from datetime import UTC, datetime, timedelta
 from typing import Literal
 from uuid import uuid4
@@ -19,9 +20,9 @@ router = APIRouter(tags=["Outbox"])
 
 class OutboxView(Record):
     id: Identifier
-    flag_id: Identifier
+    flag_id: Identifier | None
     recipient: str | None
-    channel: Literal["gmail"]
+    channel: Literal["gmail", "telegram"]
     subject: str
     content: str
     status: Literal["pending", "sending", "sent", "failed"]
@@ -41,11 +42,12 @@ class DeliveryResult(Record):
     lease_token: Identifier
     status: Literal["sent", "failed"]
     provider_message_id: str | None = Field(default=None, min_length=1, max_length=200)
-    error_code: Literal["gmail_error", "missing_recipient"] | None = None
+    error_code: Literal["gmail_error", "telegram_error", "missing_recipient"] | None = None
 
 
 def enqueue_flag_warning(session, flag, statement, crew, now):
     lead = session.get(models.CrewLead, crew.lead_id) if crew else None
+    telegram_recipient = json.loads(os.environ.get("TELEGRAM_CREW_LEADS_JSON") or "{}").get(lead.id) if lead else None
     message_id = uuid4().hex
     base = os.environ.get("DASHBOARD_BASE_URL", "http://localhost:3000").rstrip("/")
     content = (
@@ -59,15 +61,17 @@ def enqueue_flag_warning(session, flag, statement, crew, now):
         "This warning conveys facts only. Work decisions require the Superintendent."
     )
     session.add(models.OutboxMessage(
-        id=message_id, flag=flag, recipient=lead.email if lead else None,
-        channel="gmail", subject=f"SiteMind Flag {flag.type} — Zone {flag.zone_id}",
+        id=message_id, flag=flag, recipient=str(telegram_recipient) if telegram_recipient else lead.email if lead else None,
+        channel="telegram" if telegram_recipient else "gmail", subject=f"SiteMind Flag {flag.type} — Zone {flag.zone_id}",
         content=content, status="pending", attempts=0, available_at=now, created_at=now,
     ))
 
 
 def audit(session, message, action, now):
+    if message.flag_id is None:
+        return
     session.add(models.FlagAudit(flag_id=message.flag_id, action=action, actor="worker",
-        channel="gmail", source_ref=f"outbox:{message.id}", recorded_at=now))
+        channel=message.channel, source_ref=f"outbox:{message.id}", recorded_at=now))
 
 
 @router.get("/outbox", response_model=list[OutboxView])
@@ -79,11 +83,12 @@ def list_outbox(session: Database, flag_id: str | None = None):
 
 
 @router.post("/outbox/claim", response_model=ClaimView | None)
-def claim_outbox(session: Database):
+def claim_outbox(session: Database, channel: Literal["gmail", "telegram"] = "gmail"):
     now = datetime.now(UTC)
     with session.begin():
         message = session.scalar(select(models.OutboxMessage).where(
             models.OutboxMessage.status != "sent", models.OutboxMessage.available_at <= now,
+            models.OutboxMessage.channel == channel,
         ).order_by(models.OutboxMessage.available_at, models.OutboxMessage.id)
           .with_for_update(skip_locked=True).limit(1))
         if message is None:
@@ -114,19 +119,21 @@ def delivery_result(message_id: str, result: DeliveryResult, session: Database):
         if message.status != "sending":
             raise HTTPException(409, "Message is not being delivered")
         if result.status == "sent" and (not result.provider_message_id or result.error_code):
-            raise HTTPException(422, "Successful delivery requires a Gmail message ID and no error")
+            raise HTTPException(422, "Successful delivery requires a provider message ID and no error")
         if result.status == "failed" and (not result.error_code or result.provider_message_id):
-            raise HTTPException(422, "Failed delivery requires an error code and no Gmail message ID")
+            raise HTTPException(422, "Failed delivery requires an error code and no provider message ID")
         message.status = result.status
         message.error_code = result.error_code
         message.provider_message_id = result.provider_message_id
         if result.status == "sent":
             message.sent_at = now
             flag = session.scalar(select(models.Flag).where(models.Flag.id == message.flag_id).with_for_update())
-            if flag.state == "detected":
+            if flag is not None and flag.state == "detected":
                 transition_flag(session, flag, action="notified", actor="worker",
-                                actor_type="system", channel="gmail",
+                                actor_type="system", channel=message.channel,
                                 source_ref=f"outbox:{message.id}")
+            if message.channel == "telegram" and message.flag_id is None:
+                message.content = "[delivered compliance reply]"
         else:
             message.available_at = now + timedelta(seconds=min(60 * 2 ** min(message.attempts - 1, 6), 3600))
         audit(session, message, "delivery_" + result.status, now)

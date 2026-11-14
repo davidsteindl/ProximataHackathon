@@ -203,6 +203,12 @@ Grundsätze:
 
 ## 6. Compliance (Telegram, Gmail, LLM)
 
+Telegram (#12): `worker` pollt ausschließlich freigegebene Chats und Nutzer und nutzt dieselbe Ingestion.
+Die kanalgebundene Outbox enthält zusätzlich Transparenz- und Datenschutzantworten ohne Flag-Bezug.
+Worker-geschützte REST-Operationen liefern Auskunft und entfernen Telegram-Rohdaten nach konfigurierbarer
+Frist oder `/delete_my_data`; abgeleitete Events, Nachweise, relevante Flag-Zitate und Audit bleiben
+nachvollziehbar erhalten. Telegram-Kommandos treffen keine Nachweis-, Proposal- oder Flag-Entscheidungen.
+
 **Implementieren:**
 - **Transparenzhinweis:** Der Bot postet beim Beitritt zur Gruppe, was er verarbeitet, wozu, wie lange und wer verantwortlich ist. Dazu ein Befehl für Auskunft und Löschung.
 - **Allowlist:** Nur freigegebene Gruppen und Nutzer werden verarbeitet und bekommen Antworten.

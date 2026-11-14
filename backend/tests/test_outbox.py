@@ -73,6 +73,19 @@ def test_warning_is_atomic_deduplicated_and_factual(initialized, engine, monkeyp
     assert initialized.get('/outbox', params={'flag_id': row['flag_id']}).json() == [row]
 
 
+def test_telegram_routing_claim_and_audit(initialized, monkeypatch):
+    monkeypatch.setenv('TELEGRAM_CREW_LEADS_JSON', '{"lead-drywall": "123"}')
+    row = warning(initialized)
+    assert row['channel'] == 'telegram' and row['recipient'] == '123'
+    assert claim(initialized) is None
+    item = initialized.post('/outbox/claim', params={'channel': 'telegram'}).json()
+    assert report(initialized, item).status_code == 200
+    flag = initialized.get('/flags').json()[0]
+    assert flag['state'] == 'notified'
+    delivery = [entry for entry in flag['audit'] if entry['action'].startswith('delivery_')]
+    assert all(entry['channel'] == 'telegram' for entry in delivery)
+
+
 def test_recipient_comes_from_site_record_and_success_notifies_once(initialized, engine):
     with Session(engine) as session, session.begin():
         session.get(models.CrewLead, 'lead-drywall').email = 'crew@example.test'

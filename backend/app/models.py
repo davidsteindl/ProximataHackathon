@@ -324,12 +324,12 @@ class OutboxMessage(Base):
     __table_args__ = (
         UniqueConstraint("flag_id", name="outbox_flag_notification"),
         CheckConstraint("status IN ('pending','sending','sent','failed')", name="outbox_status"),
-        CheckConstraint("channel = 'gmail'", name="outbox_channel"),
+        CheckConstraint("channel IN ('gmail','telegram')", name="outbox_channel"),
         CheckConstraint("attempts >= 0", name="outbox_attempts"),
     )
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
-    flag_id: Mapped[str] = mapped_column(ForeignKey("flags.id"))
-    flag: Mapped[Flag] = relationship()
+    flag_id: Mapped[str | None] = mapped_column(ForeignKey("flags.id"))
+    flag: Mapped[Flag | None] = relationship()
     recipient: Mapped[str | None] = mapped_column(String(254))
     channel: Mapped[str] = mapped_column(String(32))
     subject: Mapped[str] = mapped_column(String(200))
