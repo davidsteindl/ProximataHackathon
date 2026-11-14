@@ -1,3 +1,4 @@
+import { FlagActions } from "./human-review";
 import { formatTime } from "../lib/site.mjs";
 
 const evaluationLabels = {
@@ -7,23 +8,24 @@ const evaluationLabels = {
   contradictory: "Conflicting inspection statements — review required",
 };
 
-export default function FlagInbox({ flags, timezone }) {
+export default function FlagInbox({ flags, timezone, closed = false }) {
   return (
-    <section aria-labelledby="flags-title">
-      <h2 id="flags-title">Flag inbox</h2>
-      <p>Open flags, highest severity first. Flags stay open until a responsible human closes them.</p>
-      {flags.length === 0 ? <p>No open flags.</p> : (
+    <section aria-labelledby={closed ? "closed-flags-title" : "flags-title"}>
+      <h2 id={closed ? "closed-flags-title" : "flags-title"}>{closed ? "Closed Flags" : "Flag inbox"}</h2>
+      {!closed && <p>Open flags, highest severity first. Flags stay open until a responsible human closes them.</p>}
+      {flags.length === 0 ? <p>{closed ? "No closed Flags." : "No open flags."}</p> : (
         <ol className="flag-inbox">
           {flags.map((flag) => (
             <li key={flag.id}>
               <article>
                 <h3>Flag {flag.type} · {flag.zone_id} · {flag.severity} severity</h3>
-                <p>{evaluationLabels[flag.evaluation] || flag.evaluation}</p>
+                <p>{closed && flag.evaluation === "satisfied" ? "Precondition satisfied" : evaluationLabels[flag.evaluation] || flag.evaluation}</p>
                 <p>{flag.explanation}</p>
                 <p>Responsible: <strong>{flag.responsible?.name || "Unassigned — responsibility needs clarification"}</strong></p>
                 <p>Work: {flag.task_id || flag.activity.replaceAll("_", " ")}
                   {" · "}Required inspection: {flag.inspection_id || "Missing or ambiguous"}</p>
                 <p>State: {flag.state.replaceAll("_", " ")} · Detected {formatTime(flag.created_at, timezone)}</p>
+                <FlagActions flag={flag} />
                 <details>
                   <summary>Flag details · {flag.sources.length} work source(s)</summary>
                   <p>Last updated: {formatTime(flag.updated_at, timezone)}</p>
@@ -54,7 +56,9 @@ export default function FlagInbox({ flags, timezone }) {
                   <h4>Audit trail</h4>
                   <ul>{flag.audit.map((entry, index) => (
                     <li key={index}>{formatTime(entry.recorded_at, timezone)} · {entry.action.replaceAll("_", " ")}
-                      {" · "}{entry.actor} · {entry.channel}
+                      {" · "}{entry.actor}{entry.actor_role && ` (${entry.actor_role})`} · {entry.channel}
+                      {entry.from_state && <p>{entry.from_state} → {entry.to_state}</p>}
+                      {entry.feedback && <p>Feedback: {entry.feedback} · {entry.reason}</p>}
                       <small className="record-id">{entry.source_ref}</small>
                     </li>
                   ))}</ul>
