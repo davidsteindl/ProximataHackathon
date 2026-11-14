@@ -89,7 +89,12 @@ def test_room_status_lists_record_with_sources_labels_and_room_link(hero):
     assert "Task " in text and "Latest: " in text
     assert "not proof" in text
     assert text.endswith("Room view: http://localhost:3000/zones/3B-BATH")
-    assert "satisfied." not in text.replace("NOT satisfied", "")
+    # No clearance claim: only predecessor completion may be satisfied, and only
+    # through the explicit F3 seed baseline (#25). Inspection and revision
+    # Preconditions stay unconfirmed, and Flag A stays open.
+    satisfied = [line for line in text.splitlines()
+                 if "satisfied." in line.replace("NOT satisfied", "")]
+    assert all(line.startswith("Precondition predecessors_completed for ") for line in satisfied), satisfied
 
 
 def test_contradictory_evaluation_is_labelled(hero, monkeypatch):
