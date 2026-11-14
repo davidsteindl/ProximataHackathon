@@ -1,0 +1,112 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="11100 -900 13800 10300" font-family="JetBrains Mono, monospace">
+<clipPath id="u"><rect x="11940" y="-60" width="12120" height="8620"/></clipPath>
+<rect x="19000" y="0" width="3300" height="3000" fill="#E2492F" fill-opacity=".07"/>
+<g clip-path="url(#u)">
+<polygon points="0,8500 24000,8500 24000,-11500 0,-11500" stroke="#171A1F" stroke-width="300.0" fill="none" stroke-linejoin="miter"/>
+<polyline points="0,0 4500,0" stroke="#171A1F" stroke-width="200.0" fill="none" stroke-linejoin="miter"/>
+<polyline points="5500,0 16500,0" stroke="#171A1F" stroke-width="200.0" fill="none" stroke-linejoin="miter"/>
+<polyline points="17500,0 24000,0" stroke="#171A1F" stroke-width="200.0" fill="none" stroke-linejoin="miter"/>
+<polyline points="0,-3000 6500,-3000" stroke="#171A1F" stroke-width="200.0" fill="none" stroke-linejoin="miter"/>
+<polyline points="7500,-3000 18500,-3000" stroke="#171A1F" stroke-width="200.0" fill="none" stroke-linejoin="miter"/>
+<polyline points="19500,-3000 24000,-3000" stroke="#171A1F" stroke-width="200.0" fill="none" stroke-linejoin="miter"/>
+<polyline points="12000,8500 12000,0" stroke="#171A1F" stroke-width="200.0" fill="none" stroke-linejoin="miter"/>
+<polyline points="12000,-3000 12000,-11500" stroke="#171A1F" stroke-width="200.0" fill="none" stroke-linejoin="miter"/>
+<polyline points="0,3000 4500,3000" stroke="#171A1F" stroke-width="100.0" fill="none" stroke-linejoin="miter"/>
+<polyline points="5400,3000 10900,3000" stroke="#171A1F" stroke-width="100.0" fill="none" stroke-linejoin="miter"/>
+<polyline points="11700,3000 12000,3000" stroke="#171A1F" stroke-width="100.0" fill="none" stroke-linejoin="miter"/>
+<polyline points="7000,8500 7000,4200" stroke="#171A1F" stroke-width="100.0" fill="none" stroke-linejoin="miter"/>
+<polyline points="7000,3300 7000,2300" stroke="#171A1F" stroke-width="100.0" fill="none" stroke-linejoin="miter"/>
+<polyline points="7000,1500 7000,0" stroke="#171A1F" stroke-width="100.0" fill="none" stroke-linejoin="miter"/>
+<polyline points="3000,3000 3000,2000" stroke="#171A1F" stroke-width="100.0" fill="none" stroke-linejoin="miter"/>
+<polyline points="3000,1100 3000,0" stroke="#171A1F" stroke-width="100.0" fill="none" stroke-linejoin="miter"/>
+<polyline points="10000,3000 10000,0" stroke="#171A1F" stroke-width="100.0" fill="none" stroke-linejoin="miter"/>
+<line x1="5500" y1="0" x2="5500" y2="1000" stroke="#171A1F" stroke-width="25" fill="none"/><path d="M4500,0 A1000,1000 0 0 0 5500,1000" stroke="#171A1F" stroke-width="25" fill="none"/>
+<line x1="5400" y1="3000" x2="5400" y2="3900" stroke="#171A1F" stroke-width="25" fill="none"/><path d="M4500,3000 A900,900 0 0 0 5400,3900" stroke="#171A1F" stroke-width="25" fill="none"/>
+<line x1="7000" y1="4200" x2="6100" y2="4200" stroke="#171A1F" stroke-width="25" fill="none"/><path d="M7000,3300 A900,900 0 0 0 6100,4200" stroke="#171A1F" stroke-width="25" fill="none"/>
+<line x1="7000" y1="1500" x2="7800" y2="1500" stroke="#171A1F" stroke-width="25" fill="none"/><path d="M7000,2300 A800,800 0 0 0 7800,1500" stroke="#171A1F" stroke-width="25" fill="none"/>
+<line x1="3000" y1="2000" x2="2100" y2="2000" stroke="#171A1F" stroke-width="25" fill="none"/><path d="M3000,1100 A900,900 0 0 0 2100,2000" stroke="#171A1F" stroke-width="25" fill="none"/>
+<line x1="10900" y1="3000" x2="10900" y2="2200" stroke="#171A1F" stroke-width="25" fill="none"/><path d="M11700,3000 A800,800 0 0 0 10900,2200" stroke="#171A1F" stroke-width="25" fill="none"/>
+<polygon points="9350,2950 9750,2950 9750,2750 9350,2750" stroke="#176AC6" stroke-width="30" fill="none" stroke-linejoin="miter"/><circle cx="9550" cy="2500" r="180" stroke="#176AC6" stroke-width="30" fill="none"/>
+<polygon points="7300,525 7900,525 7900,75 7300,75" stroke="#176AC6" stroke-width="30" fill="none" stroke-linejoin="miter"/><circle cx="7600" cy="300" r="150" stroke="#176AC6" stroke-width="30" fill="none"/>
+<polygon points="9000,1000 9900,1000 9900,100 9000,100" stroke="#176AC6" stroke-width="30" fill="none" stroke-linejoin="miter"/><line x1="9000" y1="1000" x2="9900" y2="100" stroke="#176AC6" stroke-width="30" fill="none"/><line x1="9000" y1="100" x2="9900" y2="1000" stroke="#176AC6" stroke-width="30" fill="none"/><circle cx="9450" cy="550" r="40" stroke="#176AC6" stroke-width="30" fill="none"/>
+<polygon points="1200,525 1800,525 1800,75 1200,75" stroke="#176AC6" stroke-width="30" fill="none" stroke-linejoin="miter"/><circle cx="1500" cy="300" r="150" stroke="#176AC6" stroke-width="30" fill="none"/>
+<circle cx="9850" cy="2850" r="75" stroke="#176AC6" stroke-width="30" fill="none"/><circle cx="9850" cy="2850" r="40" stroke="#176AC6" stroke-width="30" fill="none"/>
+<polyline points="7600,300 7600,2850 9850,2850" stroke="#176AC6" stroke-width="30" fill="none" stroke-linejoin="miter"/>
+<polyline points="9450,550 9850,550 9850,2850" stroke="#176AC6" stroke-width="30" fill="none" stroke-linejoin="miter"/>
+<polyline points="12000,3000 16500,3000" stroke="#171A1F" stroke-width="100.0" fill="none" stroke-linejoin="miter"/>
+<polyline points="17400,3000 22900,3000" stroke="#171A1F" stroke-width="100.0" fill="none" stroke-linejoin="miter"/>
+<polyline points="23700,3000 24000,3000" stroke="#171A1F" stroke-width="100.0" fill="none" stroke-linejoin="miter"/>
+<polyline points="19000,8500 19000,4200" stroke="#171A1F" stroke-width="100.0" fill="none" stroke-linejoin="miter"/>
+<polyline points="19000,3300 19000,2300" stroke="#171A1F" stroke-width="100.0" fill="none" stroke-linejoin="miter"/>
+<polyline points="19000,1500 19000,0" stroke="#171A1F" stroke-width="100.0" fill="none" stroke-linejoin="miter"/>
+<polyline points="15000,3000 15000,2000" stroke="#171A1F" stroke-width="100.0" fill="none" stroke-linejoin="miter"/>
+<polyline points="15000,1100 15000,0" stroke="#171A1F" stroke-width="100.0" fill="none" stroke-linejoin="miter"/>
+<line x1="17500" y1="0" x2="17500" y2="1000" stroke="#171A1F" stroke-width="25" fill="none"/><path d="M16500,0 A1000,1000 0 0 0 17500,1000" stroke="#171A1F" stroke-width="25" fill="none"/>
+<line x1="17400" y1="3000" x2="17400" y2="3900" stroke="#171A1F" stroke-width="25" fill="none"/><path d="M16500,3000 A900,900 0 0 0 17400,3900" stroke="#171A1F" stroke-width="25" fill="none"/>
+<line x1="19000" y1="4200" x2="18100" y2="4200" stroke="#171A1F" stroke-width="25" fill="none"/><path d="M19000,3300 A900,900 0 0 0 18100,4200" stroke="#171A1F" stroke-width="25" fill="none"/>
+<line x1="19000" y1="1500" x2="19800" y2="1500" stroke="#171A1F" stroke-width="25" fill="none"/><path d="M19000,2300 A800,800 0 0 0 19800,1500" stroke="#171A1F" stroke-width="25" fill="none"/>
+<line x1="15000" y1="2000" x2="14100" y2="2000" stroke="#171A1F" stroke-width="25" fill="none"/><path d="M15000,1100 A900,900 0 0 0 14100,2000" stroke="#171A1F" stroke-width="25" fill="none"/>
+<line x1="22900" y1="3000" x2="22900" y2="2200" stroke="#171A1F" stroke-width="25" fill="none"/><path d="M23700,3000 A800,800 0 0 0 22900,2200" stroke="#171A1F" stroke-width="25" fill="none"/>
+<polygon points="21350,2950 21750,2950 21750,2750 21350,2750" stroke="#176AC6" stroke-width="30" fill="none" stroke-linejoin="miter"/><circle cx="21550" cy="2500" r="180" stroke="#176AC6" stroke-width="30" fill="none"/>
+<polygon points="19300,525 19900,525 19900,75 19300,75" stroke="#176AC6" stroke-width="30" fill="none" stroke-linejoin="miter"/><circle cx="19600" cy="300" r="150" stroke="#176AC6" stroke-width="30" fill="none"/>
+<polygon points="21000,1000 21900,1000 21900,100 21000,100" stroke="#176AC6" stroke-width="30" fill="none" stroke-linejoin="miter"/><line x1="21000" y1="1000" x2="21900" y2="100" stroke="#176AC6" stroke-width="30" fill="none"/><line x1="21000" y1="100" x2="21900" y2="1000" stroke="#176AC6" stroke-width="30" fill="none"/><circle cx="21450" cy="550" r="40" stroke="#176AC6" stroke-width="30" fill="none"/>
+<polygon points="13200,525 13800,525 13800,75 13200,75" stroke="#176AC6" stroke-width="30" fill="none" stroke-linejoin="miter"/><circle cx="13500" cy="300" r="150" stroke="#176AC6" stroke-width="30" fill="none"/>
+<circle cx="21850" cy="2850" r="75" stroke="#176AC6" stroke-width="30" fill="none"/><circle cx="21850" cy="2850" r="40" stroke="#176AC6" stroke-width="30" fill="none"/>
+<polyline points="19600,300 19600,2850 21850,2850" stroke="#176AC6" stroke-width="30" fill="none" stroke-linejoin="miter"/>
+<polyline points="12000,-6000 7500,-6000" stroke="#171A1F" stroke-width="100.0" fill="none" stroke-linejoin="miter"/>
+<polyline points="6600,-6000 1100,-6000" stroke="#171A1F" stroke-width="100.0" fill="none" stroke-linejoin="miter"/>
+<polyline points="300,-6000 0,-6000" stroke="#171A1F" stroke-width="100.0" fill="none" stroke-linejoin="miter"/>
+<polyline points="5000,-11500 5000,-7200" stroke="#171A1F" stroke-width="100.0" fill="none" stroke-linejoin="miter"/>
+<polyline points="5000,-6300 5000,-5300" stroke="#171A1F" stroke-width="100.0" fill="none" stroke-linejoin="miter"/>
+<polyline points="5000,-4500 5000,-3000" stroke="#171A1F" stroke-width="100.0" fill="none" stroke-linejoin="miter"/>
+<polyline points="9000,-6000 9000,-5000" stroke="#171A1F" stroke-width="100.0" fill="none" stroke-linejoin="miter"/>
+<polyline points="9000,-4100 9000,-3000" stroke="#171A1F" stroke-width="100.0" fill="none" stroke-linejoin="miter"/>
+<polyline points="2000,-6000 2000,-3000" stroke="#171A1F" stroke-width="100.0" fill="none" stroke-linejoin="miter"/>
+<line x1="6500" y1="-3000" x2="6500" y2="-4000" stroke="#171A1F" stroke-width="25" fill="none"/><path d="M7500,-3000 A1000,1000 0 0 0 6500,-4000" stroke="#171A1F" stroke-width="25" fill="none"/>
+<line x1="6600" y1="-6000" x2="6600" y2="-6900" stroke="#171A1F" stroke-width="25" fill="none"/><path d="M7500,-6000 A900,900 0 0 0 6600,-6900" stroke="#171A1F" stroke-width="25" fill="none"/>
+<line x1="5000" y1="-7200" x2="5900" y2="-7200" stroke="#171A1F" stroke-width="25" fill="none"/><path d="M5000,-6300 A900,900 0 0 0 5900,-7200" stroke="#171A1F" stroke-width="25" fill="none"/>
+<line x1="5000" y1="-4500" x2="4200" y2="-4500" stroke="#171A1F" stroke-width="25" fill="none"/><path d="M5000,-5300 A800,800 0 0 0 4200,-4500" stroke="#171A1F" stroke-width="25" fill="none"/>
+<line x1="9000" y1="-5000" x2="9900" y2="-5000" stroke="#171A1F" stroke-width="25" fill="none"/><path d="M9000,-4100 A900,900 0 0 0 9900,-5000" stroke="#171A1F" stroke-width="25" fill="none"/>
+<line x1="1100" y1="-6000" x2="1100" y2="-5200" stroke="#171A1F" stroke-width="25" fill="none"/><path d="M300,-6000 A800,800 0 0 0 1100,-5200" stroke="#171A1F" stroke-width="25" fill="none"/>
+<polygon points="2650,-5950 2250,-5950 2250,-5750 2650,-5750" stroke="#176AC6" stroke-width="30" fill="none" stroke-linejoin="miter"/><circle cx="2450" cy="-5500" r="180" stroke="#176AC6" stroke-width="30" fill="none"/>
+<polygon points="4700,-3525 4100,-3525 4100,-3075 4700,-3075" stroke="#176AC6" stroke-width="30" fill="none" stroke-linejoin="miter"/><circle cx="4400" cy="-3300" r="150" stroke="#176AC6" stroke-width="30" fill="none"/>
+<polygon points="3000,-4000 2100,-4000 2100,-3100 3000,-3100" stroke="#176AC6" stroke-width="30" fill="none" stroke-linejoin="miter"/><line x1="3000" y1="-4000" x2="2100" y2="-3100" stroke="#176AC6" stroke-width="30" fill="none"/><line x1="3000" y1="-3100" x2="2100" y2="-4000" stroke="#176AC6" stroke-width="30" fill="none"/><circle cx="2550" cy="-3550" r="40" stroke="#176AC6" stroke-width="30" fill="none"/>
+<polygon points="10800,-3525 10200,-3525 10200,-3075 10800,-3075" stroke="#176AC6" stroke-width="30" fill="none" stroke-linejoin="miter"/><circle cx="10500" cy="-3300" r="150" stroke="#176AC6" stroke-width="30" fill="none"/>
+<circle cx="2150" cy="-5850" r="75" stroke="#176AC6" stroke-width="30" fill="none"/><circle cx="2150" cy="-5850" r="40" stroke="#176AC6" stroke-width="30" fill="none"/>
+<polyline points="4400,-3300 4400,-5850 2150,-5850" stroke="#176AC6" stroke-width="30" fill="none" stroke-linejoin="miter"/>
+<polyline points="2550,-3550 2150,-3550 2150,-5850" stroke="#176AC6" stroke-width="30" fill="none" stroke-linejoin="miter"/>
+<polyline points="24000,-6000 19500,-6000" stroke="#171A1F" stroke-width="100.0" fill="none" stroke-linejoin="miter"/>
+<polyline points="18600,-6000 13100,-6000" stroke="#171A1F" stroke-width="100.0" fill="none" stroke-linejoin="miter"/>
+<polyline points="12300,-6000 12000,-6000" stroke="#171A1F" stroke-width="100.0" fill="none" stroke-linejoin="miter"/>
+<polyline points="17000,-11500 17000,-7200" stroke="#171A1F" stroke-width="100.0" fill="none" stroke-linejoin="miter"/>
+<polyline points="17000,-6300 17000,-5300" stroke="#171A1F" stroke-width="100.0" fill="none" stroke-linejoin="miter"/>
+<polyline points="17000,-4500 17000,-3000" stroke="#171A1F" stroke-width="100.0" fill="none" stroke-linejoin="miter"/>
+<polyline points="21000,-6000 21000,-5000" stroke="#171A1F" stroke-width="100.0" fill="none" stroke-linejoin="miter"/>
+<polyline points="21000,-4100 21000,-3000" stroke="#171A1F" stroke-width="100.0" fill="none" stroke-linejoin="miter"/>
+<polyline points="14000,-6000 14000,-3000" stroke="#171A1F" stroke-width="100.0" fill="none" stroke-linejoin="miter"/>
+<line x1="18500" y1="-3000" x2="18500" y2="-4000" stroke="#171A1F" stroke-width="25" fill="none"/><path d="M19500,-3000 A1000,1000 0 0 0 18500,-4000" stroke="#171A1F" stroke-width="25" fill="none"/>
+<line x1="18600" y1="-6000" x2="18600" y2="-6900" stroke="#171A1F" stroke-width="25" fill="none"/><path d="M19500,-6000 A900,900 0 0 0 18600,-6900" stroke="#171A1F" stroke-width="25" fill="none"/>
+<line x1="17000" y1="-7200" x2="17900" y2="-7200" stroke="#171A1F" stroke-width="25" fill="none"/><path d="M17000,-6300 A900,900 0 0 0 17900,-7200" stroke="#171A1F" stroke-width="25" fill="none"/>
+<line x1="17000" y1="-4500" x2="16200" y2="-4500" stroke="#171A1F" stroke-width="25" fill="none"/><path d="M17000,-5300 A800,800 0 0 0 16200,-4500" stroke="#171A1F" stroke-width="25" fill="none"/>
+<line x1="21000" y1="-5000" x2="21900" y2="-5000" stroke="#171A1F" stroke-width="25" fill="none"/><path d="M21000,-4100 A900,900 0 0 0 21900,-5000" stroke="#171A1F" stroke-width="25" fill="none"/>
+<line x1="13100" y1="-6000" x2="13100" y2="-5200" stroke="#171A1F" stroke-width="25" fill="none"/><path d="M12300,-6000 A800,800 0 0 0 13100,-5200" stroke="#171A1F" stroke-width="25" fill="none"/>
+<polygon points="14650,-5950 14250,-5950 14250,-5750 14650,-5750" stroke="#176AC6" stroke-width="30" fill="none" stroke-linejoin="miter"/><circle cx="14450" cy="-5500" r="180" stroke="#176AC6" stroke-width="30" fill="none"/>
+<polygon points="16700,-3525 16100,-3525 16100,-3075 16700,-3075" stroke="#176AC6" stroke-width="30" fill="none" stroke-linejoin="miter"/><circle cx="16400" cy="-3300" r="150" stroke="#176AC6" stroke-width="30" fill="none"/>
+<polygon points="15000,-4000 14100,-4000 14100,-3100 15000,-3100" stroke="#176AC6" stroke-width="30" fill="none" stroke-linejoin="miter"/><line x1="15000" y1="-4000" x2="14100" y2="-3100" stroke="#176AC6" stroke-width="30" fill="none"/><line x1="15000" y1="-3100" x2="14100" y2="-4000" stroke="#176AC6" stroke-width="30" fill="none"/><circle cx="14550" cy="-3550" r="40" stroke="#176AC6" stroke-width="30" fill="none"/>
+<polygon points="22800,-3525 22200,-3525 22200,-3075 22800,-3075" stroke="#176AC6" stroke-width="30" fill="none" stroke-linejoin="miter"/><circle cx="22500" cy="-3300" r="150" stroke="#176AC6" stroke-width="30" fill="none"/>
+<circle cx="14150" cy="-5850" r="75" stroke="#176AC6" stroke-width="30" fill="none"/><circle cx="14150" cy="-5850" r="40" stroke="#176AC6" stroke-width="30" fill="none"/>
+<polyline points="16400,-3300 16400,-5850 14150,-5850" stroke="#176AC6" stroke-width="30" fill="none" stroke-linejoin="miter"/>
+<polyline points="14550,-3550 14150,-3550 14150,-5850" stroke="#176AC6" stroke-width="30" fill="none" stroke-linejoin="miter"/>
+<polyline points="22000,3000 22000,0" stroke="#8A93A1" stroke-width="100.0" fill="none" stroke-dasharray="120 90" stroke-linejoin="miter"/>
+<polyline points="22300,3000 22300,0" stroke="#E2492F" stroke-width="100.0" fill="none" stroke-linejoin="miter"/>
+<polyline points="21450,550 21850,550 21850,2850" stroke="#8A93A1" stroke-width="30" fill="none" stroke-dasharray="120 90" stroke-linejoin="miter"/>
+<polyline points="21450,550 22200,550 22200,2850 21850,2850" stroke="#E2492F" stroke-width="30" fill="none" stroke-linejoin="miter"/>
+</g>
+<text x="15500" y="5750" font-size="300" fill="#8A93A1" text-anchor="middle">3B-LIV</text>
+<text x="21500" y="5750" font-size="300" fill="#8A93A1" text-anchor="middle">3B-BED</text>
+<text x="13500" y="1500" font-size="300" fill="#8A93A1" text-anchor="middle">3B-KIT</text>
+<text x="17000" y="1900" font-size="300" fill="#8A93A1" text-anchor="middle">3B-HALL</text>
+<text x="20300" y="1600" font-size="300" fill="#8A93A1" text-anchor="middle">3B-BATH</text>
+<text x="23150" y="1500" font-size="300" fill="#8A93A1" text-anchor="middle">3B-STOR</text>
+<g stroke="#E2492F" stroke-width="20"><line x1="22000" y1="-450" x2="22300" y2="-450"/><line x1="22000" y1="-600" x2="22000" y2="-300"/><line x1="22300" y1="-600" x2="22300" y2="-300"/></g><text x="22150" y="-650" font-size="300" fill="#E2492F" text-anchor="middle">300</text>
+</svg>
