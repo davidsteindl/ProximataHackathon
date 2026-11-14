@@ -1,5 +1,8 @@
 # Puntimata
 
+## Frontend Design-Mockup
+[https://claude.ai/artifact/3MjWimC7hjDSDSK9RqtxxN#page-dcb81aee8d83](https://claude.ai/artifact/3MjWimC7hjDSDSK9RqtxxN#page-dcb81aee8d83)
+
 ## Lokal starten (Issue #2)
 
 Voraussetzung: Docker mit Compose v2 und laufender Docker Engine (Linux-Container).
