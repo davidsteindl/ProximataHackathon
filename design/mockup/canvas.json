@@ -1,0 +1,38 @@
+{
+  "v": 3,
+  "createdOnFiles": {"v": 1, "at": "2026-11-14T09:00:00Z"},
+  "title": "GroundIQ Dashboard Mockup",
+  "launch": {"view": "canvas"},
+  "boards": {
+    "Main.dc.html": {"x": 0, "y": 0, "w": 1360, "h": 940, "title": "Start — superintendent", "expand": "fill", "is_interactive": true},
+    "SiteOverview.dc.html": {"x": 1440, "y": 0, "w": 1360, "h": 840, "title": "Site plan — no zone selected", "expand": "fill", "is_interactive": true},
+    "SiteZone3B.dc.html": {"x": 2880, "y": 0, "w": 1360, "h": 860, "title": "Site plan — zone 3B selected", "expand": "fill", "is_interactive": true},
+    "SiteCollapsed.dc.html": {"x": 4320, "y": 0, "w": 1360, "h": 860, "title": "Site plan — widget collapsed", "expand": "fill", "is_interactive": true},
+    "Site3D.dc.html": {"x": 5760, "y": 0, "w": 1360, "h": 900, "title": "Site plan — 3D view", "expand": "fill", "is_interactive": true},
+    "RoomView.dc.html": {"x": 0, "y": 1020, "w": 1360, "h": 940, "title": "Room view /zones/3B", "expand": "fill", "is_interactive": true},
+    "FlagInbox.dc.html": {"x": 1440, "y": 1020, "w": 1360, "h": 800, "title": "Flag inbox", "expand": "fill", "is_interactive": true},
+    "FlagDetail.dc.html": {"x": 2880, "y": 1020, "w": 1360, "h": 1120, "title": "Flag A detail — critical", "expand": "fill", "is_interactive": true},
+    "EvidenceReview.dc.html": {"x": 0, "y": 2260, "w": 1360, "h": 880, "title": "Evidence review — works without a flag", "expand": "fill", "is_interactive": true},
+    "ProposalDetail.dc.html": {"x": 1440, "y": 2260, "w": 1360, "h": 780, "title": "Proposal — approve / reject", "expand": "fill", "is_interactive": true},
+    "SystemStates.dc.html": {"x": 2880, "y": 2260, "w": 1360, "h": 1040, "title": "Loading / empty / error + channel boundary", "expand": "fill", "is_interactive": true}
+  },
+  "order": [
+    "Main.dc.html",
+    "SiteOverview.dc.html",
+    "SiteZone3B.dc.html",
+    "SiteCollapsed.dc.html",
+    "Site3D.dc.html",
+    "RoomView.dc.html",
+    "FlagInbox.dc.html",
+    "FlagDetail.dc.html",
+    "EvidenceReview.dc.html",
+    "ProposalDetail.dc.html",
+    "SystemStates.dc.html"
+  ],
+  "notes": {
+    "r1": {"x": 0, "y": -300, "text": "Start page & site plan — widget states (expanded → 3B selected → collapsed) + 3D view", "kind": "title1", "maxW": 7120},
+    "r2": {"x": 0, "y": 740, "text": "Hero zone 3B — room view, flag inbox & Flag A detail", "kind": "title1", "maxW": 4240},
+    "r3": {"x": 0, "y": 1980, "text": "Human decisions & system states", "kind": "title1", "maxW": 4240}
+  },
+  "designSystems": []
+}

@@ -56,7 +56,8 @@ Stoppen: `docker compose down`. Die Daten bleiben im Volume `db-data` erhalten.
 Enthalten sind Infrastruktur, Health-Prüfungen, der statische Site Record aus
 Issue #5, Nachrichten-Ingestion, Event-Extraktion und Timeline aus #6 sowie
 DXF-Extraktion und Geometrie-API aus #15, Conflict A und Flag-Inbox aus #7
-sowie Gmail-Eingang aus #11 und Outbox-/Gmail-Versand aus #10. 3D-Ansicht, Plan-Diff,
+sowie Conflict B aus Revisionsnotizen (#8), Gmail-Eingang aus #11 und
+Outbox-/Gmail-Versand aus #10. 3D-Ansicht, Plan-Diff,
 Telegram-Adapter, MCP-Tools, Authentifizierung
 und Hosting folgen in ihren eigenen Issues.
 
@@ -88,7 +89,7 @@ in `.env` setzen und `api` neu erstellen. Nur `api` erhält den LLM-Key.
 Abnahme-, Task-Abschluss- und Revisionsbestätigungen aus Nachrichten werden immer
 als **unbestätigte Evidence** mit Quelle/Zitat gespeichert. Sie überschreiben keine
 vorhandene Bestätigung und geben keine Arbeit frei. Die menschliche Prüfung folgt
-in #9, Conflict B in #8. Conflict A wird bereits deterministisch geprüft.
+in #9. Conflict A und B werden bereits deterministisch geprüft.
 Der Seed-Befehl setzt auch die neuen Nachrichten
 und Events zurück. REST-Vertrag, Cache-Inhalte, Fehler-/Retry-Verhalten und
 Datenschutzgrenzen: [docs/INGESTION.md](docs/INGESTION.md).
@@ -108,9 +109,27 @@ Migration `0005` ergänzt Flags, Quellenverknüpfungen und Audit; der Seed-Reset
 entfernt diese Daten mit. Die REST-Endpunkte sind lesend. Details zu Regel,
 Nachweisgültigkeit und Integration für #8/#9/#14: [docs/FLAGS.md](docs/FLAGS.md).
 
+### Conflict B aus Revisionsnotizen (Issue #8)
+
+Nach dem Seed dieselbe Ingestion mit `backend/demo/revision-note.json` aufrufen
+(gleicher curl-Befehl wie oben, mit diesem Dateinamen). Die Hero-Notiz von Tag 1,
+10:15 Uhr, registriert A-103 Rev D auch ohne CAD-Import und erzeugt Flag B für
+die Sanitär-Crew in 3B: bestätigter Empfang C, erforderlich D. Ebenfalls betroffene
+geplante Arbeiten werden geprüft. Die Inbox zeigt Crew, Revisionen, Quellen und
+den **unbestätigten** Zonenbezug aus der Notiz. Danach die Closing-Work-Nachricht
+senden: Für die Trockenbau-Arbeit in 3B erscheinen A und B.
+
+Eine spezifische Empfangsmeldung bleibt unbestätigte Evidence. „Warnung gesehen“
+bestätigt keinen Revisionsempfang; auch bestätigter Empfang belegt keine Umsetzung.
+Migration `0006` erlaubt `file_name: null` für reine Notizrevisionen und ergänzt
+`Flag.context` mit Crew, Plan sowie erforderlicher und bestätigter Revision.
+CAD-Import kann die vorläufigen Metadaten derselben Revision vervollständigen;
+dabei entstehen weder geometrische Änderungszonen noch Empfangsbestätigungen.
+Details und Tests: [docs/FLAGS.md](docs/FLAGS.md).
+
 ### Outbox-Vertrag (Issue #10)
 
-Migration `0006` ergänzt optionale `crew_leads.email` (auch im Seed-/Crew-REST-Vertrag)
+Migration `0007` ergänzt optionale `crew_leads.email` (auch im Seed-/Crew-REST-Vertrag)
 und eine transaktionale Outbox: genau eine faktische Gmail-Warnung pro neuem Flag.
 `GET /outbox?flag_id=…` zeigt Status und Versuche. Der Worker reserviert über
 `POST /outbox/claim` eine Nachricht für fünf Minuten und meldet mit Lease-Token

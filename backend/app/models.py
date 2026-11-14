@@ -76,7 +76,7 @@ class Revision(Base):
     label: Mapped[str] = mapped_column(String(20))
     sequence: Mapped[int] = mapped_column(Integer)
     issued_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
-    file_name: Mapped[str] = mapped_column(String(200))
+    file_name: Mapped[str | None] = mapped_column(String(200))
     zones: Mapped[list[Zone]] = relationship(secondary=revision_zones, lazy="selectin")
     acknowledgments: Mapped[list["RevisionAcknowledgment"]] = relationship(lazy="selectin")
 
@@ -310,6 +310,7 @@ class Flag(Base):
     state: Mapped[str] = mapped_column(String(20))
     evaluation: Mapped[str] = mapped_column(String(20))
     explanation: Mapped[str] = mapped_column(Text)
+    context: Mapped[dict] = mapped_column(JSON, default=dict)
     open_key: Mapped[str | None] = mapped_column(String(500))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))

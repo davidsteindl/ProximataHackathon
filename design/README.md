@@ -1,8 +1,10 @@
 # Dashboard design brief
 
 Tracked in [issue #35](https://github.com/davidsteindl/ProximataHackathon/issues/35).
-This directory is the shared handoff for the mockup; the mockup has not been
-created yet. Production implementation stays in its existing feature issues.
+This directory is the shared handoff for the mockup. The mockup is in
+`mockup/` (open `mockup/index.html`) and the handoff notes are in
+[`HANDOFF.md`](HANDOFF.md). Production implementation stays in its existing
+feature issues.
 
 ## Direction and layout
 

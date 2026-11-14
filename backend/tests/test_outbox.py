@@ -1,11 +1,33 @@
 from datetime import UTC, datetime, timedelta
 
 import pytest
-from sqlalchemy import select
+from alembic import command
+from alembic.autogenerate import compare_metadata
+from alembic.config import Config
+from alembic.migration import MigrationContext
+from alembic.script import ScriptDirectory
+from sqlalchemy import inspect, select
 from sqlalchemy.orm import Session
 
 from app import models, rules
+from conftest import BACKEND
 from test_rules import initialized, ingest
+
+
+def test_outbox_migration_extends_revision_notes_and_round_trips(engine):
+    config = Config(str(BACKEND / "alembic.ini"))
+    assert ScriptDirectory.from_config(config).get_heads() == ["0007"]
+    with engine.begin() as connection:
+        config.attributes["connection"] = connection
+        command.downgrade(config, "0006")
+        inspector = inspect(connection)
+        assert "outbox_messages" not in inspector.get_table_names()
+        assert "email" not in {column["name"] for column in inspector.get_columns("crew_leads")}
+        assert "context" in {column["name"] for column in inspector.get_columns("flags")}
+        assert next(column for column in inspector.get_columns("revisions")
+                    if column["name"] == "file_name")["nullable"]
+        command.upgrade(config, "head")
+        assert compare_metadata(MigrationContext.configure(connection), models.Base.metadata) == []
 
 
 def warning(client):

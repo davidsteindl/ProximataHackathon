@@ -3,8 +3,8 @@ import { formatTime } from "../lib/site.mjs";
 const evaluationLabels = {
   satisfied: "Precondition satisfied — awaiting human Flag closure",
   not_satisfied: "Precondition not satisfied",
-  unknown: "Inspection proof missing or unconfirmed",
-  contradictory: "Conflicting inspection statements — review required",
+  unknown: "Required evidence missing or unconfirmed",
+  contradictory: "Conflicting statements — review required",
 };
 
 export default function FlagInbox({ flags, timezone }) {
@@ -22,7 +22,16 @@ export default function FlagInbox({ flags, timezone }) {
                 <p>{flag.explanation}</p>
                 <p>Responsible: <strong>{flag.responsible?.name || "Unassigned — responsibility needs clarification"}</strong></p>
                 <p>Work: {flag.task_id || flag.activity.replaceAll("_", " ")}
-                  {" · "}Required inspection: {flag.inspection_id || "Missing or ambiguous"}</p>
+                  {flag.type === "A" && <> · Required inspection: {flag.inspection_id || "Missing or ambiguous"}</>}</p>
+                {flag.type === "B" && (
+                  <div>
+                    <p>Crew: {flag.context.crew_id || "Unresolved"} · Plan: {flag.context.plan_id}
+                      {" · "}Confirmed receipt: Rev {flag.context.acknowledged_revision || "unknown"}
+                      {" · "}Required: Rev {flag.context.current_revision}</p>
+                    <p>Affected zones come from an unconfirmed revision note.</p>
+                    <p>Receipt confirms that the revision was received; implementation requires separate evidence.</p>
+                  </div>
+                )}
                 <p>State: {flag.state.replaceAll("_", " ")} · Detected {formatTime(flag.created_at, timezone)}</p>
                 {(flag.notifications || []).map((message) => (
                   <p key={message.id} role={message.status === "failed" ? "alert" : undefined}>
@@ -31,9 +40,9 @@ export default function FlagInbox({ flags, timezone }) {
                   </p>
                 ))}
                 <details>
-                  <summary>Flag details · {flag.sources.length} work source(s)</summary>
+                  <summary>Flag details · {flag.sources.length} source(s)</summary>
                   <p>Last updated: {formatTime(flag.updated_at, timezone)}</p>
-                  <h4>Work announcements</h4>
+                  <h4>Triggering sources</h4>
                   {flag.sources.map((event) => (
                     <div key={event.id}>
                       <blockquote className="source-text">{event.quote}</blockquote>
@@ -46,13 +55,16 @@ export default function FlagInbox({ flags, timezone }) {
                       </details>
                     </div>
                   ))}
-                  <h4>Inspection evidence</h4>
-                  {flag.evidence.length === 0 ? <p>No matching inspection evidence.</p> : (
+                  <h4>{flag.type === "B" ? "Revision receipt evidence" : "Inspection evidence"}</h4>
+                  {flag.evidence.length === 0 ? <p>No matching evidence.</p> : (
                     <ul>{flag.evidence.map((evidence) => (
                       <li key={evidence.id}>
                         <strong>{evidence.review_status}</strong> · {evidence.claim}
                         <blockquote className="source-text">{evidence.quote}</blockquote>
-                        <p>Zone: {evidence.scope.zone_id || "Unresolved"} · Inspection: {evidence.scope.inspection_id || "Unresolved"}</p>
+                        <p>Zone: {evidence.scope.zone_id || "Unresolved"}
+                          {flag.type === "B" ? <> · Crew: {evidence.scope.crew_id || "Unresolved"}
+                            {" · "}Revision: {evidence.scope.revision_id || "Unresolved"}</> :
+                            <> · Inspection: {evidence.scope.inspection_id || "Unresolved"}</>}</p>
                         <small className="record-id">Source: {evidence.source_ref} · {evidence.origin.replaceAll("_", " ")}</small>
                       </li>
                     ))}</ul>

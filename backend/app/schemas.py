@@ -93,6 +93,8 @@ class RevisionAcknowledgment(Record):
 
 
 class RevisionView(Revision):
+    # Note-only revisions have no imported drawing.
+    file_name: Name | None
     # A newly registered CAD revision has no affected-zone result until #17.
     zone_ids: list[Identifier]
     acknowledgments: list[RevisionAcknowledgment]
