@@ -72,7 +72,17 @@ Zonenbezugs. Menschlich bestätigter Empfang gilt nur für genau diese Crew und
 Revision sowie die abgedeckte Zone im Plan; er bestätigt keine Umsetzung und
 schließt keinen Flag. REST-, Schema- und Integrationsdetails: [FLAGS.md](FLAGS.md).
 
+**Konflikt C (#25):** `predecessors_completed` prüft die direkten Vorgänger eines
+eindeutig zugeordneten Tasks mit demselben Regel-, Flag-, Audit- und
+Outbox-Mechanismus wie A/B. Nur quellengebundene Completion-Evidence für genau
+den Vorgänger-Task und dessen Zone, menschlich bestätigt oder explizite
+synthetische Seed-Baseline, erfüllt die Precondition. Fehlende, unbestätigte,
+veraltete oder unpassende Nachweise ergeben `unknown`; ungeklärte Gegenmeldungen
+`contradictory`. `Flag.context.predecessors` enthält Task, Zone, Bewertung und
+Quellen je Vorgänger. Keine neuen Tabellen oder Endpoints. Details: [FLAGS.md](FLAGS.md).
+
 ### 3.2 Wer entscheidet was (Autonomie-Grenze)
+
 - **LLM:** Extraktion (Source Message → Event), Erklärung von Flags, Proposals, Beantwortung von Fragen. **Rein beratend. Das LLM trifft keine Entscheidungen und löst keine Aktionen aus, die über Information hinausgehen.**
 - **Regeln (deterministisch):** Prüfen Preconditions anhand gültiger Nachweise und erzeugen Flags. Dadurch reproduzierbar und erklärbar. Ein LLM-Event allein kann keine Precondition erfüllen.
 - **Automatisch (ohne Mensch):** Prüfung bei jedem neuen Event, täglicher Morgen-Scan („Was ist morgen gefährdet?“), **faktische Benachrichtigung** der verantwortlichen Person mit Quelle, Eskalation bei ausbleibender Reaktion. *(Stretch)* Faktischer Hinweis an Crew Lead und Crew-Gruppe der **blockierten Tasks** (Tasks der Zone und ihre Nachfolger laut Terminplan): welche Precondition fehlt, Quelle, „vor Beginn mit dem Superintendent abstimmen“. Das ist eine Information, keine Arbeitsanweisung.

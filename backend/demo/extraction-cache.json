@@ -3,6 +3,22 @@
   "provenance": "Explicit synthetic extraction fixtures for the hero demo; not human-reviewed evidence.",
   "entries": [
     {
+      "text": "Wir starten jetzt mit Trockenbau im 1. OG, Task drywall-F1.",
+      "sender_role": "crew_lead",
+      "result": {
+        "events": [{
+          "quote": "Wir starten jetzt mit Trockenbau im 1. OG, Task drywall-F1.",
+          "confidence": 1.0,
+          "intent": "planned_work",
+          "zones": ["F1"],
+          "activity": "drywall",
+          "trade": "drywall",
+          "task_reference": "drywall-F1",
+          "time": {"expression": "jetzt", "day_offset": 0, "local_time": "18:05"}
+        }]
+      }
+    },
+    {
       "text": "Können wir morgen früh 3B zumachen?",
       "sender_role": "crew_lead",
       "result": {

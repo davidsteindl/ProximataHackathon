@@ -16,9 +16,9 @@ def store(engine, seed):
 
 
 def test_seed_baseline_and_statement_examples_have_distinct_provenance(engine, seed, client):
-    assert store(engine, seed).evidence == 9
+    assert store(engine, seed).evidence == len(seed.evidence)
     records = client.get("/evidence").json()
-    assert len(records) == 9
+    assert len(records) == len(seed.evidence)
     assert len({record["import_ref"] for record in records}) == 1
     assert all(record["imported_at"] is not None for record in records)
     for record in records:
@@ -108,7 +108,9 @@ def test_read_api_filters_scope_status_and_exposes_review_history(engine, seed, 
     assert [record["id"] for record in records] == ["baseline-ack-F3"]
     assert records[0]["scope"]["zone_id"] == "F3"
     assert client.get("/evidence", params={"revision_id": "A-103-D"}).json() == []
-    assert len(client.get("/evidence", params={"zone_id": "B1"}).json()) == 8
+    assert len(client.get("/evidence", params={"zone_id": "B1"}).json()) == sum(
+        item.scope.zone_id is not None for item in seed.evidence
+    )
     assert client.get("/evidence", params={"zone_id": "3B"}).json() == []
     assert client.get("/evidence", params={"review_status": "invalid"}).status_code == 422
     assert client.get("/evidence", params={"zone_id": "missing"}).status_code == 404

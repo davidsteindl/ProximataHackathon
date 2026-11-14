@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from app import models
 from app.revision_rules import RevisionAcknowledged, revision_work
+from app.sequence_rules import PredecessorsCompleted, completion_evidence
 
 
 def utc(value):
@@ -72,6 +73,10 @@ def inspection_evidence(session, inspection, zone_ids):
 def flag_evidence(session, flag):
     """Exact proof and open counterclaims relevant to one Flag, for display and advice."""
     zones = {zone.id: zone for zone in session.scalars(select(models.Zone))}
+    if flag.type == "C":
+        task = session.get(models.Task, flag.task_id)
+        return [item for predecessor in task.predecessors
+                for item in completion_evidence(session, predecessor, zones)] if task else []
     if flag.type == "B":
         from app.revision_rules import receipt_evidence
         revision = session.get(models.Revision, flag.context["revision_id"])
@@ -161,7 +166,7 @@ class InspectionPassed:
 
 
 # New types implement applies/evaluate; persistence, dedup and audit are shared.
-PRECONDITIONS = (InspectionPassed(), RevisionAcknowledged())
+PRECONDITIONS = (InspectionPassed(), RevisionAcknowledged(), PredecessorsCompleted())
 
 
 def affected_work(session, statement, zones):
@@ -171,12 +176,26 @@ def affected_work(session, statement, zones):
         tasks = session.scalars(select(models.Task).where(models.Task.zone_id.in_(scope))).all()
         crew = crews.get(statement.crew_id)
         trade = statement.trade or (crew.trade if crew else None)
-        candidates = [task for task in tasks if
-            (crew is not None and task.crew_id == crew.id or
-             crew is None and trade is not None and crews[task.crew_id].trade == trade)
-            and (statement.starts_at is None or
-                 utc(task.ends_at) > utc(statement.starts_at) and
-                 utc(task.starts_at) < utc(statement.ends_at or statement.starts_at))]
+        reference = statement.details.get("task_reference")
+
+        def same_crew(task):
+            return (crew is not None and task.crew_id == crew.id or
+                    crew is None and trade is not None and crews[task.crew_id].trade == trade)
+
+        candidates = [task for task in tasks if same_crew(task) and (
+            statement.starts_at is None or
+            utc(task.ends_at) > utc(statement.starts_at) and
+            utc(task.starts_at) < utc(statement.ends_at or statement.starts_at))]
+        if reference:
+            # An exact Task reference may name an early start outside the
+            # scheduled interval. Free text that names no Task keeps the
+            # crew/trade + time-window match, so conflicts A/B keep their Task.
+            from app.event_mapping import normalized
+            referenced = [task for task in tasks
+                          if (same_crew(task) or crew is None and trade is None)
+                          and normalized(reference) in {normalized(task.id), normalized(task.name)}]
+            if referenced:
+                candidates = referenced
         task = None
         if candidates:
             nearest = min(scope.index(item.zone_id) for item in candidates)

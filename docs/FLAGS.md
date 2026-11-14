@@ -1,4 +1,4 @@
-# Conflict A, note-based Conflict B and the Flag inbox (#7, #8)
+# Conflicts A/B/C and the Flag inbox (#7, #8, #25)
 
 `GET /flags` returns open Flags ordered by severity (high, medium, low), then
 creation time and ID. `GET /flags/{id}` returns one Flag, or 404. Both include
@@ -51,6 +51,63 @@ The Flag details expose the same overlapping scope used by the evaluator.
   statement and its review history remain unchanged. Failed claims, newer or
   simultaneous pending claims, and unresolved Inspection scopes are never
   silently superseded.
+
+## Conflict C: predecessor completion
+
+`predecessors_completed` uses the same registered rule mechanism, persistence,
+deduplication, audit, outbox and human-only closure as A/B. A `planned_work` Event
+mapped to a Task, or a Task checked by the morning scan, requires completion
+Evidence for every direct schedule predecessor. Tasks without predecessors do
+not have this Precondition. An explicit `task_reference` that exactly names a
+Task (id or name) can identify it even when work starts outside its scheduled
+interval. A reference that names no Task (free text) is ignored, so the existing
+unique Crew/trade, Zone and time matching applies, as for conflicts A and B. Ambiguous work is not assigned
+an invented Task or predecessor list.
+
+Evidence must name the exact predecessor Task and its own Zone (which may differ
+from the successor's Zone). Only human-confirmed Evidence or an explicit
+confirmed synthetic `seed_baseline` can satisfy completion. LLM claims remain
+unconfirmed even at confidence 1; their Event, source, quote, claim and Zone must
+match. Statements predating the predecessor's scheduled start are stale.
+Task dates alone do not prove completion. Unresolved Task claims in overlapping
+Zones are exposed for review, but never satisfy completion. An explicit reference
+to a different Task is not a counterclaim for this predecessor.
+
+Each predecessor evaluates to `satisfied`, `not_satisfied` (confirmed
+`not_completed`), `unknown`, or `contradictory` (unrejected `completed` and
+`not_completed` claims). Counterclaims require human review, not an LLM overwrite.
+The overall result prioritizes contradictory, not satisfied, then unknown;
+all predecessors must be satisfied. One Flag C per successor Task/overlapping
+work Zone records all predecessors in `context.predecessors`, including Task ID,
+name, Zone, evaluation, Evidence IDs and source references. Triggering work and
+relevant completion Events are linked as sources. Flag details and Context/MCP
+reads expose the same completion Evidence. Confirmation/rejection rechecks the
+Flag but never closes it, and MCP/chat cannot review Evidence.
+
+### Offline seed example
+
+The seed marks `insulation-F1` as explicitly synthetic `not_completed` Evidence.
+After importing/resetting the seed, start the API with `LLM_PROVIDER=cached` and
+submit the synthetic early work announcement through the normal ingestion entry:
+
+```sh
+curl -X POST http://localhost:8000/ingestion/messages \
+  -H 'Content-Type: application/json' \
+  --data-binary @backend/demo/out-of-sequence.json
+```
+
+`GET /flags` includes Flag C for `drywall-F1` / Zone F1, with predecessor
+`insulation-F1`, evaluation `not_satisfied`, its seed provenance and the work
+announcement source. The independent pending rough-in Inspection also creates
+Flag A; completion and inspection are separate Preconditions. The explicit Task
+reference preserves the early start even though the scheduled start is tomorrow.
+Repeated submission deduplicates normally; reset restores the same synthetic
+baseline, never a fabricated human review. F3 predecessor Tasks have explicit
+synthetic completion baselines so the hero's unresolved inspection remains
+Conflict A, rather than an additional missing-completion Conflict C. Rough-in
+plumbing on F1/F2/F4 and insulation on F2/F4 have the same baselines, so a
+site-wide morning scan raises Conflict C only for `drywall-F1`. These
+baselines do not certify an Inspection or grant clearance for closing work.
 
 ## Persistence and integration
 

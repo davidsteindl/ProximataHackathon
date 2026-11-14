@@ -136,6 +136,7 @@ function LeadFlag({ flag, site }) {
       <div className="small stack" style={{ marginTop: 10, gap: 6, color: "var(--text-2)" }}>
         <span><Chip tone={evaluation.tone} glyph>{evaluation.text}</Chip> {flag.explanation}</span>
         {flag.type === "A" && <span><span className="mono muted">insp</span> {flag.inspection_id || "required inspection missing or ambiguous"}</span>}
+        {flag.type === "C" && <span><span className="mono muted">pred</span> {(flag.context?.predecessors || []).filter((task) => task.evaluation !== "satisfied").map((task) => task.task_id).join(", ") || "all confirmed"}</span>}
         {flag.type === "B" && <span><span className="mono muted">rev</span> confirmed Rev {flag.context.acknowledged_revision || "none"}, required Rev {flag.context.current_revision}</span>}
         {source && <span><span className="mono" style={{ color: "var(--crit-fg)" }}>{scenarioTime(source.source.sent_at, site)}</span> “{source.quote}” — {source.source.channel}</span>}
       </div>
