@@ -7,31 +7,36 @@ from zoneinfo import ZoneInfo
 
 
 def parse_scan_time(value):
+    """``HH:MM`` site time; ``off`` disables the worker's scan (replay drives it via ``as_of``)."""
+    if value.strip().lower() == "off":
+        return None
     try:
         hour, minute = (int(part) for part in value.split(":"))
         return time(hour, minute)
     except ValueError as error:
-        raise ValueError("MORNING_SCAN_TIME must be HH:MM") from error
+        raise ValueError("MORNING_SCAN_TIME must be HH:MM or off") from error
 
 
 @dataclass
 class JobSchedule:
     """Decides when jobs are due. The API jobs are idempotent, so a restart that
     repeats today's scan or an early escalation check only re-deduplicates."""
-    scan_time: time
-    escalation_seconds: float
+    scan_time: time | None  # None: worker scan off
+    escalation_seconds: float  # 0: worker escalation timer off
     last_scan_date: object = None
     last_escalation: datetime | None = None
 
     @classmethod
     def from_env(cls):
         seconds = float(os.environ.get("ESCALATION_CHECK_SECONDS") or 300)
-        if seconds <= 0:
-            raise ValueError("ESCALATION_CHECK_SECONDS must be positive")
+        if seconds < 0:
+            raise ValueError("ESCALATION_CHECK_SECONDS must not be negative")
         return cls(parse_scan_time(os.environ.get("MORNING_SCAN_TIME") or "06:00"), seconds)
 
     def scan_due(self, now, timezone):
         """Once per local day, at or after the configured time."""
+        if self.scan_time is None:
+            return False
         local = now.astimezone(ZoneInfo(timezone))
         return local.time() >= self.scan_time and self.last_scan_date != local.date()
 
@@ -39,6 +44,8 @@ class JobSchedule:
         self.last_scan_date = now.astimezone(ZoneInfo(timezone)).date()
 
     def escalation_due(self, now):
+        if not self.escalation_seconds:
+            return False
         return self.last_escalation is None or now - self.last_escalation >= timedelta(seconds=self.escalation_seconds)
 
     def mark_escalation(self, now):
@@ -49,6 +56,8 @@ def run_due_jobs(schedule, api, now=None):
     """Trigger due jobs via the API; the API owns all rule logic and thresholds."""
     now = now or datetime.now(UTC)
     ran = []
+    if schedule.scan_time is None and not schedule.escalation_seconds:
+        return ran
     site = api.get("/site")
     site.raise_for_status()
     site = site.json()

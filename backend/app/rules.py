@@ -195,11 +195,12 @@ def overlapping(zone_a, zone_b, zones):
 
 
 def evaluate_site(session, *, source_ref="rules:scan", actor="rule_engine", channel="system",
-                  scan_tasks=()):
+                  scan_tasks=(), scan_at=None):
     """Recheck persisted work Events in the caller's transaction; never close a Flag.
 
     ``scan_tasks`` are scheduled Tasks checked by the morning scan from the
-    schedule alone (#14). Open Flags of scheduled work are rechecked on every
+    schedule alone (#14); ``scan_at`` (the scan's ``as_of``) is their detection
+    time, so escalation runs on the same, possibly simulated, clock. Open Flags of scheduled work are rechecked on every
     run, so Evidence decisions update them like Event-based Flags. Serializing
     on the Site row keeps concurrent detections consistent; the unique open_key
     is a second boundary.
@@ -259,7 +260,8 @@ def evaluate_site(session, *, source_ref="rules:scan", actor="rule_engine", chan
                 precondition=rule.name, inspection_id=result.inspection_id,
                 severity="high", responsible_id=work.crew.lead_id if work.crew else None,
                 state="detected", evaluation=result.status, explanation=result.explanation,
-                context=result.context, open_key=key, created_at=now, updated_at=now, sources=[],
+                context=result.context, open_key=key, updated_at=now, sources=[],
+                created_at=now if statement is not None else utc(scan_at or now),
                 audit=[models.FlagAudit(action="detected", to_state="detected", recorded_at=now, **origin)],
             )
             session.add(flag)

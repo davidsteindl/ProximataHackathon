@@ -57,7 +57,7 @@ def run_morning_scan(session, as_of, lookahead_days=None):
     tasks = scan_tasks(session, start, end)
     before = {flag.id: len(flag.audit) for flag in session.scalars(select(models.Flag))}
     evaluate_site(session, source_ref=f"scan:{start.isoformat()}", actor="morning_scan",
-                  channel="system", scan_tasks=tasks)
+                  channel="system", scan_tasks=tasks, scan_at=start)
     session.flush()
     created, updated = [], []
     for flag in session.scalars(select(models.Flag).where(models.Flag.state.in_(OPEN))
@@ -75,6 +75,18 @@ def had_reaction(flag):
     return any(item.actor_role is not None for item in flag.audit)
 
 
+def detected_at(session, flag):
+    """Detection time on the trigger's clock, comparable with a simulated ``as_of``:
+    the source message's ``sent_at`` (replay keeps its simulated time) for Event
+    Flags, ``created_at`` (the scan's ``as_of``) for schedule Flags."""
+    detection = next((item for item in flag.audit if item.action == "detected"), None)
+    if detection and detection.source_ref and detection.source_ref.startswith("source:"):
+        message = session.get(models.SourceMessage, detection.source_ref.removeprefix("source:"))
+        if message is not None:
+            return utc(message.sent_at)
+    return utc(flag.created_at)
+
+
 def run_escalations(session, as_of, hours=None):
     """Escalate each Flag without human reaction after X hours, exactly once."""
     session.scalar(select(models.Site).with_for_update())
@@ -87,7 +99,7 @@ def run_escalations(session, as_of, hours=None):
     for flag in flags:
         if had_reaction(flag) or any(item.action == "escalated" for item in flag.audit):
             continue
-        if utc(as_of) - utc(flag.created_at) < threshold:
+        if utc(as_of) - detected_at(session, flag) < threshold:
             continue
         message = enqueue_escalation(session, flag, hours, now)
         transition_flag(session, flag, action="escalated", actor="escalation_timer",

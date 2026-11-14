@@ -310,19 +310,25 @@ day-2 scan also flags their insulation/drywall work as `unknown`. This is the
 Evidence policy working as designed, not noise to suppress.
 
 **`POST /jobs/escalation`** escalates open `detected`/`notified` Flags whose
-`created_at` is at least `ESCALATION_HOURS` (api, default 4) before `as_of` and
+detection is at least `ESCALATION_HOURS` (api, default 4) before `as_of` and
 which have no human reaction (any audit entry with a human role). Each Flag
 escalates at most once: one `escalation` outbox message to
 `SUPERINTENDENT_EMAIL` (api; empty = visible `missing_recipient` failure) plus an
 `escalated` audit entry (actor `escalation_timer`, source `outbox:<id>`) through
 `transition_flag`, keeping the state. Delivering an escalation does not mark the
-Flag `notified`; only the Crew Lead warning does.
+Flag `notified`; only the Crew Lead warning does. Detection time is taken on the
+trigger's clock so a simulated `as_of` compares like with like: the `sent_at` of
+the detecting source message for Event Flags (replay keeps its simulated time),
+the scan's `as_of` (stored as `created_at`) for schedule Flags.
 
 Migration `0011` adds `outbox_messages.kind` (`warning` | `escalation`, exposed
 in `OutboxView`) and makes the unique notification constraint per Flag and kind.
 
-Worker config: `MORNING_SCAN_TIME` (HH:MM site time, default 06:00) and
-`ESCALATION_CHECK_SECONDS` (default 300). The worker remembers the last scan day
+Worker config: `MORNING_SCAN_TIME` (HH:MM site time, default 06:00; `off`
+disables the automatic scan) and `ESCALATION_CHECK_SECONDS` (default 300; `0`
+disables the automatic check). Turn both off for replay/demo runs: on the
+seed's dates a real-clock scan would pre-empt the hero announcement (Flag A then
+sits in Zone F3 from the schedule). The worker remembers the last scan day
 in memory; a restart may rerun today's scan, which only re-deduplicates.
 
 From `backend`, `python -m pytest tests/test_jobs.py` covers schedule-only

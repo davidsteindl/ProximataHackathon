@@ -266,7 +266,10 @@ anhand des Terminplans, mit derselben Nachweisregel wie bei Events. Die
 **Eskalation** schickt einen Flag ohne menschliche Reaktion nach
 `ESCALATION_HOURS` genau einmal über die Outbox an `SUPERINTENDENT_EMAIL` und
 schreibt das ins Audit. Für das Replay lassen sich beide Jobs mit simulierter Uhr
-direkt auslösen:
+direkt auslösen. Die Eskalation misst dabei ab der Uhr des Auslösers (`sent_at`
+der Quellnachricht bzw. `as_of` des Scans). Damit die Echtzeit-Jobs des Workers
+Replay und Hero-Szenario nicht vorwegnehmen, schalten `MORNING_SCAN_TIME=off`
+und `ESCALATION_CHECK_SECONDS=0` sie ab:
 
 ```sh
 curl -X POST localhost:8000/jobs/morning-scan -H 'Content-Type: application/json' -d '{"as_of":"2026-11-14T05:00:00Z"}'

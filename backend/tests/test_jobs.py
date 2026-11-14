@@ -161,9 +161,8 @@ def test_scan_requires_seed(client):
     assert client.post("/jobs/morning-scan", json={}).status_code == 409
 
 
-def flag_created_at(engine, flag_id):
-    with Session(engine) as session:
-        return session.get(models.Flag, flag_id).created_at.replace(tzinfo=UTC)
+# Default test message (day 2, 18:05 site time): the Event Flag's detection time.
+SENT = datetime(2026, 11, 14, 17, 5, tzinfo=UTC)
 
 
 def iso(value):
@@ -175,12 +174,11 @@ def test_escalation_fires_once_after_threshold_and_is_audited(initialized, engin
     monkeypatch.setenv("SUPERINTENDENT_EMAIL", "superintendent@example.test")
     ingest(initialized)
     flag = drywall_f3(initialized)
-    created = flag_created_at(engine, flag["id"])
-    assert escalate(initialized, iso(created + timedelta(hours=3, minutes=59)))["escalated_flag_ids"] == []
-    result = escalate(initialized, iso(created + timedelta(hours=4)))
+    assert escalate(initialized, iso(SENT + timedelta(hours=3, minutes=59)))["escalated_flag_ids"] == []
+    result = escalate(initialized, iso(SENT + timedelta(hours=4)))
     assert result == {**result, "escalated_flag_ids": [flag["id"]], "threshold_hours": 4}
     for hours in (5, 9, 48):
-        assert escalate(initialized, iso(created + timedelta(hours=hours)))["escalated_flag_ids"] == []
+        assert escalate(initialized, iso(SENT + timedelta(hours=hours)))["escalated_flag_ids"] == []
     flag = drywall_f3(initialized)
     assert flag["state"] == "detected"
     escalated = [item for item in flag["audit"] if item["action"] == "escalated"]
@@ -200,15 +198,14 @@ def test_human_reaction_prevents_escalation(initialized, engine):
     signal(engine, flag["id"], "notified")
     flag = initialized.get(f"/flags/{flag['id']}").json()
     assert action(initialized, flag, "acknowledge").status_code == 200
-    later = flag_created_at(engine, flag["id"]) + timedelta(days=3)
+    later = SENT + timedelta(days=3)
     assert escalate(initialized, iso(later))["escalated_flag_ids"] == []
 
 
 def test_notified_flag_escalates_and_escalation_delivery_does_not_notify(initialized, engine):
     ingest(initialized)
     flag = drywall_f3(initialized)
-    created = flag_created_at(engine, flag["id"])
-    escalate(initialized, iso(created + timedelta(hours=5)))
+    escalate(initialized, iso(SENT + timedelta(hours=5)))
     with Session(engine) as session, session.begin():
         for message in session.scalars(select(models.OutboxMessage)):
             message.available_at = datetime.now(UTC) - timedelta(seconds=1)
@@ -227,16 +224,32 @@ def test_escalation_threshold_is_configurable(initialized, engine, monkeypatch):
     monkeypatch.setenv("ESCALATION_HOURS", "0.5")
     ingest(initialized)
     flag = drywall_f3(initialized)
-    created = flag_created_at(engine, flag["id"])
-    assert escalate(initialized, iso(created + timedelta(minutes=30)))["escalated_flag_ids"] == [flag["id"]]
+    assert escalate(initialized, iso(SENT + timedelta(minutes=30)))["escalated_flag_ids"] == [flag["id"]]
 
 
 def test_closed_flags_never_escalate(initialized, engine):
     ingest(initialized)
     flag = drywall_f3(initialized)
     close(initialized, engine, flag)
-    later = flag_created_at(engine, flag["id"]) + timedelta(days=3)
+    later = SENT + timedelta(days=3)
     assert escalate(initialized, iso(later))["escalated_flag_ids"] == []
+
+
+def test_escalation_runs_on_the_trigger_clock_not_the_wall_clock(initialized, engine):
+    # Replay (#22) run long after the simulated timeline: real creation is later.
+    ingest(initialized)
+    flag = drywall_f3(initialized)
+    with Session(engine) as session, session.begin():
+        session.get(models.Flag, flag["id"]).created_at = datetime(2027, 6, 1, tzinfo=UTC)
+    assert escalate(initialized, iso(SENT + timedelta(hours=3, minutes=59)))["escalated_flag_ids"] == []
+    assert escalate(initialized, iso(SENT + timedelta(hours=4)))["escalated_flag_ids"] == [flag["id"]]
+
+
+def test_scan_flags_escalate_from_the_scan_time(initialized):
+    created = scan(initialized)["created_flag_ids"]
+    morning = datetime(2026, 11, 14, 5, tzinfo=UTC)
+    assert escalate(initialized, iso(morning + timedelta(hours=3, minutes=59)))["escalated_flag_ids"] == []
+    assert sorted(escalate(initialized, iso(morning + timedelta(hours=4)))["escalated_flag_ids"]) == sorted(created)
 
 
 def test_job_schedule_runs_scan_once_per_local_day():
@@ -263,6 +276,21 @@ def test_job_schedule_escalation_interval():
 def test_invalid_scan_time_is_rejected(value):
     with pytest.raises(ValueError):
         parse_scan_time(value)
+
+
+def test_worker_jobs_can_be_switched_off(monkeypatch):
+    monkeypatch.setenv("MORNING_SCAN_TIME", "off")
+    monkeypatch.setenv("ESCALATION_CHECK_SECONDS", "0")
+    api = MagicMock()
+    assert run_due_jobs(JobSchedule.from_env(), api, datetime(2026, 11, 14, 12, tzinfo=UTC)) == []
+    assert not api.get.called and not api.post.called
+    # Scan off alone: the escalation timer keeps running.
+    api.get.return_value.json.return_value = {"timezone": "Europe/Vienna"}
+    monkeypatch.setenv("ESCALATION_CHECK_SECONDS", "300")
+    assert run_due_jobs(JobSchedule.from_env(), api, datetime(2026, 11, 14, 12, tzinfo=UTC)) == ["escalation"]
+    monkeypatch.setenv("ESCALATION_CHECK_SECONDS", "-1")
+    with pytest.raises(ValueError):
+        JobSchedule.from_env()
 
 
 def test_worker_triggers_due_jobs_via_rest_only():
