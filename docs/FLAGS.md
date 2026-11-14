@@ -65,7 +65,7 @@ retain the human review actor and Evidence reference when triggered by review.
 `app.rules.PRECONDITIONS` registers rules with `applies`/`evaluate`; Flag creation,
 deduplication and audit are shared. `evaluate_site(session, ...)` rechecks persisted
 work Events in the caller's transaction and can be reused by #14's future scan.
-B also checks scheduled Tasks intersecting a revision note. No scheduler is implemented.
+B also checks scheduled Tasks intersecting a revision note. #14 adds the scheduled morning scan (below).
 SQLAlchemy Session hooks run it after new Events and human `EvidenceReview`
 records are flushed, in the same transaction. #9 must validate/authorize decisions
 before appending immutable reviews through this ORM contract; bulk SQL bypasses
@@ -143,7 +143,7 @@ transaction, after acquiring the Site lock and validating the signal/source:
 - #13: `action_approved` with the approving Superintendent as human actor and
   Proposal reference, acknowledged → in_progress. The caller must validate the
   actual Proposal approval; this helper does not approve Proposals.
-- #14: `escalated` (system), notified → notified, with an audited source.
+- #14: `escalated` (system), detected/notified → unchanged state, with the escalation outbox message as source.
 
 These signals have no public action endpoint in #9. A detected Flag awaits successful outbox
 notification delivery before acknowledgment; an acknowledged Flag awaits #13
@@ -278,3 +278,59 @@ To verify offline, seed and ingest `backend/demo/revision-note.json`, then
 Run `python -m pytest tests/test_rules.py tests/test_revision_rules.py` from
 `backend` for the human Evidence boundary, day 1/day 2, provenance, dedup/reset,
 wrong/missing scopes, contradictions, revision ordering and note/CAD import order.
+
+## Morning scan and escalation (#14)
+
+Both jobs run in `api` and are triggered by the `worker` over REST, or on demand
+with an optional simulated clock (`{"as_of": "<timestamp>"}`, default: now) for
+replay (#22). Both are idempotent and never close Flags, confirm Evidence or
+approve anything.
+
+**`POST /jobs/morning-scan`** selects Tasks starting between `as_of` and the end
+of the local site day `SCAN_LOOKAHEAD_DAYS` (api, default 1) days later, and
+checks them from the schedule alone: a scheduled Task becomes work in its own
+Zone, and the Crew trade names the activity (drywall/insulation need the rough-in
+Inspection, exactly like announcements). The same Evidence policy applies, so an
+unconfirmed success claim, even with high confidence, still yields a Flag. The
+scan creates Flags with actor `morning_scan`, channel `system` and source
+`schedule:<task>@<start>` (no Source Message exists), and queues the usual
+factual warning. Response: checked Task IDs, created and updated Flag IDs.
+
+Dedup: one open Flag per Task + Precondition also across nested Zones. A floor
+scan of `drywall-F3` and the 3B announcement join the same Flag (whichever came
+first keeps its Zone); sibling Zones stay separate. Work in the Flag's own Zone
+owns its evaluation; overlapping work only attaches its source. A scan records
+one `morning_scan` audit entry per scheduled occurrence; repeated scans add
+nothing. Open Flags of scheduled work are re-evaluated on every rule run, so an
+Evidence decision updates them too. A human closure settles that scheduled
+occurrence; a rescheduled Task (new start) is checked again.
+
+On the default seed, floors 1, 2 and 4 have no inspection Evidence at all, so a
+day-2 scan also flags their insulation/drywall work as `unknown`. This is the
+Evidence policy working as designed, not noise to suppress.
+
+**`POST /jobs/escalation`** escalates open `detected`/`notified` Flags whose
+detection is at least `ESCALATION_HOURS` (api, default 4) before `as_of` and
+which have no human reaction (any audit entry with a human role). Each Flag
+escalates at most once: one `escalation` outbox message to
+`SUPERINTENDENT_EMAIL` (api; empty = visible `missing_recipient` failure) plus an
+`escalated` audit entry (actor `escalation_timer`, source `outbox:<id>`) through
+`transition_flag`, keeping the state. Delivering an escalation does not mark the
+Flag `notified`; only the Crew Lead warning does. Detection time is taken on the
+trigger's clock so a simulated `as_of` compares like with like: the `sent_at` of
+the detecting source message for Event Flags (replay keeps its simulated time),
+the scan's `as_of` (stored as `created_at`) for schedule Flags.
+
+Migration `0011` adds `outbox_messages.kind` (`warning` | `escalation`, exposed
+in `OutboxView`) and makes the unique notification constraint per Flag and kind.
+
+Worker config: `MORNING_SCAN_TIME` (HH:MM site time, default 06:00; `off`
+disables the automatic scan) and `ESCALATION_CHECK_SECONDS` (default 300; `0`
+disables the automatic check). Turn both off for replay/demo runs: on the
+seed's dates a real-clock scan would pre-empt the hero announcement (Flag A then
+sits in Zone F3 from the schedule). The worker remembers the last scan day
+in memory; a restart may rerun today's scan, which only re-deduplicates.
+
+From `backend`, `python -m pytest tests/test_jobs.py` covers schedule-only
+detection, the evidence boundary, dedup in both orders, scan windows/timezone,
+closure and reschedule, escalation threshold, once-only, reaction and delivery.

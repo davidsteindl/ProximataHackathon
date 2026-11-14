@@ -27,7 +27,8 @@ class Evaluation:
 
 @dataclass(frozen=True)
 class Work:
-    event: models.Event
+    """Work to check: an announced Event, or a scheduled Task (``event`` None)."""
+    event: models.Event | None
     zone_id: str
     task: models.Task | None
     crew: models.Crew | None
@@ -73,10 +74,15 @@ class InspectionPassed:
     name = "inspection_passed"
     kind = "rough_in"
 
+    activities = {"closing_work", "drywall", "insulation"}
+
     def applies(self, work):
-        return work.revision is None and work.event.intent == "planned_work" and work.event.activity in {
-            "closing_work", "drywall", "insulation",
-        }
+        if work.revision is not None:
+            return False
+        if work.event is None:
+            # Morning scan: the schedule alone; the Crew trade names the activity.
+            return work.task is not None and work.crew is not None and work.crew.trade in self.activities
+        return work.event.intent == "planned_work" and work.event.activity in self.activities
 
     def evaluate(self, session, work, zones):
         scope = ancestors(work.zone_id, zones)
@@ -173,25 +179,117 @@ def affected_work(session, statement, zones):
         yield Work(statement, zone_id, task, crew)
 
 
-def evaluate_site(session, *, source_ref="rules:scan", actor="rule_engine", channel="system"):
+def schedule_ref(task):
+    """Stable reference to one scheduled occurrence of a Task."""
+    return f"schedule:{task.id}@{utc(task.starts_at).isoformat()}"
+
+
+def scheduled_work(session, tasks):
+    crews = {crew.id: crew for crew in session.scalars(select(models.Crew))}
+    for task in tasks:
+        yield Work(None, task.zone_id, task, crews.get(task.crew_id))
+
+
+def overlapping(zone_a, zone_b, zones):
+    return zone_a in ancestors(zone_b, zones) or zone_b in ancestors(zone_a, zones)
+
+
+def evaluate_site(session, *, source_ref="rules:scan", actor="rule_engine", channel="system",
+                  scan_tasks=(), scan_at=None):
     """Recheck persisted work Events in the caller's transaction; never close a Flag.
 
-    Also reusable by the later morning scan. Serializing on the Site row keeps
-    concurrent detections consistent; the unique open_key is a second boundary.
+    ``scan_tasks`` are scheduled Tasks checked by the morning scan from the
+    schedule alone (#14); ``scan_at`` (the scan's ``as_of``) is their detection
+    time, so escalation runs on the same, possibly simulated, clock. Open Flags of scheduled work are rechecked on every
+    run, so Evidence decisions update them like Event-based Flags. Serializing
+    on the Site row keeps concurrent detections consistent; the unique open_key
+    is a second boundary.
     """
     session.scalar(select(models.Site).with_for_update())
     zones = {zone.id: zone for zone in session.scalars(select(models.Zone))}
     existing_flags = session.scalars(select(models.Flag)).all()
     flags = {flag.open_key: flag for flag in existing_flags if flag.open_key}
+    closed = [flag for flag in existing_flags if flag.state in {"resolved", "false_alarm"}]
     closed_sources = {
         (source.event_id, flag.type, flag.zone_id, flag.precondition,
          (flag.context or {}).get("revision_id"),
          (flag.context or {}).get("crew_id"))
-        for flag in existing_flags if flag.state in {"resolved", "false_alarm"}
-        for source in flag.sources
+        for flag in closed for source in flag.sources
     }
     statements = session.scalars(select(models.Event).order_by(models.Event.created_at, models.Event.id)).all()
+    scan_ids = {task.id for task in scan_tasks}
     now = datetime.now(UTC)
+
+    def same_task_flag(rule, work):
+        """Dedup across Zone granularity: one open Flag per Task + Precondition.
+
+        A scan of floor-level ``drywall-F3`` and an announcement for unit 3B
+        are the same conflict; sibling Zones stay separate. Only Task-keyed
+        rules (no explicit conflict key) participate.
+        """
+        if work.task is None:
+            return None
+        return next((flag for flag in flags.values() if flag.type == rule.type
+                     and flag.precondition == rule.name and flag.task_id == work.task.id
+                     and overlapping(flag.zone_id, work.zone_id, zones)), None)
+
+    def check(rule, work, statement):
+        result = rule.evaluate(session, work, zones)
+        key = result.conflict_key or ":".join((rule.type, work.zone_id,
+            work.task.id if work.task else work.crew.id if work.crew else "unassigned",
+            rule.name))
+        flag = flags.get(key)
+        # The Flag's evaluation belongs to work in its own Zone; work in an
+        # overlapping Zone only attaches its source to the same open Flag.
+        owns_evaluation = True
+        if flag is None and result.conflict_key is None:
+            flag = same_task_flag(rule, work)
+            owns_evaluation = flag is None
+        if flag is None and result.status == "satisfied":
+            return
+        if flag is None:
+            if statement is None and work.task.id not in scan_ids:
+                return
+            origin = (dict(actor="rule_engine", channel=statement.source.channel,
+                           source_ref=f"source:{statement.source_message_id}") if statement is not None else
+                      dict(actor="morning_scan", channel="system", source_ref=schedule_ref(work.task)))
+            flag = models.Flag(
+                id=uuid4().hex, type=rule.type, zone_id=work.zone_id,
+                task_id=work.task.id if work.task else None,
+                activity=(statement.activity if statement is not None else work.crew.trade) or rule.name,
+                precondition=rule.name, inspection_id=result.inspection_id,
+                severity="high", responsible_id=work.crew.lead_id if work.crew else None,
+                state="detected", evaluation=result.status, explanation=result.explanation,
+                context=result.context, open_key=key, updated_at=now, sources=[],
+                created_at=now if statement is not None else utc(scan_at or now),
+                audit=[models.FlagAudit(action="detected", to_state="detected", recorded_at=now, **origin)],
+            )
+            session.add(flag)
+            flags[key] = flag
+            from app.outbox import enqueue_flag_warning
+            enqueue_flag_warning(session, flag, statement, work.crew, now, task=work.task)
+        elif owns_evaluation and (flag.evaluation != result.status or flag.explanation != result.explanation
+                                  or flag.inspection_id != result.inspection_id or flag.context != result.context):
+            flag.evaluation, flag.explanation = result.status, result.explanation
+            flag.updated_at = now
+            flag.audit.append(models.FlagAudit(action="precondition_evaluated", actor=actor,
+                channel=channel, source_ref=source_ref, recorded_at=now))
+        if owns_evaluation:
+            flag.inspection_id = result.inspection_id
+            flag.context = result.context
+        if statement is None and work.task.id in scan_ids:
+            reference = schedule_ref(work.task)
+            if reference not in {item.source_ref for item in flag.audit}:
+                # Once per scheduled occurrence; repeated scans stay silent.
+                flag.audit.append(models.FlagAudit(action="morning_scan", actor="morning_scan",
+                    channel="system", source_ref=reference, recorded_at=now))
+                flag.updated_at = now
+        event_ids = ((statement.id,) if statement is not None else ()) + tuple(result.source_event_ids)
+        for event_id in dict.fromkeys(event_ids):
+            if event_id not in {item.event_id for item in flag.sources}:
+                flag.sources.append(models.FlagSource(event_id=event_id, attached_at=now))
+                flag.updated_at = now
+
     for statement in statements:
         candidates = [*affected_work(session, statement, zones), *revision_work(session, statement, zones)]
         for work in candidates:
@@ -205,40 +303,27 @@ def evaluate_site(session, *, source_ref="rules:scan", actor="rule_engine", chan
                     work.revision.id if work.revision else None,
                     work.crew.id if work.revision and work.crew else None) in closed_sources:
                     continue
-                result = rule.evaluate(session, work, zones)
-                key = result.conflict_key or ":".join((rule.type, work.zone_id,
-                    work.task.id if work.task else work.crew.id if work.crew else "unassigned",
-                    rule.name))
-                flag = flags.get(key)
-                if flag is None and result.status == "satisfied":
-                    continue
-                if flag is None:
-                    flag = models.Flag(
-                        id=uuid4().hex, type=rule.type, zone_id=work.zone_id,
-                        task_id=work.task.id if work.task else None, activity=statement.activity or rule.name,
-                        precondition=rule.name, inspection_id=result.inspection_id,
-                        severity="high", responsible_id=work.crew.lead_id if work.crew else None,
-                        state="detected", evaluation=result.status, explanation=result.explanation,
-                        context=result.context, open_key=key, created_at=now, updated_at=now, sources=[],
-                        audit=[models.FlagAudit(action="detected", actor="rule_engine", to_state="detected",
-                            channel=statement.source.channel, source_ref=f"source:{statement.source_message_id}", recorded_at=now)],
-                    )
-                    session.add(flag)
-                    flags[key] = flag
-                    from app.outbox import enqueue_flag_warning
-                    enqueue_flag_warning(session, flag, statement, work.crew, now)
-                elif (flag.evaluation != result.status or flag.explanation != result.explanation
-                      or flag.inspection_id != result.inspection_id or flag.context != result.context):
-                    flag.evaluation, flag.explanation = result.status, result.explanation
-                    flag.updated_at = now
-                    flag.audit.append(models.FlagAudit(action="precondition_evaluated", actor=actor,
-                        channel=channel, source_ref=source_ref, recorded_at=now))
-                flag.inspection_id = result.inspection_id
-                flag.context = result.context
-                for event_id in dict.fromkeys((statement.id, *result.source_event_ids)):
-                    if event_id not in {item.event_id for item in flag.sources}:
-                        flag.sources.append(models.FlagSource(event_id=event_id, attached_at=now))
-                        flag.updated_at = now
+                check(rule, work, statement)
+
+    # Scheduled work: scanned Tasks plus Tasks whose open Flag sits in the Task's Zone.
+    tasks = {task.id: task for task in scan_tasks}
+    tracked = {flag.task_id for flag in flags.values()
+               if flag.task_id and flag.task_id not in tasks and flag.state not in {"resolved", "false_alarm"}}
+    for task in session.scalars(select(models.Task).where(models.Task.id.in_(tracked))):
+        if any(flag.task_id == task.id and flag.zone_id == task.zone_id for flag in flags.values()):
+            tasks[task.id] = task
+    for work in scheduled_work(session, sorted(tasks.values(), key=lambda task: task.id)):
+        reference = schedule_ref(work.task)
+        for rule in PRECONDITIONS:
+            if not rule.applies(work):
+                continue
+            # A human closure settles this scheduled occurrence; a rescheduled
+            # Task is a new occurrence and is checked again.
+            if any(flag.type == rule.type and flag.precondition == rule.name
+                   and flag.task_id == work.task.id and overlapping(flag.zone_id, work.zone_id, zones)
+                   and reference in {item.source_ref for item in flag.audit} for flag in closed):
+                continue
+            check(rule, work, None)
 
 
 @event.listens_for(Session, "before_flush")

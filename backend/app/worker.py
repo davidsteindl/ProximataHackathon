@@ -8,6 +8,7 @@ from google.auth.exceptions import GoogleAuthError
 from app.api_client import check_api
 from app.gmail import GmailClient, GmailError, GmailSettings
 from app.gmail_polling import poll_gmail
+from app.job_schedule import JobSchedule, run_due_jobs
 from app.outbox_delivery import deliver_outbox
 from app.telegram import TelegramClient, TelegramError, TelegramSettings, deliver_telegram_outbox, poll_telegram
 
@@ -28,6 +29,7 @@ def main() -> None:
     interval = settings.poll_seconds if settings else 30
     if telegram_settings:
         interval = min(interval, telegram_settings.poll_seconds)
+    schedule = JobSchedule.from_env()
     with httpx.Client() as gmail_http, httpx.Client(
         base_url=os.environ["API_BASE_URL"].rstrip("/"), timeout=90,
     ) as api:
@@ -40,6 +42,10 @@ def main() -> None:
                     check_api("worker")
             except (httpx.HTTPError, GoogleAuthError, GmailError, OSError, ValueError, LookupError, TypeError) as error:
                 logger.warning("Worker poll failed (%s); retry next interval", type(error).__name__)
+            try:
+                run_due_jobs(schedule, api)
+            except (httpx.HTTPError, OSError, ValueError, LookupError, TypeError) as error:
+                logger.warning("Scheduled job failed (%s); retry next interval", type(error).__name__)
             if settings and settings.send_enabled:
                 try:
                     deliver_outbox(GmailClient(settings, gmail_http), api)

@@ -41,6 +41,7 @@ def decision(client, evidence_id, status, **changes):
 def test_transition_matrix(state, operation, actor_type):
     flag = models.Flag(id="unit-flag", state=state, open_key="conflict", audit=[])
     allowed, target, required_actor = TRANSITIONS[operation]
+    target = target or state
     feedback = {"acknowledge": "confirmed", "resolved": "resolved", "false_alarm": "false_alarm"}.get(operation)
     class Storage:
         def add(self, _):
@@ -255,7 +256,7 @@ def test_lifecycle_migration_follows_outbox_and_round_trips(engine):
     from conftest import BACKEND
 
     config = Config(str(BACKEND / "alembic.ini"))
-    assert ScriptDirectory.from_config(config).get_heads() == ["0010"]
+    assert ScriptDirectory.from_config(config).get_heads() == ["0011"]
     with engine.begin() as connection:
         config.attributes["connection"] = connection
         command.downgrade(config, "0007")
