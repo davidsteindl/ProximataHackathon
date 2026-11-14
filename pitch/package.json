@@ -1,0 +1,15 @@
+{
+  "name": "groundiq-pitch",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "slidev --open",
+    "build": "slidev build",
+    "export": "slidev export --output GroundIQ-pitch.pdf --timeout 60000 && slidev export --format pptx --output GroundIQ-pitch.pptx --timeout 60000"
+  },
+  "devDependencies": {
+    "@slidev/cli": "^53.1.0",
+    "@slidev/theme-default": "^0.25.0",
+    "playwright-chromium": "^1.65.1"
+  }
+}
