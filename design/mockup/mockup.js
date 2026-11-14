@@ -25,6 +25,11 @@ document.addEventListener('DOMContentLoaded', () => {
         : state.evidence === 'Confirmed' ? 'Open — inspection precondition satisfied; awaiting human closure'
           : state.acknowledged ? 'Acknowledged — open' : 'Notified — open';
     });
+    const stage = state.closure ? 4 : state.acknowledged ? 2 : 1;
+    document.querySelectorAll('[aria-label="Lifecycle"] .step').forEach((el, index) => {
+      el.classList.toggle('done', index < stage);
+      el.classList.toggle('cur', index === stage);
+    });
     document.querySelectorAll('[data-proposal-state]').forEach(el => {
       el.textContent = state.proposal || 'Awaiting superintendent decision';
     });
