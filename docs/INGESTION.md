@@ -125,14 +125,17 @@ channel adapters and pauses for human decisions remain in #22.
   `200`, `duplicate=true`, same source/Event/Evidence IDs, no second LLM call.
 - The same identity with different content/metadata is `409`; the original is
   unchanged. Corrections must be new source messages. No baseline is also `409`.
-- Irrelevant text or attachment-only input: `processed`, no Events. Attachment-only
-  messages bypass the LLM. This is different from a failed extraction.
+- Irrelevant text or non-DXF attachment-only input: `processed`, no Events.
+  Attachment-only messages bypass the LLM. DXF attachments can produce
+  deterministic revision Events and Conflict B (#17), including without text.
 - Provider/cache/schema/quote failure: `502` with the stored source and a safe
   `error_code` (`provider_unavailable`, `provider_not_configured`, `cache_miss`,
   `invalid_cache`, `invalid_extraction`, `invalid_quote`). No partial Events or
   Evidence are committed. Storage failure is reported as `storage_failed` when
   the database remains available to record it. Provider bodies/secrets are never
-  returned as error text.
+  returned as error text. Exception: if a DXF diff succeeds despite text extraction
+  failure, the source is `processed` and retains the extraction `error_code`;
+  its deterministic Event is committed with no extracted statements.
 - Re-deliver the exact request to retry a failed source. Requests already being
   processed return `202`; they do not launch a second extraction. A crashed
   processing attempt can be reclaimed by re-delivery after five minutes. Attempt
@@ -167,5 +170,8 @@ Gmail source keys are the verified project mailbox address (lowercase), external
 IDs are Gmail message IDs, sender IDs are the parsed From address, and timestamps
 are Gmail `internalDate` in UTC. Subject and MIME-decoded body use the existing
 `text` field as `Subject: <subject>\n\n<body>` (no prefix for an empty subject).
-Original attachment bytes go through the existing attachment contract. No CAD
-import/diff is triggered by this adapter. Setup: [GMAIL.md](GMAIL.md).
+Original attachment bytes go through the existing attachment contract. DXF
+import/diff is performed in the API ingestion path, never by the adapter.
+`Event.origin` distinguishes `llm_statement` from `deterministic_plan_diff`;
+CAD provenance, zone overrides and explicit note fallback are documented in
+[CAD-PIPELINE.md](CAD-PIPELINE.md#plan-diff-17). Setup: [GMAIL.md](GMAIL.md).

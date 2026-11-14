@@ -1,9 +1,9 @@
-# DXF geometry contract — Issue #15
+# DXF geometry and plan-diff contract — Issues #15 / #17
 
 The API extracts the [documented CAD layers](../cad/README.md) from DXF R2000
-(AC1015) in millimetres. No DWG conversion, plan diff, conflict evaluation or
-3D frontend is implemented here. Both the future 3D view and agent query the
-same stored geometry through REST; no MCP tool is introduced by this issue.
+(AC1015) in millimetres. The 3D view and agent query the same stored geometry
+through REST. DXF attachments use deterministic plan diffs to trigger Conflict B
+as described below. No DWG conversion or MCP tool is introduced here.
 
 ## Import the supplied plans
 
@@ -44,10 +44,10 @@ without inferring label order or an issue timestamp from the DXF. Registration
 updates what `/plans` considers the current Revision by its sequence, but creates
 no Crew acknowledgment, Evidence, Event or Flag. Existing acknowledgment/history
 records are left intact. `Revision.zone_ids` is left untouched for existing
-Revisions and is initially empty for a new one: changed/affected Zones are #17's
-responsibility. Geometry coverage uses its own associations below, not that field.
-Accordingly `/plans` can return a Revision with `zone_ids: []`; this means that
-affected-zone information has not been supplied, not that a diff found no changes.
+Revisions and is initially empty for a new one. The ingestion diff below updates
+changed/affected Zones; geometry coverage uses its own associations instead.
+`zone_ids: []` alone does not distinguish unavailable scope from an empty diff;
+check the revision Event's `diff_status` and `plan_diff`.
 
 ## REST import and source retrieval
 
@@ -146,7 +146,7 @@ Block definitions' inherited layer `0` is not an unknown modelspace layer.
 
 XDATA IDs keep their identity across C/D, including `3B-BATH-WALL` and the drain.
 Without XDATA, handles are only stable if the drawing editor preserves them;
-geometry-based identity matching is not implemented here. No plan diff is computed.
+geometry-based identity matching is not implemented. The diff below matches IDs.
 
 ## Persistence and reset
 
@@ -179,3 +179,34 @@ coverage is excluded to avoid flagging unrelated apartments. Stable SITEMIND IDs
 are preferred; handle-based IDs can only match when handles persist across files.
 Identical extracted geometry yields an empty diff, regardless of DXF metadata.
 The comparison never creates Evidence or certifies any Precondition.
+
+### DXF attachments through ingestion
+
+`POST /ingestion/messages` recognizes `<known-plan>_Rev<label>.dxf` attachments.
+The filename resolves the Plan and Revision; existing revision metadata is reused.
+A new label receives the next sequence only when the source is newer than the
+latest registered revision. Historical attachments without registered metadata
+use the note fallback rather than guessing their order. Original bytes remain
+source attachments and, on success, the imported revision source.
+
+Text Events and DXF processing run as one batch before rule checks. A successful
+diff replaces the revision Event's note zones (including an empty result), sets
+`Event.origin` and `details.affected_zones_origin` to `deterministic_plan_diff`,
+and stores `details.plan_diff`, `attachment_id`, `source_sha256` and
+`diff_status: succeeded`. Original note text stays as the explanatory quote.
+With no revision note, ingestion creates a source-backed revision Event itself.
+`Revision.zones` receives the affected units. Rule B uses the geometric scope for
+that revision even when a later text note claims broader zones.
+
+A comparison/import failure rolls back the attachment import, retains the
+unconfirmed revision note and adds `diff_status: failed` plus `diff_error`.
+Flag B exposes this fallback in its context and the dashboard. Without a usable
+note no affected zones are invented. A successful DXF comparison can proceed
+even when text extraction fails; the processed Source Message retains the safe
+extraction `error_code`, and its original text remains available. Otherwise the
+existing failed-source retry behavior applies.
+
+Neither deterministic Events nor fallback notes create receipt Evidence.
+Confirmed, correctly scoped Crew/Revision Evidence is still required for B;
+confirmation/rejection re-evaluates the Flag without closing it. Seed reset also
+removes the source Events, diff details and geometry via existing deletion paths.

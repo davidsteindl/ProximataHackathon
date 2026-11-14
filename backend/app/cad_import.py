@@ -19,82 +19,88 @@ class ImportConflict(ValueError):
 
 
 def import_plan(session: Session, source: bytes, filename: str, metadata: cad_schemas.ImportMetadata):
+    with session.begin():
+        result = import_plan_in_transaction(session, source, filename, metadata)
+        from app.rules import evaluate_site
+        evaluate_site(session, source_ref=f"cad:{metadata.revision_id}")
+        return result
+
+
+def import_plan_in_transaction(session, source, filename, metadata):
+    """Reuse the importer atomically inside message ingestion."""
     filename = PurePosixPath(filename.replace("\\", "/")).name
     if not filename.lower().endswith(".dxf") or len(filename) > 200:
         raise InvalidPlan("A DXF filename of at most 200 characters is required")
     digest = hashlib.sha256(source).hexdigest()
-    with session.begin():
-        session.scalar(select(models.Site).with_for_update())
-        plan = session.get(models.Plan, metadata.plan_id)
-        floor = session.get(models.Zone, metadata.floor_id)
-        if plan is None or floor is None or floor.kind != "floor" or plan.floor_id != floor.id:
-            raise InvalidPlan("Sheet and floor must match the seeded building metadata")
-        if floor.height_m is None or floor.elevation_m is None:
-            raise InvalidPlan("Floor height and elevation are required")
-        revision = session.get(models.Revision, metadata.revision_id)
-        if revision is not None:
-            issued_at = revision.issued_at
-            if issued_at.tzinfo is None:
-                issued_at = issued_at.replace(tzinfo=UTC)
-            if revision.file_name is None and (revision.plan_id, revision.label) == (metadata.plan_id, metadata.label):
-                collision = session.scalar(select(models.Revision).where(
-                    models.Revision.plan_id == plan.id, models.Revision.sequence == metadata.sequence,
-                    models.Revision.id != revision.id,
-                ))
-                if collision is not None:
-                    raise ImportConflict("CAD sequence conflicts with another revision")
-                revision.sequence, revision.issued_at = metadata.sequence, metadata.issued_at
-                revision.file_name = filename
-            elif (revision.plan_id, revision.label, revision.sequence, issued_at) != (
-                metadata.plan_id, metadata.label, metadata.sequence, metadata.issued_at,
-            ):
-                raise ImportConflict("Revision metadata conflicts with the stored revision")
-        else:
+    session.scalar(select(models.Site).with_for_update())
+    plan = session.get(models.Plan, metadata.plan_id)
+    floor = session.get(models.Zone, metadata.floor_id)
+    if plan is None or floor is None or floor.kind != "floor" or plan.floor_id != floor.id:
+        raise InvalidPlan("Sheet and floor must match the seeded building metadata")
+    if floor.height_m is None or floor.elevation_m is None:
+        raise InvalidPlan("Floor height and elevation are required")
+    revision = session.get(models.Revision, metadata.revision_id)
+    if revision is not None:
+        issued_at = revision.issued_at
+        if issued_at.tzinfo is None:
+            issued_at = issued_at.replace(tzinfo=UTC)
+        if revision.file_name is None and (revision.plan_id, revision.label) == (metadata.plan_id, metadata.label):
             collision = session.scalar(select(models.Revision).where(
-                models.Revision.plan_id == plan.id,
-                (models.Revision.label == metadata.label) | (models.Revision.sequence == metadata.sequence),
+                models.Revision.plan_id == plan.id, models.Revision.sequence == metadata.sequence,
+                models.Revision.id != revision.id,
             ))
             if collision is not None:
-                raise ImportConflict("Revision label/sequence is already registered with a different ID")
-        stored = session.get(models.PlanGeometry, metadata.revision_id)
-        if stored is not None:
-            if stored.source_sha256 != digest:
-                raise ImportConflict("Different source content requires a new plan revision")
-            count = session.scalar(select(func.count()).select_from(models.GeometryElement).where(
-                models.GeometryElement.revision_id == metadata.revision_id,
-            ))
-            return cad_schemas.ImportResult(
-                revision_id=metadata.revision_id, element_count=count,
-                source_sha256=digest, ignored_layers=stored.ignored_layers,
-            )
-        zones = session.scalars(select(models.Zone)).all()
-        elements, ignored = extract_dxf(source, zones, metadata.floor_id)
-        if revision is None:
-            # Coverage comes from geometry associations. Changed/affected zones
-            # belong to #17's diff; do not invent them or acknowledge a revision.
-            revision = models.Revision(
-                id=metadata.revision_id, plan_id=plan.id, label=metadata.label,
-                sequence=metadata.sequence, issued_at=metadata.issued_at, file_name=filename,
-            )
-            session.add(revision)
-            session.flush()
-        session.add(models.PlanGeometry(
-            revision_id=revision.id, original_filename=filename, source=source,
-            source_sha256=digest, floor_height_m=floor.height_m,
-            floor_elevation_m=floor.elevation_m,
-            ignored_layers=[layer.model_dump() for layer in ignored],
+                raise ImportConflict("CAD sequence conflicts with another revision")
+            revision.sequence, revision.issued_at = metadata.sequence, metadata.issued_at
+            revision.file_name = filename
+        elif (revision.plan_id, revision.label, revision.sequence, issued_at) != (
+            metadata.plan_id, metadata.label, metadata.sequence, metadata.issued_at,
+        ):
+            raise ImportConflict("Revision metadata conflicts with the stored revision")
+    else:
+        collision = session.scalar(select(models.Revision).where(
+            models.Revision.plan_id == plan.id,
+            (models.Revision.label == metadata.label) | (models.Revision.sequence == metadata.sequence),
         ))
+        if collision is not None:
+            raise ImportConflict("Revision label/sequence is already registered with a different ID")
+    stored = session.get(models.PlanGeometry, metadata.revision_id)
+    if stored is not None:
+        if stored.source_sha256 != digest:
+            raise ImportConflict("Different source content requires a new plan revision")
+        count = session.scalar(select(func.count()).select_from(models.GeometryElement).where(
+            models.GeometryElement.revision_id == metadata.revision_id,
+        ))
+        return cad_schemas.ImportResult(
+            revision_id=metadata.revision_id, element_count=count,
+            source_sha256=digest, ignored_layers=stored.ignored_layers,
+        )
+    zones = session.scalars(select(models.Zone)).all()
+    elements, ignored = extract_dxf(source, zones, metadata.floor_id)
+    if revision is None:
+        # Coverage comes from geometry associations. Ingestion separately
+        # applies the revision diff; importing alone never acknowledges receipt.
+        revision = models.Revision(
+            id=metadata.revision_id, plan_id=plan.id, label=metadata.label,
+            sequence=metadata.sequence, issued_at=metadata.issued_at, file_name=filename,
+        )
+        session.add(revision)
         session.flush()
-        by_id = {zone.id: zone for zone in zones}
-        for element in elements:
-            session.add(models.GeometryElement(
-                revision_id=revision.id, element_id=element.element_id, kind=element.kind,
-                layer=element.layer, shape=element.shape.model_dump(mode="json"),
-                zones=[by_id[key] for key in element.zone_ids],
-            ))
-        from app.rules import evaluate_site
-        session.flush()
-        evaluate_site(session, source_ref=f"cad:{revision.id}")
+    session.add(models.PlanGeometry(
+        revision_id=revision.id, original_filename=filename, source=source,
+        source_sha256=digest, floor_height_m=floor.height_m,
+        floor_elevation_m=floor.elevation_m,
+        ignored_layers=[layer.model_dump() for layer in ignored],
+    ))
+    session.flush()
+    by_id = {zone.id: zone for zone in zones}
+    for element in elements:
+        session.add(models.GeometryElement(
+            revision_id=revision.id, element_id=element.element_id, kind=element.kind,
+            layer=element.layer, shape=element.shape.model_dump(mode="json"),
+            zones=[by_id[key] for key in element.zone_ids],
+        ))
+    session.flush()
     return cad_schemas.ImportResult(
         revision_id=metadata.revision_id, element_count=len(elements),
         source_sha256=digest, ignored_layers=ignored,

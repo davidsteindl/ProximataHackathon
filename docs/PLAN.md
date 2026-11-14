@@ -125,10 +125,22 @@ schließt keinen Flag. REST-, Schema- und Integrationsdetails: [FLAGS.md](FLAGS.
 - **Separat in Gebäude-Metadaten:** Etagenhöhen, Zuordnung Plan → Etage, Zonen-IDs. Die Zonenhierarchie ist also unabhängig vom CAD-Parsing sofort verfügbar. Das Parsing füllt die Geometrie nach und verknüpft sie über den Raumstempel mit den Zonen-IDs.
 - **Gemeinsame Zonen-IDs für #3/#5:** Gebäude `B1`, Etagen `F1`–`F4`, Wohnungen `1A`–`4D`, je Wohnung die Räume `LIV`, `BED`, `KIT`, `HALL`, `BATH`, `STOR` (z. B. Hero-Bad `3B-BATH`), Badwand `3B-BATH-WALL`. CAD-Stempel verwenden exakt die IDs. Hierarchie, Plan-Zuordnung und Seed-Vertrag stehen in [SITE_RECORD.md](SITE_RECORD.md).
 - **Eine Quelle für alle:** Die extrahierte Geometrie wird über die API bereitgestellt. Die 3D-Ansicht (Wände auf Etagenhöhe extrudiert) und der Agent nutzen **dieselben** Daten. Der Agent bekommt nie rohe CAD-Dateien, sondern Abfragen wie „Was ist in Zone X?“ oder „Was hat sich zwischen Rev C und Rev D in Zone X geändert?“.
-- **Geometrievertrag (#15):** `/geometry` liefert die höchste importierte Revision je Plan oder eine explizite `revision_id`, gefiltert nach Etage/Zone. Koordinaten und Etagen-Metadaten sind in Metern; Original-DXF und Geometrie werden je Revision gespeichert. Neue CAD-Revisionen erzeugen keine Bestätigungen/Nachweise; ihre betroffenen Zonen (`Revision.zone_ids`) bleiben bis zur Ermittlung durch #17 leer. Vollständiger Import-, Speicher- und REST-Vertrag: [CAD-PIPELINE.md](CAD-PIPELINE.md).
+- **Geometrievertrag (#15):** `/geometry` liefert die höchste importierte Revision je Plan oder eine explizite `revision_id`, gefiltert nach Etage/Zone. Koordinaten und Etagen-Metadaten sind in Metern; Original-DXF und Geometrie werden je Revision gespeichert. Neue CAD-Revisionen erzeugen keine Bestätigungen/Nachweise; ihre betroffenen Zonen (`Revision.zone_ids`) werden durch den Ingestion-Plan-Diff (#17) ermittelt; ein reiner Geometrieimport lässt sie unverändert. Vollständiger Import-, Speicher- und REST-Vertrag: [CAD-PIPELINE.md](CAD-PIPELINE.md).
 - **Plan-Diff statt Vision:** Eine neue Revision wird geometrisch mit der vorherigen verglichen. Das Ergebnis sind die betroffenen Zonen, und das ist der deterministische Auslöser für Konflikttyp B. Die Revisionsnotiz in der Mail dient dem LLM nur zur Erklärung. **Fallback**, falls der Diff nicht rechtzeitig steht: Die betroffenen Zonen kommen aus der Revisionsnotiz (LLM-Extraktion). Diese Angaben bleiben als unbestätigt gekennzeichnet und dürfen Warnungen auslösen, aber keine Crew-Bestätigung oder andere Precondition erfüllen.
 - **Erweiterung für DWG:** Ein separater Konverter kann DWG vor derselben DXF-Extraktion umwandeln. Dabei müssen Layer, Beschriftungen, Einheiten und relevante Geometrie erhalten bleiben; das Original-DWG bleibt als Quelle gespeichert. Der bestehende LibreDWG-Prototyp aus #4 ist vorbereitet, seine automatische Anbindung ist außerhalb des MVP. Auch bei direktem DXF-Import bleibt die Originaldatei mit ihrer Revision als Quelle erhalten.
 
+
+**Implementierter Plan-Diff (#17):**
+
+Der lesende REST-Vertrag `/geometry/revisions/{revision_id}/diff` vergleicht
+stabile Element-IDs mit der unmittelbar vorherigen Planrevision nach `sequence`.
+Änderungen werden nach betroffenen Wohnungen gruppiert, aus alter und neuer
+Geometrie; übergeordnete Etagenzuordnungen erweitern den Konfliktbereich nicht.
+DXF-Anhänge aus der gemeinsamen Ingestion ersetzen nach erfolgreichem Vergleich
+die Notizzonen des Revisions-Events und lösen B deterministisch aus. Fehler
+bleiben als Notiz-Fallback im Event und Flag sichtbar. Die Nachweisgrenze aus
+§3.2 bleibt unverändert: Geometrie bestätigt keinen Revisionsempfang.
+Details und Grenzen: [CAD-PIPELINE.md](CAD-PIPELINE.md#plan-diff-17).
 
 ### 3.6 Raumansicht, Raumstatus und Neuigkeiten
 - **Raumansicht im Dashboard:** Jeder Raum bzw. jede Zone ist per URL `/zones/<zoneId>` aufrufbar (z. B. `/zones/3B-BATH`). Links: 3D-Ansicht (#16), Etage isoliert und in der Draufsicht, ausgewählter Raum hervorgehoben. Rechts: Seitenleiste mit Widgets, oben breit **Zustand** (Precondition-Bewertungen, offene Flags), unten **anstehende Tasks** und **Plan & Abnahmen** (aktuelle Revision, Kenntnisnahmen, Inspections mit Nachweisstatus). Die genaue Gestaltung legt das Mockup (#35) fest.
@@ -334,11 +346,3 @@ Schlaf in Schichten, sodass nachts immer jemand reviewen und mergen kann.
 - [x] DWG-Konverter gewählt: LibreDWG als separater Prozess; Details in docs/CAD-CONVERTER.md. Lizenz und Plattformen dokumentiert.
 - [x] Layer-Konvention für die synthetischen Pläne festgelegt und in §3.5 eingetragen (Details: `cad/README.md`)
 - [ ] Mentor fragen: Wie liegen Pläne bei Talonas Kunden typischerweise vor (DWG, PDF, beides)?
-
-### Implementierter Plan-Diff (#17)
-
-Der lesende REST-Vertrag `/geometry/revisions/{revision_id}/diff` vergleicht
-stabile Element-IDs mit der unmittelbar vorherigen Planrevision nach `sequence`.
-Änderungen werden nach betroffenen Wohnungen gruppiert, aus alter und neuer
-Geometrie; übergeordnete Etagenzuordnungen erweitern den Konfliktbereich nicht.
-Details und Grenzen: [CAD-PIPELINE.md](CAD-PIPELINE.md#plan-diff-17).

@@ -88,7 +88,7 @@ export default function SiteOverview({ data, filters }) {
 
       <section aria-labelledby="plans-title">
         <h2 id="plans-title">Plans and revisions</h2>
-        <p>Revision-note zones are unconfirmed. Importing a drawing does not confirm them.</p>
+        <p>Revision-note zones are unconfirmed; DXF plan diffs determine affected zones geometrically. Neither confirms crew receipt.</p>
         {plans.map((plan) => (
           <article key={plan.id}>
             <h3>{plan.id} · {plan.name} · {plan.floor_id}</h3>

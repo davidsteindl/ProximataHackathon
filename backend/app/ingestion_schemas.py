@@ -90,9 +90,14 @@ class EventView(Record):
     time_expression: str | None
     details: dict
     created_at: Timestamp
-    origin: Literal["llm_statement"] = "llm_statement"
+    origin: Literal["llm_statement", "deterministic_plan_diff"] = "llm_statement"
     source: SourceMessageView
     evidence: list[EvidenceView] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def event_origin(self):
+        self.origin = self.details.get("origin", "llm_statement")
+        return self
 
 
 class IngestionResult(Record):

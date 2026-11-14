@@ -85,15 +85,22 @@ def process_source(session, source_id, extractor_factory=None):
         session.expire_all()
         source = session.get(models.SourceMessage, source_id)
         text, role, sender_id = source.text, source.sender_role, source.sender_id
+        has_dxf = any(item.file_name.lower().endswith(".dxf") for item in source.attachments)
     # No database transaction or row lock is held during the provider call.
-    backend = None
+    backend, extraction_error = None, None
     try:
         if text.strip():
-            extractor = (extractor_factory or get_extractor)()
-            backend = extractor.name
-            redacted = redact_text(text, sender_id)
-            batch = extractor.extract(redacted, role)
-            statements = validate_quotes(batch, redacted, text)
+            try:
+                extractor = (extractor_factory or get_extractor)()
+                backend = extractor.name
+                redacted = redact_text(text, sender_id)
+                batch = extractor.extract(redacted, role)
+                statements = validate_quotes(batch, redacted, text)
+            except ExtractionError as error:
+                if not has_dxf:
+                    raise
+                # CAD comparison must also work offline or during LLM outages.
+                statements, extraction_error = [], error
         else:
             statements, backend = [], "attachment_only"
         with session.begin():
@@ -102,8 +109,20 @@ def process_source(session, source_id, extractor_factory=None):
             ).with_for_update())
             if source is None:
                 return  # Reset or a newer attempt owns this source now.
-            build_events(session, source, statements)
-            source.status, source.error_code = "processed", None
+            # Defer checks until note scopes have been replaced by DXF results.
+            # Import/savepoint flushes must not create flags from provisional text.
+            session.info["defer_rules"] = True
+            try:
+                events = build_events(session, source, statements)
+                from app.plan_ingestion import process_plan_attachments
+                process_plan_attachments(session, source, events)
+                if extraction_error and not any(event.details.get("diff_status") == "succeeded" for event in events):
+                    raise extraction_error
+                session.flush()
+            finally:
+                session.info.pop("defer_rules", None)
+            rules.evaluate_site(session, source_ref=f"source:{source.id}")
+            source.status, source.error_code = "processed", extraction_error.code if extraction_error else None
             source.processing_token, source.processing_started_at = None, None
             source.extraction_backend = backend
     except (ExtractionError, SQLAlchemyError) as error:
