@@ -22,7 +22,8 @@ No LLM call is used to interpret free-text feedback as executable instructions.
   `planned_work` intent. Only that Event changes. Other claims in the same batch
   remain unconfirmed and all existing rules still run. Historical Events and
   Evidence are not rewritten. Corrected Event `details.learning` exposes the
-  knowledge, feedback, original source/Event and Flag references for explanations.
+  knowledge, feedback, original source/Event and Flag references for explanations,
+  including the existing zone-context and timeline MCP tools via the REST API.
 - Feedback without this explicit correction is viewable context, not a reason to
   suppress any future Flag. Corrections do not generalize to similar messages,
   other Crews or roles. Free-text reasons and identities are not sent to the LLM.

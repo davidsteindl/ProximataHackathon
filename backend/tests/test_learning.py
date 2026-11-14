@@ -5,15 +5,15 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app import models
-from app.extraction import ExtractedBatch, ExtractedEvent
+from app.extraction import ExtractedBatch, ExtractedEvent, get_extractor
 from app.lifecycle import transition_flag
-from test_lifecycle import action, signal
+from test_lifecycle import action, decision, signal
 from test_rules import initialized, ingest, inspection_claim  # noqa: F401
 
 QUESTION = "Können wir morgen früh 3B zumachen?"
 
 
-def false_alarm(client, engine, *, correct=True):
+def false_alarm(client, *, correct=True):
     original = ingest(client, text=QUESTION)
     flag = client.get("/flags").json()[0]
     delivery = client.post("/outbox/claim").json()
@@ -30,7 +30,7 @@ def false_alarm(client, engine, *, correct=True):
 
 
 def test_exact_replay_corrected_with_feedback_source_and_knowledge_reference(initialized, engine):
-    original, flag = false_alarm(initialized, engine)
+    original, flag = false_alarm(initialized)
     knowledge = initialized.get("/site-knowledge").json()
     assert len(knowledge) == 1
     entry = knowledge[0]
@@ -49,19 +49,22 @@ def test_exact_replay_corrected_with_feedback_source_and_knowledge_reference(ini
         "original_intent": "planned_work", "corrected_intent": "question",
     }
     assert initialized.get("/flags").json() == []
+    context = initialized.get("/context/zones/3B").json()
+    contextual_event = next(item for item in context["events"] if item["id"] == event["id"])
+    assert contextual_event["details"]["learning"] == event["details"]["learning"]
     assert initialized.get(f"/flags/{flag['id']}").json()["state"] == "false_alarm"
     assert initialized.get("/metrics/flag-feedback").json()[-1]["confirmed_share"] == 0
 
 
 def test_feedback_alone_never_suppresses_work(initialized, engine):
-    false_alarm(initialized, engine, correct=False)
+    false_alarm(initialized, correct=False)
     replay = ingest(initialized, text=QUESTION, external_id="new-question")
     assert replay["events"][0]["intent"] == "planned_work"
     assert len(initialized.get("/flags").json()) == 1
 
 
 def test_genuine_work_and_high_confidence_inspection_remain_unsafe(initialized, engine):
-    false_alarm(initialized, engine)
+    false_alarm(initialized)
     evidence_id = inspection_claim(initialized)
     ingest(initialized, external_id="genuine-hero")
     flag = initialized.get("/flags").json()[0]
@@ -74,7 +77,7 @@ def test_genuine_work_and_high_confidence_inspection_remain_unsafe(initialized, 
 
 @pytest.mark.parametrize("changes", [{"sender_crew_id": "plumbing"}, {"sender_role": "crew"}, {"text": QUESTION + " Jetzt wirklich."}])
 def test_scope_does_not_generalize(initialized, engine, monkeypatch, changes):
-    false_alarm(initialized, engine)
+    false_alarm(initialized)
 
     class Extractor:
         name = "test"
@@ -102,6 +105,8 @@ def test_correction_validation_and_agent_boundary_are_atomic(initialized, engine
         {"correction_event_id": original["events"][0]["id"], "role": "agent"},
     ):
         assert action(initialized, flag, "false_alarm", **changes).status_code == 422
+    for client_kind in ("mcp", "chat", "agent"):
+        assert initialized.post(f"/flags/{flag['id']}/actions", headers={"X-SiteMind-Client": client_kind}, json={}).status_code == 403
     assert action(initialized, flag, "acknowledge", correction_event_id=original["events"][0]["id"]).status_code == 422
     assert initialized.get("/site-knowledge").json() == []
     assert initialized.get(f"/flags/{flag['id']}").json()["state"] == "notified"
@@ -156,7 +161,7 @@ def test_metric_counts_flags_once_and_tracks_verdict_changes(initialized, engine
 
 
 def test_seed_reset_removes_knowledge_and_preserves_unconfirmed_replay(initialized, engine, seed):
-    false_alarm(initialized, engine)
+    false_alarm(initialized)
     assert initialized.post("/seed/import", json=seed.model_dump(mode="json")).status_code == 200
     assert initialized.get("/site-knowledge").json() == []
     assert initialized.get("/metrics/flag-feedback").json() == []
@@ -166,7 +171,7 @@ def test_seed_reset_removes_knowledge_and_preserves_unconfirmed_replay(initializ
 
 
 def test_metric_denominator_excludes_unreviewed_flags_and_resolution_is_not_double_counted(initialized, engine):
-    false_alarm(initialized, engine)
+    false_alarm(initialized)
     ingest(initialized, external_id="real-work")
     assert initialized.get("/metrics/flag-feedback").json()[-1]["reviewed_flags"] == 1
     flag = initialized.get("/flags").json()[0]
@@ -184,3 +189,31 @@ def test_metric_denominator_excludes_unreviewed_flags_and_resolution_is_not_doub
     assert action(initialized, flag, "resolved").status_code == 200
     assert initialized.get("/metrics/flag-feedback").json()[-1] == metric
     assert len(initialized.get("/site-knowledge").json()) == 3
+
+
+def test_learning_preserves_human_confirmation_and_unresolved_counterclaim(initialized, monkeypatch):
+    evidence_id = inspection_claim(initialized)
+    assert decision(initialized, evidence_id, "confirmed").status_code == 200
+    cached = get_extractor()
+    counterclaim = "Die Rohinstallation im 3. OG ist nicht bestanden."
+
+    class Extractor:
+        name = "test"
+
+        def extract(self, text, sender_role):
+            if text != counterclaim:
+                return cached.extract(text, sender_role)
+            return ExtractedBatch(events=[ExtractedEvent(
+                intent="inspection_result", quote=text, confidence=1, zones=["F3"],
+                inspection_kind="rough_in", claim="failed",
+            )])
+
+    monkeypatch.setattr("app.ingestion.get_extractor", Extractor)
+    ingest(initialized, text=counterclaim, sender_role="inspector", sender_crew_id=None, external_id="counterclaim")
+    before = initialized.get("/evidence").json()
+    false_alarm(initialized)
+    replay = ingest(initialized, text=QUESTION, external_id="question-replay")
+    assert replay["events"][0]["intent"] == "question"
+    assert initialized.get("/evidence").json() == before
+    ingest(initialized, external_id="genuine-work-after-learning")
+    assert initialized.get("/flags").json()[0]["evaluation"] == "contradictory"
