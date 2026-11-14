@@ -159,8 +159,15 @@ def handle_update(telegram, api, update):
             existing = result["source"]
         # Revisit processed sources on retries: ingestion success alone does not mean
         # Q&A has been queued. Deleted raw data remains an identity tombstone.
-        candidate = bool(existing["text"].strip()) and (is_question(existing["text"]) or
-                    result is not None and any(event["intent"] == "question" for event in result["events"]))
+        candidate = bool(existing["text"].strip()) and is_question(existing["text"])
+        if existing["text"].strip() and not candidate:
+            if result is None:
+                response = api.get("/events", params={"source_id": existing["id"]})
+                response.raise_for_status()
+                events = response.json()
+            else:
+                events = result["events"]
+            candidate = any(event["intent"] == "question" for event in events)
         if candidate:
             response = api.post("/telegram/qa", headers={
                 "X-Telegram-Compliance-Key": telegram.settings.compliance_key,

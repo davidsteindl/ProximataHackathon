@@ -11,7 +11,8 @@ import pytest
 from mcp import ClientSession
 from mcp.client.streamable_http import streamable_http_client
 
-from app import mcp_server, qa
+from app import ingestion, mcp_server, qa
+from app.extraction import ExtractedBatch, ExtractedEvent
 from app.outbox_delivery import deliver_outbox
 from app.telegram import TelegramError, deliver_telegram_outbox, is_question, poll_telegram
 from conftest import BACKEND
@@ -171,8 +172,15 @@ def test_unknown_room_is_clarified_instead_of_guessed(qa_stack, monkeypatch):
     assert "Status of" not in text
 
 
-def test_qa_failure_retries_even_after_successful_ingestion(qa_stack, monkeypatch):
+@pytest.mark.parametrize("text", [REVISION_QUESTION, "Bitte sag mir den aktuellen Plan für 3B"])
+def test_qa_failure_retries_even_after_successful_ingestion(qa_stack, monkeypatch, text):
     api, _ = qa_stack
+    extractor = Mock()
+    extractor.name = "mock"
+    extractor.extract.return_value = ExtractedBatch(events=[
+        ExtractedEvent(intent="question", quote=text, confidence=0.99, zones=["3B"]),
+    ])
+    monkeypatch.setattr(ingestion, "get_extractor", lambda: extractor)
     class RetryRouter:
         calls = 0
         async def route(self, *args):
@@ -182,14 +190,16 @@ def test_qa_failure_retries_even_after_successful_ingestion(qa_stack, monkeypatc
             return routing("revision_in_force", "3B")
     router = RetryRouter()
     monkeypatch.setattr(qa, "get_router", lambda: router)
-    telegram, http, _ = bot([message(REVISION_QUESTION)])
+    telegram, http, _ = bot([message(text)])
     with http:
         with pytest.raises(TelegramError):
             poll_telegram(telegram, api)
         assert telegram.offset == 1 and replies(api) == []
         poll_telegram(telegram, api)
+        poll_telegram(telegram, api)
     assert telegram.offset == 2 and len(replies(api)) == 1 and router.calls == 2
     assert len(api.get("/events").json()) == 1
+    extractor.extract.assert_called_once()
 
 
 @pytest.mark.parametrize("sender, chat", [(999, -100), (123, -999)])

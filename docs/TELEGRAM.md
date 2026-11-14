@@ -101,6 +101,8 @@ routing. Source-derived outbox IDs and dedup keys prevent additional replies or
 forwards on repeated updates/restarts. A Q&A failure is retried even if ingestion
 already succeeded. Outbound failure keeps the normal leased retry behavior;
 uncertain provider responses can still duplicate delivery as described below.
+Retries also read persisted question Events through `GET /events?source_id=…`
+when the text heuristic does not detect a question, without repeating extraction.
 
 ## Privacy and retention
 
