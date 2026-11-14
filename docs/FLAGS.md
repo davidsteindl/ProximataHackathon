@@ -5,8 +5,8 @@ creation time and ID. `GET /flags/{id}` returns one Flag, or 404. Both include
 affected Zone/Task/activity, required Inspection, responsible Crew Lead, current
 Precondition evaluation, timestamps, triggering Events with original Source
 Messages/quotes, Evidence with review history, and the Flag audit trail.
-These endpoints are read-only. Lifecycle actions and dashboard Evidence review
-belong to #9; ingestion, MCP and chat cannot approve Evidence here.
+Read endpoints never mutate state. Lifecycle actions and separate dashboard
+Evidence review are documented below; ingestion, MCP and chat cannot approve Evidence.
 
 ## Rule contract
 
@@ -94,3 +94,89 @@ details. An unconfirmed inspection success does not authorize work.
 
 From `backend`, `python -m pytest tests/test_rules.py` covers evaluation, review-triggered
 rechecks, dedup, reset, read-only routes and migration parity/rollback.
+
+## Lifecycle and Evidence review (#9)
+
+Migration `0006` adds structured transition/feedback fields to `flag_audit` and
+an optional reason to `evidence_reviews`. Both histories are append-only through
+the ORM; explicit seed reset still clears the demo. Older audit rows retain
+null values for the added fields. No synthetic human decisions are backfilled.
+
+`GET /flags?status=open|closed|all` defaults to `open`. Closed Flags remain
+readable through the list and `GET /flags/{id}` for feedback/audit inspection.
+`awaiting_human_closure` is true only for an open Flag whose evaluation is
+`satisfied`. Neither review nor closing a Flag changes Inspection/Task/Revision
+records or implicitly approves a Proposal.
+
+`POST /flags/{id}/actions` accepts:
+
+```json
+{
+  "actor": "synthetic-superintendent",
+  "role": "superintendent",
+  "channel": "dashboard",
+  "action": "acknowledge",
+  "feedback": "confirmed",
+  "reason": "Reviewed the source; this is a real problem.",
+  "expected_state": "notified"
+}
+```
+
+- `acknowledge` + `confirmed`: notified → acknowledged.
+- `resolved` + `resolved`: in_progress → resolved.
+- `false_alarm` + `false_alarm`: notified/acknowledged/in_progress → false_alarm.
+
+All feedback needs a nonblank reason. The Superintendent or the assigned Crew
+Lead may act. Closing clears `open_key`; the existing rule contract prevents
+replaying settled work into a new Flag. Feedback, actor/role, time, channel,
+previous/next state and basis (`flag:{id}`) are stored together in the audit;
+#21 can consume the structured `feedback` and `reason` fields. A resolved Flag
+need not have satisfied Evidence: a human can resolve the problem by moving
+work, as in the hero scenario. Its closure never certifies an Inspection.
+
+Trusted API integrations call `app.lifecycle.transition_flag` inside their own
+transaction, after acquiring the Site lock and validating the signal/source:
+
+- #10: `notified` (system) only after delivery, detected → notified.
+- #13: `action_approved` with the approving Superintendent as human actor and
+  Proposal reference, acknowledged → in_progress. The caller must validate the
+  actual Proposal approval; this helper does not approve Proposals.
+- #14: `escalated` (system), notified → notified, with an audited source.
+
+These signals have no public action endpoint in #9. A detected Flag awaits #10
+notification delivery before acknowledgment; an acknowledged Flag awaits #13
+approval before resolution. No notification sender, Proposal workflow or
+escalation scheduler is added here. The helper rejects any system/agent closure.
+
+`POST /evidence/{id}/reviews` works independently of a Flag:
+
+```json
+{
+  "actor": "synthetic-superintendent",
+  "role": "superintendent",
+  "channel": "dashboard",
+  "decision": "confirmed",
+  "expected_sequence": 1,
+  "reason": "Checked the source quote and exact Inspection scope."
+}
+```
+
+Confirmation requires resolved, matching subject/Zone scope and source
+provenance. For LLM Evidence the Event, source reference and quote must match.
+Inspection review requires the Superintendent; Crew Leads can review their own
+Crew's scoped Task completion or exact Revision acknowledgment. The
+Superintendent can reject unresolved Evidence. Prior decisions may be reversed
+by a new explicit review, preserving the whole history. Incomplete scopes cannot
+be edited through review: reject the statement and ingest a source-backed
+clarification as new Evidence. Review time/person/role/decision/reason live in
+history; immutable source/quote/scope remain on its parent Evidence. Every
+accepted review triggers rules in the same transaction, including rejection and
+clarification reviews. Genuine counterclaims remain visible until reviewed.
+
+Both write endpoints reject unknown fields, agent/system roles and non-dashboard
+channels (including MCP/chat). Stale expected state/sequence returns 409;
+invalid scope/payload returns 422; unauthorized roles/persons return 403; missing
+records return 404. Site locking serializes review, lifecycle and ingestion.
+This explicit dashboard boundary is an MVP convention, **not authentication**:
+caller-provided demo identities can be impersonated. #18 must keep human write
+routes out of all MCP/chat tool surfaces.

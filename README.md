@@ -105,8 +105,26 @@ Nachweisentscheidungen lösen die Prüfung in derselben Transaktion aus.
 Ein später erfüllter Nachweis schließt keinen Flag.
 
 Migration `0005` ergänzt Flags, Quellenverknüpfungen und Audit; der Seed-Reset
-entfernt diese Daten mit. Die REST-Endpunkte sind lesend. Details zu Regel,
+entfernt diese Daten mit. Die Inbox ist lesend; menschliche Lifecycle- und Nachweisaktionen ergänzt #9
+(siehe unten). Details zu Regel,
 Nachweisgültigkeit und Integration für #8/#9/#14: [docs/FLAGS.md](docs/FLAGS.md).
+
+### Flag-Lifecycle und Nachweisprüfung (Issue #9)
+
+`POST /flags/{id}/actions` speichert menschliche Kenntnisnahme (`confirmed`)
+oder Abschluss (`resolved` / `false_alarm`) mit Begründung und vollständigem
+Audit. `GET /flags?status=closed` hält abgeschlossene Flags samt Feedback
+zugänglich. Systemsignale für Benachrichtigung (#10), freigegebene Maßnahmen
+(#13) und Eskalation (#14) nutzen den gemeinsamen API-internen Lifecycle.
+
+Die separate Dashboard-Aktion `POST /evidence/{id}/reviews` bestätigt/ablehnt
+quellengebundene Nachweise mit genauem Geltungsbereich, auch ohne Flag. Jede
+Entscheidung prüft die Regeln erneut; ein erfüllter Nachweis lässt den Flag offen
+und setzt nur `awaiting_human_closure`. Kenntnisnahme, Nachweisentscheidung,
+Proposal-Freigabe und Abschluss bleiben getrennt. Der Rollenumschalter verwendet
+synthetische Identitäten und ist keine produktionsreife Authentifizierung.
+MCP/Chat-Kanäle dürfen diese Aktionen nicht ausführen. REST-Payloads,
+Übergänge, Rollen und Integrationsgrenzen: [docs/FLAGS.md](docs/FLAGS.md#lifecycle-and-evidence-review-9).
 
 ### Gmail-Eingang (Issue #11)
 

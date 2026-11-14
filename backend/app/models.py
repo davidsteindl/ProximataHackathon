@@ -274,6 +274,7 @@ class EvidenceReview(Base):
     reviewer_role: Mapped[str | None] = mapped_column(String(30))
     decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     recorded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    reason: Mapped[str | None] = mapped_column(Text)
 
 
 @event.listens_for(EvidenceReview, "before_update")
@@ -333,6 +334,17 @@ class FlagAudit(Base):
     channel: Mapped[str] = mapped_column(String(32))
     source_ref: Mapped[str] = mapped_column(String(200))
     recorded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    actor_role: Mapped[str | None] = mapped_column(String(30))
+    from_state: Mapped[str | None] = mapped_column(String(20))
+    to_state: Mapped[str | None] = mapped_column(String(20))
+    feedback: Mapped[str | None] = mapped_column(String(20))
+    reason: Mapped[str | None] = mapped_column(Text)
+
+
+@event.listens_for(FlagAudit, "before_update")
+@event.listens_for(FlagAudit, "before_delete")
+def preserve_flag_audit(_mapper, _connection, _record):
+    raise ValueError("Flag audit is append-only; use explicit seed reset to clear demo data")
 
 
 class PlanGeometry(Base):
