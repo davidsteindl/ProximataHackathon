@@ -31,9 +31,17 @@ docker compose up --build
 In PowerShell statt `cp`: `Copy-Item .env.example .env`. Beim ersten Start baut auch
 `docker compose up` die noch fehlenden Images; nach Codeänderungen `--build` verwenden.
 
-- Dashboard: http://localhost:3000 – zeigt den aktuellen API- und DB-Status.
-  Der Next.js-Server fragt dafür die API ab, die mit `SELECT 1` PostgreSQL prüft.
-  Zum Aktualisieren die Seite neu laden.
+- Dashboard (GroundIQ, #55): http://localhost:3000 – Startseite mit Kennzahlen,
+  3D-Modell, „Needs your attention“, Activity und den nächsten 48 h; aktualisiert
+  sich alle 5 s. Dunkle Arbeitsansichten: `/flags` (Inbox), `/flags/<id>`
+  (Detail mit getrennten Karten für Kenntnisnahme und Abschluss), `/evidence`
+  (Prüfung, auch ohne Flag), `/proposals` (Advisor-Proposals mit Freigabe/Ablehnung
+  durch den Superintendent, #13), `/activity` (Timeline, Terminplan mit Filtern, Site
+  Knowledge und Feedback-Kennzahl aus #21, Pläne, Inspections, API-/DB-Status). Links
+  aus Warnungen (`/#flag-<id>`) leiten auf `/flags/<id>` weiter. `/chat` zeigt bis #19
+  ausdrücklich „nicht verfügbar“. Der Demo-Rollenumschalter sitzt in der
+  Navigation und gilt seitenübergreifend (keine Authentifizierung). Gestaltung:
+  [design/HANDOFF.md](design/HANDOFF.md).
 - Statischer Site Record (Issue #5): Nach dem Start in einem zweiten Terminal
   `docker compose exec api python -m app.seed` ausführen. Das Dashboard zeigt dann
   Zonen, Terminplan, Crews, Revisionen/Bestätigungen und Inspections.
@@ -61,8 +69,10 @@ In PowerShell statt `cp`: `Copy-Item .env.example .env`. Beim ersten Start baut 
   Abwasser); Kräne, Gerüst, Zaun, Bäume und Container sind als dekorativer
   Kontext gekennzeichnet. Status kommt aus `/flags`, `/inspections`, `/evidence`
   und wird alle 3 s über `web` (`/api/site-state`) nachgeladen, ohne Reload.
+  Helle Plan-Shell: Geschoss-Leiste mit 2D (Draufsicht-Kamera) / 3D, Infopanel
+  rechts (einklappbar, Kontext bleibt erhalten), Schnellaktionen unten.
   Die Ansicht liest nur; Evidence-Prüfung und Flag-Abschluss bleiben getrennte
-  menschliche Aktionen. Flag-Detail (lesend): `/flags/<id>`.
+  menschliche Aktionen unter `/evidence` und `/flags/<id>`.
 - OpenAPI: http://localhost:8000/openapi.json, interaktive Dokumentation unter `/docs`.
 - MCP: http://localhost:8001/mcp – Streamable HTTP mit neun Kontext-Tools,
   Verbindung und Beispiele unter [MCP-Verbindung](#mcp-verbindung-issue-18).
@@ -83,7 +93,7 @@ Issue #5, Nachrichten-Ingestion, Event-Extraktion und Timeline aus #6 sowie
 DXF-Extraktion und Geometrie-API aus #15, Conflict A und Flag-Inbox aus #7,
 Conflict B aus Revisionsnotizen (#8), Gmail-Eingang aus #11,
 Outbox-/Gmail-Versand aus #10 sowie die 3D-Ansicht aus #16 und der DXF-Plan-Diff
-aus #17 sowie MCP-Kontext-Tools aus #18. Telegram-Adapter, Authentifizierung
+aus #17 sowie MCP-Kontext-Tools aus #18 und der Q&A-Kern aus #19. Telegram-Adapter, Authentifizierung
 und Hosting folgen in ihren eigenen Issues.
 
 ### MCP-Verbindung (Issue #18)
@@ -157,6 +167,28 @@ isolierte Test-DB, ohne LLM-/Gmail-/Telegram-Zugang):
 
 ```sh
 PYTHONPATH=backend python -m pytest backend/tests/test_mcp_server.py backend/tests/test_context_api.py backend/tests/test_agent_proposals.py
+```
+
+### Q&A-Kern (Issue #19)
+
+`POST /qa` mit `{"text": "...", "sender_role": "crew_lead"}` beantwortet eine Frage
+für den Telegram-Bot (#20). `api` ist dabei MCP-Client des eigenen `mcp`-Servers
+(`MCP_URL`) und nutzt nur dessen Tools. Das LLM klassifiziert nur (Fragetyp und Zone
+aus fester Auswahl, `QA_ROUTER_PROVIDER=decisions` mit `OPENAI_API_KEY`, sonst
+`cached`); der Antworttext wird deterministisch aus den Tool-Ergebnissen mit Quellen
+und Prüfstatus gebaut. Antwortarten: `answer`, `clarification` (Konfidenz unter
+`QA_CONFIDENCE_THRESHOLD` oder unbekannte Zone, mit Vorschlägen), `not_found`,
+`decision_request` (nicht beantwortet, #20 leitet weiter), `dashboard_review`
+(Nachweis bestätigen geht nur im Dashboard) und `not_a_question`. Routing- oder
+Record-Fehler ergeben HTTP 503 mit Fehlercode, nie eine geratene Antwort.
+`list_zones` liefert dafür zusätzlich die Site (Zeitzone, Starttag = Tag 1).
+`get_zone_status` enthaelt zudem `plans` mit vollstaendiger Revisionshistorie und
+aktueller Revision je abdeckendem Plan, unabhaengig von Timeline-Limits.
+Empfangsmeldungen stammen aus Evidence mit aktuellem Pruefstatus und Zone;
+Extraktionsherkunft und menschliche Nachweispruefung werden getrennt dargestellt.
+
+```sh
+PYTHONPATH=backend python -m pytest backend/tests/test_qa.py
 ```
 
 ### Nachricht → Event → Timeline (Issue #6)

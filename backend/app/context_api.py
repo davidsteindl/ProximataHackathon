@@ -13,7 +13,7 @@ from app.ingestion import event_views
 from app.ingestion_schemas import EventView
 from app.revision_rules import receipt_evidence, revision_work
 from app.rules import PRECONDITIONS, affected_work, ancestors, inspection_evidence, inspection_evidence_scope, utc
-from app.site_api import Database, zone_scope
+from app.site_api import Database, get_plans, zone_scope
 
 router = APIRouter(prefix="/context", tags=["Context"])
 EvaluationStatus = Literal["satisfied", "not_satisfied", "unknown", "contradictory"]
@@ -37,6 +37,7 @@ class PreconditionView(schemas.Record):
 class ZoneStatus(schemas.Record):
     zone: schemas.Zone
     zones: list[schemas.Zone]
+    plans: list[schemas.PlanView]
     tasks: list[schemas.Task]
     inspections: list[schemas.Inspection]
     evidence: list[schemas.EvidenceView]
@@ -124,6 +125,7 @@ def get_zone_status(zone_id: str, session: Database):
         zone=schemas.Zone.model_validate(zones[zone_id]),
         zones=[schemas.Zone.model_validate(zone) for zone in zones.values()
                if zone.id in scope and (zone.id == zone_id or zone_id in ancestors(zone.id, zones))],
+        plans=[plan for plan in get_plans(session) if plan.floor_id in scope],
         tasks=[schemas.Task.model_validate(task) for task in tasks],
         inspections=[schemas.Inspection.model_validate(item) for item in inspections],
         evidence=[schemas.EvidenceView.model_validate(item) for item in evidence],

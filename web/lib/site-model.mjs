@@ -291,3 +291,72 @@ export function viewForZone(index, zoneId) {
   if (zone.kind === "building") return { known: true, floorId: null, mode: "orbit", highlight: null };
   return { known: true, floorId: floorOf(index, zoneId), mode: "top", highlight: zoneId };
 }
+
+/**
+ * Anchored callouts for the model: open Flags (on their flagged wall if there is one), wall revision changes
+ * (when `showChanges`) and, per floor in view, the inspection with the most unconfirmed claims. Shared by the
+ * site view and the dashboard model so both show the same markers for the same records.
+ */
+export function buildCallouts({ state, geometry, index, changes, showChanges = true, route = {} }) {
+  const list = [];
+  const words = (value) => (value || "").replaceAll("_", " ");
+  for (const flag of state.flags || []) {
+    let anchor = flag.zone_id;
+    let target = flag.zone_id;
+    for (const plan of geometry) for (const element of plan.elements) {
+      const own = elementZone(index, element);
+      if (own && flagsForZone(index, [flag], own).length && element.kind === "wall") { anchor = `${plan.floor_id}:${element.element_id}`; target = own; }
+    }
+    list.push({ key: `flag-${flag.id}`, anchor, floorId: floorOf(index, flag.zone_id), tone: "crit", short: `Flag ${flag.type}`, title: `Flag ${flag.type} · ${flag.zone_id}`, text: `${words(flag.activity)} announced · precondition ${words(flag.evaluation)}`, target });
+  }
+  if (showChanges) for (const change of changes.filter((c) => c.element.kind === "wall")) {
+    list.push({ key: `rev-${change.element.element_id}`, anchor: `${change.floorId}:${change.element.element_id}`, floorId: change.floorId, tone: "info", short: `Rev ${change.label}`, title: `Rev ${change.label} · ${change.change}`, text: `${change.element.element_id}, dashed = Rev ${change.previousLabel}`, target: elementZone(index, change.element) || change.floorId, below: true });
+  }
+  const floors = new Set((state.flags || []).map((flag) => floorOf(index, flag.zone_id)));
+  if (route.floorId) floors.add(route.floorId);
+  // One callout per floor: the earliest inspection there whose pass is not confirmed and that has claims to review.
+  if (!route.highlight || route.highlight === route.floorId) for (const floorId of floors) {
+    const pending = (state.inspections || [])
+      .filter((inspection) => inspection.zone_id === floorId && !inspectionConfirmedPassed(index, inspection, state.evidence, state.plans))
+      .map((inspection) => ({ inspection, unconfirmed: (state.evidence || []).filter((record) => record.scope.inspection_id === inspection.id && record.review_status === "unconfirmed").length }))
+      .sort((a, b) => b.unconfirmed - a.unconfirmed || a.inspection.scheduled_at.localeCompare(b.inspection.scheduled_at))[0];
+    if (!pending) continue;
+    const { inspection, unconfirmed } = pending;
+    list.push({ key: `insp-${inspection.id}`, anchor: inspection.zone_id, floorId: inspection.zone_id, tone: "warn", short: inspectionKindLabel(inspection.kind), title: `${inspectionKindLabel(inspection.kind)} ${inspection.zone_id} · ${inspection.status}`, text: unconfirmed ? `${unconfirmed} unconfirmed claim${unconfirmed === 1 ? "" : "s"} awaiting review` : "No confirmed pass yet", target: inspection.zone_id });
+  }
+  return list;
+}
+
+/** Geometry changes per plan against its previous imported revision, for the Rev diff layer and callouts. */
+export function revisionChanges(model) {
+  return (model?.geometry || []).flatMap((plan) => changedElements(plan, model.previous?.[plan.plan_id])
+    .map((change) => ({ ...change, floorId: plan.floor_id, label: plan.label, previousLabel: model.previous[plan.plan_id].label })));
+}
+
+/** Status colours for the scene: rooms, walls with their own element Zone, and zones with open Flags. */
+export function sceneStatus(index, state, geometry) {
+  const rooms = new Map();
+  for (const zone of index.values()) if (zone.kind === "room") rooms.set(zone.id, zoneStatus(index, state, zone.id));
+  const walls = new Map();
+  for (const plan of geometry) for (const element of plan.elements) {
+    const status = element.kind === "wall" ? elementStatus(index, state, element) : null;
+    if (status) walls.set(`${plan.floor_id}:${element.element_id}`, status);
+  }
+  return { rooms, walls, flagZones: new Set((state.flags || []).map((flag) => flag.zone_id)) };
+}
+
+/** Tasks and inspections starting in the next 48 h. A task reads "blocked" only when an open Flag names it. */
+export function upcoming({ tasks, inspections, flags, evidence, plans }, index, now) {
+  const soon = (value) => { const t = Date.parse(value); return t >= now && t < now + 48 * 3600 * 1000; };
+  return [
+    ...tasks.filter((task) => soon(task.starts_at)).map((task) => {
+      const flag = flags.find((item) => item.task_id === task.id);
+      return { key: task.id, at: task.starts_at, name: task.name, zone: task.zone_id, href: flag ? `/flags/${flag.id}` : `/zones/${encodeURIComponent(task.zone_id)}`,
+        chip: flag ? { tone: "crit", text: "Blocked by Flag" } : { tone: "unk", text: "No open Flag" } };
+    }),
+    ...inspections.filter((inspection) => soon(inspection.scheduled_at)).map((inspection) => ({
+      key: inspection.id, at: inspection.scheduled_at, name: `${inspectionKindLabel(inspection.kind)} inspection`, zone: inspection.zone_id, href: "/evidence",
+      chip: inspectionConfirmedPassed(index, inspection, evidence, plans) ? { tone: "ok", text: "Pass confirmed" } : { tone: "warn", text: "Pass not confirmed" },
+    })),
+  ].sort((a, b) => a.at.localeCompare(b.at));
+}

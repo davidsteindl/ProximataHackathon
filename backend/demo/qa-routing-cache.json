@@ -1,0 +1,37 @@
+{
+  "version": 1,
+  "entries": [
+    {
+      "text": "welcher plan gilt für 3B?",
+      "sender_role": "crew_lead",
+      "result": {
+        "question_type": {"value": "revision_in_force", "confidence": 0.94, "probabilities": {"revision_in_force": 0.94, "zone_status": 0.04, "other_record_question": 0.02}},
+        "zone": {"value": "3B", "confidence": 0.97, "probabilities": {"3B": 0.97, "3B-BATH": 0.02, "F3": 0.01}}
+      }
+    },
+    {
+      "text": "wie ist der Stand im Bad 3B?",
+      "sender_role": "superintendent",
+      "result": {
+        "question_type": {"value": "zone_status", "confidence": 0.96, "probabilities": {"zone_status": 0.96, "other_record_question": 0.03, "revision_in_force": 0.01}},
+        "zone": {"value": "3B-BATH", "confidence": 0.91, "probabilities": {"3B-BATH": 0.91, "3B": 0.07, "3B-BATH-WALL": 0.02}}
+      }
+    },
+    {
+      "text": "dürfen wir morgen in 3B zumachen?",
+      "sender_role": "crew_lead",
+      "result": {
+        "question_type": {"value": "decision_request", "confidence": 0.9, "probabilities": {"decision_request": 0.9, "zone_status": 0.07, "evidence_confirmation_request": 0.03}},
+        "zone": {"value": "3B", "confidence": 0.95, "probabilities": {"3B": 0.95, "3B-BATH": 0.05}}
+      }
+    },
+    {
+      "text": "bitte die Abnahme in 3B als bestanden bestätigen",
+      "sender_role": "crew_lead",
+      "result": {
+        "question_type": {"value": "evidence_confirmation_request", "confidence": 0.93, "probabilities": {"evidence_confirmation_request": 0.93, "decision_request": 0.06, "not_a_question": 0.01}},
+        "zone": {"value": "3B", "confidence": 0.96, "probabilities": {"3B": 0.96, "3B-BATH": 0.04}}
+      }
+    }
+  ]
+}

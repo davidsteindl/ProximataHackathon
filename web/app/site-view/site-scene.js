@@ -17,10 +17,10 @@ const C = {
   conflict: 0xFF5C49,
   open: 0xE8B04B,
   ok: 0x55B97D,
-  selected: 0xFF8A4A,
+  selected: 0x176AC6, // GroundIQ brand blue
   pipe: 0x62A8D8,
   fixture: 0xFAF8F2,
-  ghost: 0x2FC4BC, // previous revision: teal, distinct from status reds/ambers, selection orange and drain blue
+  ghost: 0x2FC4BC, // previous revision: teal, distinct from status reds/ambers, selection blue and the lighter drain blue
   door: 0xB9A585,
 };
 const SLAB = 0.25;
@@ -48,9 +48,13 @@ function aoTexture() {
   return new THREE.CanvasTexture(canvas);
 }
 
-export function createSiteScene(container, { geometry, zones, changes, onHover, onSelect }) {
+// Haze colour per page theme; the canvas itself is transparent so the page backdrop shows through.
+const FOG = { light: 0xDDE4EB, dark: 0x171A1F };
+
+export function createSiteScene(container, { geometry, zones, changes, onHover, onSelect, theme = "light" }) {
   const kindOf = (id) => zones.get(id)?.kind;
-  const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: "high-performance" });
+  renderer.setClearColor(0x000000, 0);
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.75));
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -61,20 +65,8 @@ export function createSiteScene(container, { geometry, zones, changes, onHover, 
   container.appendChild(renderer.domElement);
 
   const scene = new THREE.Scene();
-  // Graphite sky with a slightly lighter, warmer haze at the horizon; fog fades the far scenery into it.
-  const sky = document.createElement("canvas");
-  sky.width = 2;
-  sky.height = 256;
-  const skyCtx = sky.getContext("2d");
-  const skyGrad = skyCtx.createLinearGradient(0, 0, 0, 256);
-  skyGrad.addColorStop(0, "#161814");
-  skyGrad.addColorStop(0.62, "#2A2C26");
-  skyGrad.addColorStop(1, "#3A3A33");
-  skyCtx.fillStyle = skyGrad;
-  skyCtx.fillRect(0, 0, 2, 256);
-  scene.background = new THREE.CanvasTexture(sky);
-  scene.background.colorSpace = THREE.SRGBColorSpace;
-  scene.fog = new THREE.Fog(0x33342D, 110, 260); // near/far follow the camera distance, see loop()
+  // No sky texture: the page backdrop (light plan gradient or dark panel) is the sky; fog fades far scenery into it.
+  scene.fog = new THREE.Fog(FOG[theme] ?? FOG.light, 110, 260); // near/far follow the camera distance, see loop()
   const pmrem = new THREE.PMREMGenerator(renderer);
   scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
   pmrem.dispose();
@@ -497,8 +489,8 @@ export function createSiteScene(container, { geometry, zones, changes, onHover, 
         ribbon(P(p[0], p[1], y), P(q[0], q[1], y), y, 0.1);
       });
     } else if (wall) {
-      // Selected element: an orange frame with a dark keyline, drawn on top and outside the red conflict halo,
-      // plus orange corner posts, so selection stays distinct whatever status colour the wall has.
+      // Selected element: a brand-blue frame with a dark keyline, drawn on top and outside the red conflict halo,
+      // plus blue corner posts, so selection stays distinct whatever status colour the wall has.
       const { elevation, wallHeight } = floorGroups.get(wall.floorId).userData;
       const [a, b] = wall.segment;
       const pa = P(a[0], a[1]);
@@ -551,7 +543,7 @@ export function createSiteScene(container, { geometry, zones, changes, onHover, 
       if (s === "conflict") { color = C.conflict; opacity = isolated ? 0.26 : 0.14; }
       else if (s === "open") { color = C.open; opacity = 0.12; }
       else if (s === "ok") { color = C.ok; opacity = 0.14; }
-      // Selection is carried by the orange outline; a conflicting room keeps its red fill so it still reads flagged.
+      // Selection is carried by the blue outline; a conflicting room keeps its red fill so it still reads flagged.
       if (plate.zoneId === view.highlight) { if (s === "conflict") opacity = 0.34; else { color = C.selected; opacity = 0.42; } }
       else if (selectedUnit && plate.unitId === selectedUnit && s !== "conflict") { color = C.selected; opacity = Math.max(opacity, 0.22); }
       if (plate.zoneId === hovered || plate.unitId === hovered) opacity = Math.min(0.75, opacity + 0.22) || 0.18; // hovering a unit edge lights its rooms
@@ -819,7 +811,7 @@ export function createSiteScene(container, { geometry, zones, changes, onHover, 
       if (M.halo.opacity !== 0.5) { M.halo.opacity = 0.5; dirty = true; }
     }
     const distance = camera.position.distanceTo(controls.target);
-    // Aerial haze: the far side of the site and the scenery fade into the graphite horizon.
+    // Aerial haze: the far side of the site and the scenery fade into the page backdrop.
     scene.fog.near = distance * 0.9;
     scene.fog.far = distance * 1.9 + 10;
     if (pointer && pointer !== lastPointer && !down) {

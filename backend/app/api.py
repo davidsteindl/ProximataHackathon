@@ -19,6 +19,7 @@ from app.proposal_api import router as proposal_router
 from app.jobs import router as jobs_router
 from app.replay_api import router as replay_router
 from app.feed_api import router as feed_router
+from app.qa import router as qa_router
 
 app = FastAPI(title="SiteMind API")
 app.include_router(router)
@@ -34,6 +35,7 @@ app.include_router(proposal_router)
 app.include_router(jobs_router)
 app.include_router(replay_router)
 app.include_router(feed_router)
+app.include_router(qa_router)
 
 
 @app.middleware("http")
