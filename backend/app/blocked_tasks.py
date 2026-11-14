@@ -51,7 +51,7 @@ def detect_blocked_tasks(flag, tasks, zones, as_of):
 def blocked_tasks(session, flag, as_of=None):
     # Replay follows the source clock, not the wall clock of the demo machine.
     if as_of is None:
-        reference = flag.audit[0].source_ref
+        reference = flag.audit[0].source_ref if flag.audit else ""
         source = session.get(models.SourceMessage, reference.removeprefix("source:")) if reference.startswith("source:") else None
         as_of = source.sent_at if source else flag.created_at
     return detect_blocked_tasks(flag, session.scalars(select(models.Task)).all(),
