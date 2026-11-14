@@ -206,6 +206,14 @@ error code, Gmail message ID and timestamps. `GET /flags/{id}` includes the same
 records as `notifications`; the dashboard displays status, attempts and failures.
 Pending messages remain visible even when sending is disabled.
 
+Set `GMAIL_SEND_ENABLED=false` and recreate the worker to pause outbound delivery
+while retaining inbound polling. A previously authorized token with exactly
+`gmail.readonly` + `gmail.send` remains usable for reading; the disabled sending
+guard prevents outbound requests. A read-only token still works in this mode.
+Missing read permission and broader scopes remain rejected. This switch does not
+revoke Google's send permission; use read-only OAuth consent if that permission
+also needs to be removed. Queued warnings remain in the outbox for later delivery.
+
 The worker uses only REST: `POST /outbox/claim` atomically leases one due message
 for five minutes with a new token and increments attempts. PostgreSQL row locks
 with `SKIP LOCKED` prevent simultaneous claims. `POST /outbox/{id}/result` accepts

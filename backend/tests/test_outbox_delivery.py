@@ -141,3 +141,50 @@ def test_seed_rejects_invalid_delivery_addresses(seed, address):
     payload['crew_leads'][0]['email'] = address
     with pytest.raises(ValidationError):
         Seed.model_validate(payload)
+
+
+def test_disabling_send_keeps_existing_inbound_token_and_blocks_outbound_requests():
+    creds = credentials()
+    calls = []
+    def handle(request):
+        calls.append(request.method)
+        if request.url.path.endswith('/profile'):
+            return httpx.Response(200, json={'emailAddress': 'project@example.test'})
+        return httpx.Response(200, json={'messages': []})
+    with httpx.Client(transport=httpx.MockTransport(handle)) as http:
+        enabled = GmailClient(GmailSettings('project@example.test', label='', send_enabled=True), http, creds)
+        assert list(enabled.message_ids()) == []
+        disabled = GmailClient(GmailSettings('project@example.test', label='', send_enabled=False), http, creds)
+        assert list(disabled.message_ids()) == []
+        with pytest.raises(GmailError, match='sending_disabled'):
+            disabled.send_warning({'recipient': 'crew@example.test'})
+    assert calls == ['GET', 'GET', 'GET', 'GET']
+
+
+@pytest.mark.parametrize('scopes', [[], [SEND_SCOPE], [READ_SCOPE, SEND_SCOPE, 'https://mail.google.com/']])
+def test_disabled_sending_still_rejects_missing_read_or_broad_scopes(scopes):
+    creds = credentials()
+    creds.scopes = scopes
+    with pytest.raises(GmailError, match='expected_readonly_scope'):
+        GmailClient(GmailSettings('project@example.test'), Mock(), creds)
+
+
+def test_worker_keeps_polling_after_send_is_disabled_with_existing_token(monkeypatch):
+    from app import gmail, worker
+
+    monkeypatch.setenv('GMAIL_ENABLED', 'true')
+    monkeypatch.setenv('GMAIL_SEND_ENABLED', 'false')
+    monkeypatch.setenv('GMAIL_MAILBOX', 'project@example.test')
+    monkeypatch.setenv('API_BASE_URL', 'http://api.test')
+    monkeypatch.setattr(gmail.Credentials, 'from_authorized_user_file', Mock(return_value=credentials()))
+    poll, deliver = Mock(), Mock()
+    monkeypatch.setattr(worker, 'poll_gmail', poll)
+    monkeypatch.setattr(worker, 'deliver_outbox', deliver)
+    class StopLoop(Exception):
+        pass
+    monkeypatch.setattr(worker.time, 'sleep', Mock(side_effect=StopLoop))
+    with pytest.raises(StopLoop):
+        worker.main()
+    poll.assert_called_once()
+    assert poll.call_args.args[0].settings.send_enabled is False
+    deliver.assert_not_called()

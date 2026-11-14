@@ -75,8 +75,11 @@ class GmailClient:
     def __init__(self, settings, http, credentials=None):
         self.settings, self.http = settings, http
         self.credentials = credentials or Credentials.from_authorized_user_file(settings.token_file)
-        expected = {READ_SCOPE, SEND_SCOPE} if settings.send_enabled else {READ_SCOPE}
-        if set(self.credentials.scopes or ()) != expected:
+        scopes = set(self.credentials.scopes or ())
+        allowed = ({READ_SCOPE, SEND_SCOPE},) if settings.send_enabled else (
+            {READ_SCOPE}, {READ_SCOPE, SEND_SCOPE},
+        )
+        if scopes not in allowed:
             raise GmailError("expected_sending_scopes" if settings.send_enabled else "expected_readonly_scope")
 
     def get(self, resource, **params):
