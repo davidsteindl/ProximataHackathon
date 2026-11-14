@@ -52,9 +52,9 @@ Stoppen: `docker compose down`. Die Daten bleiben im Volume `db-data` erhalten.
 
 Enthalten sind Infrastruktur, Health-Prüfungen, der statische Site Record aus
 Issue #5, Nachrichten-Ingestion, Event-Extraktion und Timeline aus #6 sowie
-DXF-Extraktion und Geometrie-API aus #15 sowie Conflict A und Flag-Inbox aus #7.
-3D-Ansicht, Plan-Diff,
-Kanal-Adapter, MCP-Tools, Authentifizierung
+DXF-Extraktion und Geometrie-API aus #15, Conflict A und Flag-Inbox aus #7
+sowie Gmail-Eingang aus #11. 3D-Ansicht, Plan-Diff,
+Telegram-Adapter, Gmail-Versand, MCP-Tools, Authentifizierung
 und Hosting folgen in ihren eigenen Issues.
 
 ### Nachricht → Event → Timeline (Issue #6)
@@ -104,6 +104,36 @@ Ein später erfüllter Nachweis schließt keinen Flag.
 Migration `0005` ergänzt Flags, Quellenverknüpfungen und Audit; der Seed-Reset
 entfernt diese Daten mit. Die REST-Endpunkte sind lesend. Details zu Regel,
 Nachweisgültigkeit und Integration für #8/#9/#14: [docs/FLAGS.md](docs/FLAGS.md).
+
+### Gmail-Eingang (Issue #11)
+
+Der optionale Worker-Adapter liest ein verifiziertes Projekt-Testpostfach/Label
+und übergibt Betreff, Text und Originalanhänge an dieselbe Ingestion. Bereits
+verarbeitete Quellen werden über eine exakte REST-Abfrage nach Kanal, Konto und
+Gmail-ID übersprungen. Einrichtung und Grenzen: [docs/GMAIL.md](docs/GMAIL.md).
+Die OAuth-Zugangsdaten erhält ausschließlich der Worker; ohne Konfiguration
+bleibt Gmail deaktiviert.
+
+Kurzsetup: Gmail API im Team-Cloud-Projekt aktivieren, OAuth-Consent im Testmodus
+konfigurieren und das Projekt-Testkonto als **Test user** eintragen. Einen OAuth-
+Client vom Typ **Desktop app** anlegen; dessen JSON lokal unter
+`.gmail/client-secret.json` speichern. Nach Installation der Backend-Abhängigkeiten
+vom Repository-Root aus autorisieren:
+
+```powershell
+$env:PYTHONPATH = 'backend'
+python -m app.gmail_auth
+```
+
+Im Browser das Projektkonto auswählen. Danach in `.env` `GMAIL_ENABLED=true`,
+`GMAIL_MAILBOX=<Projektkonto>` und optional `GMAIL_LABEL=<exakter Labelname>` setzen;
+`GMAIL_POLL_SECONDS=15` steuert die Pause zwischen Polls. Mit
+`docker compose up --build -d worker` starten (Seed-Baseline muss vorhanden sein).
+Nur `gmail.readonly` wird angefordert. `.gmail/` bleibt lokal und wird nur in den
+Worker gemountet. **External/Testing:** Ohne eingetragenen Testnutzer scheitert die
+Anmeldung; Refresh-Tokens für Gmail laufen nach **7 Tagen** ab. Dann die lokale
+Autorisierung erneut ausführen. Vollständige Schritte, Hero-Mails und Fehlerhilfe:
+[docs/GMAIL.md](docs/GMAIL.md).
 
 ### Lokale Checks
 

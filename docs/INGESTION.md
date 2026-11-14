@@ -150,3 +150,22 @@ the claimed future activity time. Unknown zones return `404`; naive timestamps
 or non-increasing ranges return `422`. Unknown source/attachment IDs return `404`.
 The dashboard shows the same chronological timeline with expandable original
 sources and separate evidence review labels; reload it to fetch new records.
+
+## Gmail adapter identity lookup (#11)
+
+`GET /source-messages?channel=gmail&source_key=<mailbox>&external_id=<Gmail ID>`
+requires all three exact identity parameters and returns one `SourceMessageView`,
+or JSON `null` if absent. This read-only extension lets the worker skip sources
+whose status is `processed`, including irrelevant messages with zero Events,
+without downloading mail content again. Other statuses remain eligible for
+idempotent delivery through `POST /ingestion/messages`. The API's existing unique
+constraint remains authoritative under concurrent deliveries or worker restarts.
+No schema migration or worker database access is introduced. A seed reset removes
+these identities too; mail still in the configured selection can then be replayed.
+
+Gmail source keys are the verified project mailbox address (lowercase), external
+IDs are Gmail message IDs, sender IDs are the parsed From address, and timestamps
+are Gmail `internalDate` in UTC. Subject and MIME-decoded body use the existing
+`text` field as `Subject: <subject>\n\n<body>` (no prefix for an empty subject).
+Original attachment bytes go through the existing attachment contract. No CAD
+import/diff is triggered by this adapter. Setup: [GMAIL.md](GMAIL.md).

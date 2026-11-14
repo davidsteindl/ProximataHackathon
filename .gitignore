@@ -7,3 +7,6 @@ node_modules/
 .next/
 
 /cad-data/
+
+# Local Gmail OAuth client and refresh token (worker only).
+/.gmail/

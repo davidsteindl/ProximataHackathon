@@ -28,6 +28,16 @@ def ingest_message(payload: SourceMessageInput, session: Database, response: Res
     return result
 
 
+@router.get("/source-messages", response_model=SourceMessageView | None)
+def find_source_message(channel: str, source_key: str, external_id: str, session: Database):
+    """Exact identity lookup for channel adapters; null means not received yet."""
+    return session.scalar(select(models.SourceMessage).where(
+        models.SourceMessage.channel == channel,
+        models.SourceMessage.source_key == source_key,
+        models.SourceMessage.external_id == external_id,
+    ))
+
+
 @router.get("/source-messages/{source_id}", response_model=SourceMessageView)
 def get_source_message(source_id: str, session: Database):
     """Original source and processing status; no caller-supplied review action."""
