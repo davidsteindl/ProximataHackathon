@@ -150,6 +150,14 @@ notification delivery before acknowledgment; an acknowledged Flag awaits #13
 approval before resolution. No notification sender, Proposal workflow or
 escalation scheduler is added here. The helper rejects any system/agent closure.
 
+Revision receipt review accepts resolved Zone scopes within the referenced Plan's
+floor. A unit/floor receipt may cover changed descendants; `Revision.zone_ids`
+records changes and does not restrict receipt scope. If the receipt arrived
+before revision registration, review and rules resolve only its exact immutable
+source Plan/label once registered. The source time must be on/after issue time;
+missing/ambiguous references, wrong Crew/source or an outside-floor Zone cannot
+be confirmed. Resolution never rewrites Evidence scope or creates human review.
+
 `POST /evidence/{id}/reviews` works independently of a Flag:
 
 ```json

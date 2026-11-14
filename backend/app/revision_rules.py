@@ -106,6 +106,20 @@ def receipt_evidence(session, zone_id, crew_id, revision, zones):
     return result
 
 
+def resolve_receipt_revision(session, evidence):
+    """Resolve exact immutable source plan/label without changing Evidence scope."""
+    target = session.get(models.Revision, evidence.revision_id) if evidence.revision_id else None
+    if target is None and evidence.revision_id is None and evidence.origin == "llm_statement":
+        statement = session.get(models.Event, evidence.statement_ref) if evidence.statement_ref else None
+        if statement and statement.details.get("plan_reference") and statement.details.get("revision_label"):
+            matches = session.scalars(select(models.Revision).where(
+                models.Revision.plan_id == statement.details["plan_reference"],
+                models.Revision.label == statement.details["revision_label"],
+            )).all()
+            target = matches[0] if len(matches) == 1 else None
+    return target
+
+
 class RevisionAcknowledged:
     type = "B"
     name = "revision_acknowledged"
@@ -130,21 +144,12 @@ class RevisionAcknowledged:
                 item.history[-1].actor_type == "human" or
                 item.origin == "seed_baseline" and item.history[-1].actor_type == "seed_import"))
             statement = session.get(models.Event, item.statement_ref) if item.origin == "llm_statement" else None
-            target = session.get(models.Revision, item.revision_id) if item.revision_id else None
+            target = resolve_receipt_revision(session, item)
             if item.origin == "llm_statement":
                 if (statement is None or item.source_ref != f"source:{statement.source_message_id}"
                         or statement.intent != "revision_acknowledgment"
                         or statement.details.get("plan_reference") != revision.plan_id):
                     continue
-                if item.revision_id is None and statement.details.get("revision_label"):
-                    # Cross-channel delivery may precede revision registration.
-                    # Resolve only the exact immutable plan/label assertion;
-                    # never rewrite Evidence scope or create a confirmation.
-                    matches = session.scalars(select(models.Revision).where(
-                        models.Revision.plan_id == statement.details["plan_reference"],
-                        models.Revision.label == statement.details["revision_label"],
-                    )).all()
-                    target = matches[0] if len(matches) == 1 else None
                 if target and (statement.details.get("revision_label") != target.label
                                or utc(statement.source.sent_at) < utc(target.issued_at)):
                     continue

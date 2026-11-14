@@ -44,12 +44,26 @@ def validate_scope(session, evidence):
         subject = session.get(models.Task, evidence.task_id) if evidence.task_id else None
         valid = subject is not None and subject.zone_id == evidence.zone_id
     else:
-        revision = session.get(models.Revision, evidence.revision_id) if evidence.revision_id else None
+        from app.revision_rules import resolve_receipt_revision
+        from app.rules import ancestors, utc
+
+        revision = resolve_receipt_revision(session, evidence)
         crew = session.get(models.Crew, evidence.crew_id) if evidence.crew_id else None
         plan = session.get(models.Plan, revision.plan_id) if revision else None
-        valid = revision is not None and crew is not None and (
-            evidence.zone_id in revision.zone_ids or evidence.zone_id == plan.floor_id
-        )
+        zones = {zone.id: zone for zone in session.scalars(select(models.Zone))}
+        # Revision.zone_ids lists changed zones, not permitted receipt scopes.
+        # A floor or unit receipt can cover work in its changed descendants.
+        valid = plan is not None and crew is not None and plan.floor_id in ancestors(evidence.zone_id, zones)
+        if valid and evidence.origin == "llm_statement":
+            statement = session.get(models.Event, evidence.statement_ref) if evidence.statement_ref else None
+            valid = (statement is not None
+                     and evidence.source_ref == f"source:{statement.source_message_id}"
+                     and statement.intent == "revision_acknowledgment"
+                     and statement.details.get("plan_reference") == revision.plan_id
+                     and statement.details.get("revision_label") == revision.label
+                     and statement.crew_id == evidence.crew_id
+                     and evidence.zone_id in statement.zone_ids
+                     and utc(statement.source.sent_at) >= utc(revision.issued_at))
     if not valid:
         raise HTTPException(422, "Evidence scope is incomplete or does not match its subject")
 

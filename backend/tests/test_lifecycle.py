@@ -266,3 +266,56 @@ def test_lifecycle_migration_follows_outbox_and_round_trips(engine):
         assert "reason" not in {column["name"] for column in inspector.get_columns("evidence_reviews")}
         command.upgrade(config, "head")
         assert compare_metadata(MigrationContext.configure(connection), models.Base.metadata) == []
+
+
+@pytest.mark.parametrize("receipt_zone", ["F3", "3B", "3B-BATH"])
+def test_dashboard_receipt_scope_covers_changed_descendant(initialized, monkeypatch, receipt_zone):
+    from test_revision_rules import statement, receipt, plumbing
+
+    statement(initialized, monkeypatch, zones=["3B-BATH"])
+    evidence_id = receipt(initialized, monkeypatch, zones=[receipt_zone])
+    before = next(item for item in initialized.get("/evidence").json() if item["id"] == evidence_id)
+    response = decision(initialized, evidence_id, "confirmed", role="crew_lead", actor="lead-plumbing")
+    assert response.status_code == 200, response.text
+    assert response.json()["scope"] == before["scope"]
+    flag = plumbing(initialized)
+    assert flag["zone_id"] == "3B-BATH"
+    assert flag["evaluation"] == "satisfied"
+    assert flag["state"] == "detected" and flag["awaiting_human_closure"]
+
+
+def test_dashboard_confirms_late_registered_revision_without_rewriting_evidence(initialized, monkeypatch):
+    from test_revision_rules import statement, receipt, plumbing
+
+    evidence_id = receipt(initialized, monkeypatch)
+    before = next(item for item in initialized.get("/evidence").json() if item["id"] == evidence_id)
+    assert before["scope"]["revision_id"] is None
+    assert decision(initialized, evidence_id, "confirmed").status_code == 422
+    statement(initialized, monkeypatch)
+    assert plumbing(initialized)["evaluation"] == "unknown"
+    response = decision(initialized, evidence_id, "confirmed")
+    assert response.status_code == 200, response.text
+    after = response.json()
+    for key in ("scope", "source_ref", "statement_ref", "quote"):
+        assert after[key] == before[key]
+    assert after["history"][:-1] == before["history"]
+    assert after["history"][-1]["actor_type"] == "human"
+    assert plumbing(initialized)["evaluation"] == "satisfied"
+    assert decision(initialized, evidence_id, "rejected").status_code == 200
+    assert plumbing(initialized)["evaluation"] == "unknown"
+
+
+@pytest.mark.parametrize("changes", [
+    {"label": None}, {"label": "E"}, {"plan": None}, {"plan": "A-102"},
+    {"crew": "ambiguous"}, {"zones": ["F4"]},
+    {"sent_at": "2026-11-13T09:00:00+01:00"},
+])
+def test_dashboard_does_not_confirm_invalid_late_revision_scope(initialized, monkeypatch, changes):
+    from test_revision_rules import statement, receipt, plumbing
+
+    evidence_id = receipt(initialized, monkeypatch, **changes)
+    statement(initialized, monkeypatch)
+    response = decision(initialized, evidence_id, "confirmed")
+    assert response.status_code == 422, response.text
+    assert plumbing(initialized)["evaluation"] != "satisfied"
+    assert decision(initialized, evidence_id, "rejected").status_code == 200
