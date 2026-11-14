@@ -16,3 +16,5 @@ th, td { padding: 12px 8px; border-bottom: 1px solid #d9dfe5; vertical-align: to
 .event-timeline > li { padding: 12px 0; border-bottom: 1px solid #d9dfe5; }
 .source-text { white-space: pre-wrap; overflow-wrap: anywhere; }
 summary { cursor: pointer; }
+.flag-inbox { padding-left: 24px; }
+.flag-inbox > li { padding: 12px 0; border-bottom: 1px solid #d9dfe5; }

@@ -11,6 +11,7 @@ from sqlalchemy import or_, select, update
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
 from app import models, schemas
+from app import rules  # Register atomic Event/EvidenceReview rule evaluation hooks.
 from app.event_mapping import build_events
 from app.extraction import ExtractionError, get_extractor, redact_text, validate_quotes
 from app.ingestion_schemas import EventView, IngestionResult, SourceMessageView

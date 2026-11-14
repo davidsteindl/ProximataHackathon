@@ -234,7 +234,7 @@ class Evidence(Base):
     import_ref: Mapped[str | None] = mapped_column(String(64))
     imported_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     history: Mapped[list["EvidenceReview"]] = relationship(
-        lazy="selectin", order_by="EvidenceReview.sequence",
+        lazy="selectin", order_by="EvidenceReview.sequence", back_populates="evidence",
     )
 
     @property
@@ -266,6 +266,7 @@ class EvidenceReview(Base):
     )
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     evidence_id: Mapped[str] = mapped_column(ForeignKey("evidence.id"), index=True)
+    evidence: Mapped[Evidence] = relationship(back_populates="history")
     sequence: Mapped[int] = mapped_column(Integer)
     status: Mapped[str] = mapped_column(String(20))
     actor_type: Mapped[str] = mapped_column(String(30))
@@ -285,6 +286,53 @@ def preserve_evidence_review_history(_mapper, _connection, _record):
 def preserve_evidence_source_and_scope(_mapper, _connection, record):
     if any(inspect(record).attrs[column.key].history.has_changes() for column in Evidence.__table__.columns):
         raise ValueError("Evidence content is immutable; store a new statement or clarification separately")
+
+
+class Flag(Base):
+    __tablename__ = "flags"
+    __table_args__ = (
+        CheckConstraint("state IN ('detected','notified','acknowledged','in_progress','resolved','false_alarm')", name="flag_state"),
+        CheckConstraint("severity IN ('high','medium','low')", name="flag_severity"),
+        CheckConstraint("evaluation IN ('satisfied','not_satisfied','unknown','contradictory')", name="flag_evaluation"),
+        UniqueConstraint("open_key", name="flag_open_conflict"),
+    )
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    type: Mapped[str] = mapped_column(String(32))
+    zone_id: Mapped[str] = mapped_column(ForeignKey("zones.id"), index=True)
+    task_id: Mapped[str | None] = mapped_column(ForeignKey("tasks.id"))
+    activity: Mapped[str] = mapped_column(String(200))
+    precondition: Mapped[str] = mapped_column(String(64))
+    inspection_id: Mapped[str | None] = mapped_column(ForeignKey("inspections.id"))
+    severity: Mapped[str] = mapped_column(String(20))
+    responsible_id: Mapped[str | None] = mapped_column(ForeignKey("crew_leads.id"))
+    responsible: Mapped[CrewLead | None] = relationship(lazy="selectin")
+    state: Mapped[str] = mapped_column(String(20))
+    evaluation: Mapped[str] = mapped_column(String(20))
+    explanation: Mapped[str] = mapped_column(Text)
+    open_key: Mapped[str | None] = mapped_column(String(500))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    sources: Mapped[list["FlagSource"]] = relationship(lazy="selectin", order_by="FlagSource.attached_at, FlagSource.event_id")
+    audit: Mapped[list["FlagAudit"]] = relationship(lazy="selectin", order_by="FlagAudit.id")
+
+
+class FlagSource(Base):
+    __tablename__ = "flag_sources"
+    flag_id: Mapped[str] = mapped_column(ForeignKey("flags.id"), primary_key=True)
+    event_id: Mapped[str] = mapped_column(ForeignKey("events.id"), primary_key=True)
+    event: Mapped[Event] = relationship(lazy="selectin")
+    attached_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class FlagAudit(Base):
+    __tablename__ = "flag_audit"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    flag_id: Mapped[str] = mapped_column(ForeignKey("flags.id"), index=True)
+    action: Mapped[str] = mapped_column(String(40))
+    actor: Mapped[str] = mapped_column(String(64))
+    channel: Mapped[str] = mapped_column(String(32))
+    source_ref: Mapped[str] = mapped_column(String(200))
+    recorded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
 
 class PlanGeometry(Base):

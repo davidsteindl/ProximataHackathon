@@ -52,7 +52,8 @@ Stoppen: `docker compose down`. Die Daten bleiben im Volume `db-data` erhalten.
 
 Enthalten sind Infrastruktur, Health-Prüfungen, der statische Site Record aus
 Issue #5, Nachrichten-Ingestion, Event-Extraktion und Timeline aus #6 sowie
-DXF-Extraktion und Geometrie-API aus #15 sowie Gmail-Eingang aus #11. Flags, 3D-Ansicht, Plan-Diff,
+DXF-Extraktion und Geometrie-API aus #15, Conflict A und Flag-Inbox aus #7
+sowie Gmail-Eingang aus #11. 3D-Ansicht, Plan-Diff,
 Telegram-Adapter, Gmail-Versand, MCP-Tools, Authentifizierung
 und Hosting folgen in ihren eigenen Issues.
 
@@ -84,9 +85,25 @@ in `.env` setzen und `api` neu erstellen. Nur `api` erhält den LLM-Key.
 Abnahme-, Task-Abschluss- und Revisionsbestätigungen aus Nachrichten werden immer
 als **unbestätigte Evidence** mit Quelle/Zitat gespeichert. Sie überschreiben keine
 vorhandene Bestätigung und geben keine Arbeit frei. Die menschliche Prüfung folgt
-in #9, die Regelprüfung in #7/#8. Der Seed-Befehl setzt auch die neuen Nachrichten
+in #9, Conflict B in #8. Conflict A wird bereits deterministisch geprüft.
+Der Seed-Befehl setzt auch die neuen Nachrichten
 und Events zurück. REST-Vertrag, Cache-Inhalte, Fehler-/Retry-Verhalten und
 Datenschutzgrenzen: [docs/INGESTION.md](docs/INGESTION.md).
+
+### Conflict A und Flag-Inbox (Issue #7)
+
+Nach der Hero-Nachricht zeigt `GET /flags` den offenen Flag A für 3B mit
+Quellzitat, betroffener Task, erforderlicher Rohinstallationsabnahme und
+verantwortlichem Crew Lead. `GET /flags/{id}` liefert die Details. Wiederholte
+Erkennung ergänzt den bestehenden offenen Flag. Die Regel bewertet Nachweise
+als erfüllt, nicht erfüllt, unbekannt oder widersprüchlich; eine unbestätigte
+Erfolgsmeldung reicht nie als Freigabe. Neue Events und menschliche
+Nachweisentscheidungen lösen die Prüfung in derselben Transaktion aus.
+Ein später erfüllter Nachweis schließt keinen Flag.
+
+Migration `0005` ergänzt Flags, Quellenverknüpfungen und Audit; der Seed-Reset
+entfernt diese Daten mit. Die REST-Endpunkte sind lesend. Details zu Regel,
+Nachweisgültigkeit und Integration für #8/#9/#14: [docs/FLAGS.md](docs/FLAGS.md).
 
 ### Gmail-Eingang (Issue #11)
 

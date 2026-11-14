@@ -11,6 +11,7 @@ export async function getSiteOverview(baseUrl, { zoneId, fromDate, toDate } = {}
     plans: "/plans",
     inspections: "/inspections",
     evidence: "/evidence",
+    flags: "/flags",
     tasks: `/tasks?${query}`,
     events: `/events?${query}`,
   };
