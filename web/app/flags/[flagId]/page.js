@@ -89,7 +89,11 @@ function FlagDetail({ flag, site }) {
               <div className="small"><Chip tone={evaluation.tone} glyph>{evaluation.text}</Chip> <span className="muted">{evaluation.note}</span></div>
               {flag.awaiting_human_closure && <p className="small" style={{ margin: 0 }}><Chip tone="ok">Awaiting closure</Chip> The Precondition is satisfied, but only a person closes this Flag.</p>}
               <dl className="facts small">
-                {flag.type === "A" ? <><dt>Required inspection</dt><dd className="mono">{flag.inspection_id || "missing or ambiguous"}</dd></> : (
+                {flag.type === "A" ? <><dt>Required inspection</dt><dd className="mono">{flag.inspection_id || "missing or ambiguous"}</dd></> : flag.type === "C" ? (
+                  <><dt>Required predecessors</dt><dd>{(flag.context.predecessors || []).map((task) => (
+                    <span key={task.task_id} style={{ display: "block" }}><span className="mono">{task.task_id}</span> · {label(task.evaluation)}</span>
+                  ))}</dd></>
+                ) : (
                   <>
                     <dt>Crew</dt><dd>{flag.context.crew_id || "Unresolved"}</dd>
                     <dt>Plan</dt><dd className="mono">{flag.context.plan_id} · required Rev {flag.context.current_revision} · confirmed receipt Rev {flag.context.acknowledged_revision || "unknown"}</dd>
@@ -131,7 +135,7 @@ function FlagDetail({ flag, site }) {
           </section>
 
           <section className="panel" aria-labelledby="ev-h">
-            <h2 id="ev-h">{flag.type === "B" ? "Revision receipt Evidence" : "Inspection Evidence"} <Link className="link small" href="/evidence" style={{ marginLeft: "auto" }}>Review evidence →</Link></h2>
+            <h2 id="ev-h">{flag.type === "C" ? "Predecessor completion Evidence" : flag.type === "B" ? "Revision receipt Evidence" : "Inspection Evidence"} <Link className="link small" href="/evidence" style={{ marginLeft: "auto" }}>Review evidence →</Link></h2>
             <div className="pad">
               {flag.evidence.length === 0 ? <p className="small muted" style={{ margin: 0 }}>No matching Evidence.</p> : (
                 <ul className="ev-list">{flag.evidence.map((record) => <EvidenceItem key={record.id} record={record} timezone={timezone} href={`/evidence?id=${encodeURIComponent(record.id)}`} />)}</ul>

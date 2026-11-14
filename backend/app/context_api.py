@@ -12,6 +12,7 @@ from app.flag_api import FlagView, flag_view
 from app.ingestion import event_views
 from app.ingestion_schemas import EventView
 from app.revision_rules import receipt_evidence, revision_work
+from app.sequence_rules import completion_evidence
 from app.rules import PRECONDITIONS, affected_work, ancestors, inspection_evidence, inspection_evidence_scope, utc
 from app.site_api import Database, get_plans, zone_scope
 
@@ -92,7 +93,10 @@ def preconditions(session, zones, scope, tasks):
                     continue
                 evaluation = rule.evaluate(session, work, zones)
                 evidence = []
-                if evaluation.inspection_id is not None:
+                if rule.type == "C":
+                    evidence = [item for predecessor in work.task.predecessors
+                                for item in completion_evidence(session, predecessor, zones)]
+                elif evaluation.inspection_id is not None:
                     evidence = inspection_evidence(session, session.get(models.Inspection, evaluation.inspection_id),
                                                    inspection_evidence_scope(work.zone_id, zones))
                 elif work.revision is not None:
