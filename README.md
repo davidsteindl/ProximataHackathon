@@ -184,7 +184,6 @@ zeigt den Fallback samt Fehlergrund. Ein erfolgreicher Diff ersetzt keine
 menschlich bestätigte Empfangs-Evidence. Dateinamen, Metadaten, Herkunft und
 Fehlerverhalten: [CAD-PIPELINE.md](docs/CAD-PIPELINE.md#plan-diff-17).
 
-
 ### Gmail-Eingang (Issue #11)
 
 Der optionale Worker-Adapter liest ein verifiziertes Projekt-Testpostfach/Label

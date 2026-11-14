@@ -106,6 +106,13 @@ def test_geometry_overrides_broad_note_before_flags_are_created(seeded, client, 
     result = statement(client, monkeypatch, zones=['F3'], attachments=hero_payload()['attachments'])
     assert result['events'][0]['zone_ids'] == ['3B']
     assert {flag['zone_id'] for flag in client.get('/flags').json()} == {'3B'}
+    from sqlalchemy import select
+    from sqlalchemy.orm import Session
+    from app import models
+    with Session(seeded) as session:
+        messages = session.scalars(select(models.OutboxMessage)).all()
+        assert messages
+        assert all(session.get(models.Flag, message.flag_id).zone_id == '3B' for message in messages)
     statement(client, monkeypatch, external_id='later-broad-note', zones=['F3'])
     assert {flag['zone_id'] for flag in client.get('/flags').json()} == {'3B'}
 
@@ -204,3 +211,24 @@ def test_diff_does_not_skip_missing_immediately_previous_geometry(seeded, client
     statement(client, monkeypatch)  # Register D without geometry.
     assert upload(client, ENTRIES[3], revision_id='A-103-E', label='E', sequence=5).status_code == 200
     assert client.get('/geometry/revisions/A-103-E/diff').status_code == 409
+
+
+def test_failed_text_and_diff_leave_source_retryable_without_partial_events(seeded, client, monkeypatch):
+    from unittest.mock import Mock
+    from app import ingestion
+    from app.extraction import ExtractionError
+
+    extractor = Mock()
+    extractor.name = 'unavailable'
+    extractor.extract.side_effect = ExtractionError('provider_unavailable')
+    monkeypatch.setattr(ingestion, 'get_extractor', lambda: extractor)
+    payload = hero_payload()
+    failed = client.post('/ingestion/messages', json=payload)
+    assert failed.status_code == 502
+    assert client.get('/events').json() == []
+    assert client.get('/flags').json() == []
+    assert upload(client, ENTRIES[2]).status_code == 200
+    retried = client.post('/ingestion/messages', json=payload)
+    assert retried.status_code == 200
+    assert retried.json()['source']['id'] == failed.json()['source']['id']
+    assert retried.json()['events'][0]['origin'] == 'deterministic_plan_diff'
