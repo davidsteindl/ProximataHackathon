@@ -39,7 +39,20 @@ def retention_days():
     return days
 
 
+def erase_qa_copies(session, sources):
+    keys = [f"telegram-{kind}:{source.id}" for source in sources for kind in ("qa_reply", "decision_request")]
+    if not keys:
+        return
+    copies = session.scalars(select(models.OutboxMessage).where(
+        models.OutboxMessage.dedup_key.in_(keys)).with_for_update()).all()
+    for copy in copies:
+        copy.content, copy.lease_token = "[deleted Telegram question copy]", None
+        if copy.status != "sent":
+            copy.status = "cancelled"
+
+
 def erase_raw(session, sources):
+    erase_qa_copies(session, sources)
     for source in sources:
         session.execute(delete(models.SourceAttachment).where(
             models.SourceAttachment.source_message_id == source.id))
@@ -60,7 +73,7 @@ def enforce_retention(session: Database):
         erase_raw(session, sources)
         affected_users = {source.sender_id for source in sources}
         replies = session.scalars(select(models.OutboxMessage).where(
-            models.OutboxMessage.channel == "telegram", models.OutboxMessage.flag_id.is_(None),
+            models.OutboxMessage.channel == "telegram", models.OutboxMessage.kind == "compliance_reply",
             (models.OutboxMessage.created_at < cutoff) | models.OutboxMessage.recipient.in_(affected_users),
         ).with_for_update()).all()
         for reply in replies:
@@ -119,7 +132,7 @@ def privacy_command(command: PrivacyCommand, session: Database):
         elif command.command == "delete_my_data":
             erase_raw(session, sources)
             replies = session.scalars(select(models.OutboxMessage).where(
-                models.OutboxMessage.channel == "telegram", models.OutboxMessage.flag_id.is_(None),
+                models.OutboxMessage.channel == "telegram", models.OutboxMessage.kind == "compliance_reply",
                 models.OutboxMessage.recipient == command.sender_id,
             ).with_for_update()).all()
             for reply in replies:
