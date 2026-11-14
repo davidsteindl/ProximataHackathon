@@ -54,10 +54,11 @@ export function isOpenFlag(flag) {
   return flag.state !== "resolved" && flag.state !== "false_alarm";
 }
 
-/** Open Flags on the zone, an ancestor or a descendant. Sibling zones are never included. */
+/** Open Flags in the zone scope, including schedule successors affected by a conflict elsewhere. */
 export function flagsForZone(index, flags, zoneId) {
   const scope = scopeOf(index, zoneId);
-  return (flags || []).filter((flag) => isOpenFlag(flag) && scope.has(flag.zone_id));
+  return (flags || []).filter((flag) => isOpenFlag(flag) && (scope.has(flag.zone_id)
+    || flag.blocked_tasks?.some((task) => scope.has(task.zone_id))));
 }
 
 function evidenceFor(evidence, inspection) {

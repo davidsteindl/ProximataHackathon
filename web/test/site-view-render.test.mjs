@@ -108,3 +108,17 @@ test("a confirmation of a superseded revision is never shown in the positive gre
   assert.equal(reviewTone("unconfirmed", true), "warn");
   assert.equal(reviewTone("rejected", true), "unk");
 });
+
+test("blocked Tasks render their scope and crew with factual advice", async () => {
+  const { BlockedTasks } = (await loadLocal("/site"))("./zone-panel");
+  const html = renderToString(React.createElement(BlockedTasks, { flag: {
+    blocked_tasks: [{ id: "finish-3A", name: "Finishing", zone_id: "3A", crew_id: "insulation" }],
+  } }));
+  assert.match(html, /finish-3A/);
+  assert.match(html, /Finishing/);
+  assert.match(html, /insulation/);
+  assert.match(html, /Check with the Superintendent before starting/);
+  assert.match(html, /requires separate Proposal approval/);
+  assert.doesNotMatch(html, /on hold|do not continue/i);
+  assert.equal(renderToString(React.createElement(BlockedTasks, { flag: { blocked_tasks: [] } })), "");
+});
