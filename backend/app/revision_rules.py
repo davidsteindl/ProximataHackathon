@@ -120,6 +120,7 @@ class RevisionAcknowledged:
         crew_id = work.crew.id if work.crew else None
         records = receipt_evidence(session, work.zone_id, crew_id, revision, zones)
         relevant, confirmed, acknowledged, statement_times = [], [], [], {}
+        resolved_revision_ids = {}
         for item in records:
             if item.review_status == "rejected":
                 continue
@@ -129,27 +130,37 @@ class RevisionAcknowledged:
                 item.history[-1].actor_type == "human" or
                 item.origin == "seed_baseline" and item.history[-1].actor_type == "seed_import"))
             statement = session.get(models.Event, item.statement_ref) if item.origin == "llm_statement" else None
+            target = session.get(models.Revision, item.revision_id) if item.revision_id else None
             if item.origin == "llm_statement":
                 if (statement is None or item.source_ref != f"source:{statement.source_message_id}"
                         or statement.intent != "revision_acknowledgment"
                         or statement.details.get("plan_reference") != revision.plan_id):
                     continue
-                target = session.get(models.Revision, item.revision_id) if item.revision_id else None
+                if item.revision_id is None and statement.details.get("revision_label"):
+                    # Cross-channel delivery may precede revision registration.
+                    # Resolve only the exact immutable plan/label assertion;
+                    # never rewrite Evidence scope or create a confirmation.
+                    matches = session.scalars(select(models.Revision).where(
+                        models.Revision.plan_id == statement.details["plan_reference"],
+                        models.Revision.label == statement.details["revision_label"],
+                    )).all()
+                    target = matches[0] if len(matches) == 1 else None
                 if target and (statement.details.get("revision_label") != target.label
                                or utc(statement.source.sent_at) < utc(target.issued_at)):
                     continue
                 if statement.crew_id != item.crew_id or item.zone_id not in statement.zone_ids:
                     continue
                 statement_times[item.id] = utc(statement.source.sent_at)
-            if trusted and covers and exact_crew and item.claim == "acknowledged" and item.revision_id:
-                acknowledged.append(session.get(models.Revision, item.revision_id))
-            if item.revision_id != revision.id:
+            resolved_revision_ids[item.id] = target.id if target else None
+            if trusted and covers and exact_crew and item.claim == "acknowledged" and target:
+                acknowledged.append(target)
+            if target is None or target.id != revision.id:
                 # Ambiguous current-revision counterclaims still require review.
                 if not (item.revision_id is None and statement and
                         statement.details.get("revision_label") in {None, revision.label}):
                     continue
             relevant.append(item)
-            if trusted and covers and exact_crew and item.revision_id == revision.id:
+            if trusted and covers and exact_crew and target is not None and target.id == revision.id:
                 confirmed.append(item)
         last = max(acknowledged, key=lambda item: item.sequence, default=None)
         context = dict(crew_id=crew_id, plan_id=revision.plan_id, revision_id=revision.id,
@@ -165,8 +176,8 @@ class RevisionAcknowledged:
             # the same exact Crew/Zone/Revision using validated source times.
             return (item.claim == "not_acknowledged" and item.id in statement_times
                     and any(positive.id in statement_times
-                            and (item.crew_id, item.zone_id, item.revision_id)
-                            == (positive.crew_id, positive.zone_id, positive.revision_id)
+                            and (item.crew_id, item.zone_id, resolved_revision_ids[item.id])
+                            == (positive.crew_id, positive.zone_id, resolved_revision_ids[positive.id])
                             and statement_times[item.id] < statement_times[positive.id]
                             for positive in positives))
 

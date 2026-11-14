@@ -154,6 +154,16 @@ their review history remain unchanged. Simultaneous/newer negatives and
 different or unresolved scopes still require review; an unconfirmed receipt
 does not supersede anything.
 
+If a receipt arrives before its revision is registered, its stored Evidence may
+have `revision_id: null`. Evaluation can later resolve the immutable source
+Event's explicit plan and revision label to exactly one registered Revision.
+It still validates the source reference, Crew, Zone, label and source timestamp;
+missing labels and stale/wrong scopes never become proof. Only the existing
+explicit human confirmation can satisfy B. Registration never creates a review
+or changes the original Evidence, stored scope or history. `Flag.context` shows
+the resolved confirmed receipt; Evidence retains its original ingestion-time
+scope for traceability. A newer revision still requires its own receipt.
+
 Migration `0006` makes revision filenames nullable and adds the JSON Flag context;
 existing Flags receive `{}`. CAD import serializes on the same Site lock and can
 replace provisional sequence/issue time with explicit CAD metadata for the same

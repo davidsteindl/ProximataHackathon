@@ -286,3 +286,84 @@ def test_later_receipt_does_not_erase_counterclaims_with_different_or_unresolved
     positive = receipt(initialized, monkeypatch, external_id="later", sent_at="2026-11-13T12:00:00+01:00")
     review(engine, positive, "confirmed")
     assert plumbing(initialized)["evaluation"] == "contradictory"
+
+
+@pytest.mark.parametrize("review_first", [False, True])
+def test_receipt_delivered_before_note_resolves_exact_label_without_mutating_evidence(
+    initialized, engine, monkeypatch, review_first,
+):
+    evidence_id = receipt(initialized, monkeypatch)
+    original = next(item for item in initialized.get("/evidence").json() if item["id"] == evidence_id)
+    assert original["scope"]["revision_id"] is None
+    if review_first:
+        review(engine, evidence_id, "confirmed")
+    statement(initialized, monkeypatch)
+    if review_first:
+        # With valid proof already confirmed, no new Flag is necessary. A later
+        # rejection discovers the missing proof, and reconfirmation updates it.
+        assert not any(item["type"] == "B" and item["context"]["crew_id"] == "plumbing"
+                       for item in initialized.get("/flags").json())
+        review(engine, evidence_id, "rejected")
+        assert plumbing(initialized)["evaluation"] == "unknown"
+        review(engine, evidence_id, "confirmed")
+    else:
+        assert plumbing(initialized)["evaluation"] == "unknown"
+        assert next(item for item in plumbing(initialized)["evidence"] if item["id"] == evidence_id)["review_status"] == "unconfirmed"
+        review(engine, evidence_id, "confirmed")
+    flag = plumbing(initialized)
+    assert flag["evaluation"] == "satisfied"
+    assert flag["state"] == "detected"
+    assert flag["context"]["acknowledged_revision_id"] == "A-103-D"
+    resolved = next(item for item in flag["evidence"] if item["id"] == evidence_id)
+    for key in ("scope", "source_ref", "statement_ref", "quote"):
+        assert resolved[key] == original[key]
+    assert resolved["history"][0] == original["history"][0]
+    assert len(resolved["history"]) == (4 if review_first else 2)
+    review(engine, evidence_id, "rejected")
+    assert plumbing(initialized)["evaluation"] == "unknown"
+
+
+@pytest.mark.parametrize("changes", [
+    {"label": None}, {"label": "E"}, {"plan": None}, {"plan": "A-102"},
+    {"crew": "ambiguous"}, {"zones": ["3B-BATH"]},
+    {"sent_at": "2026-11-13T09:00:00+01:00"},
+])
+def test_late_registration_never_fills_missing_or_invalid_receipt_scope(
+    initialized, engine, monkeypatch, changes,
+):
+    evidence_id = receipt(initialized, monkeypatch, **changes)
+    statement(initialized, monkeypatch)
+    review(engine, evidence_id, "confirmed")
+    assert plumbing(initialized)["evaluation"] == "unknown"
+
+
+def test_early_nonreceipt_resolves_and_is_superseded_only_by_later_confirmed_receipt(
+    initialized, engine, monkeypatch,
+):
+    negative = receipt(initialized, monkeypatch, claim="not_acknowledged")
+    statement(initialized, monkeypatch)
+    review(engine, negative, "confirmed")
+    assert plumbing(initialized)["evaluation"] == "not_satisfied"
+    positive = receipt(initialized, monkeypatch, external_id="later-receipt",
+                       sent_at="2026-11-13T12:00:00+01:00")
+    assert plumbing(initialized)["evaluation"] == "contradictory"
+    review(engine, positive, "confirmed")
+    assert plumbing(initialized)["evaluation"] == "satisfied"
+
+
+def test_early_receipt_still_requires_exact_revision_after_cad_and_new_note(
+    initialized, engine, monkeypatch,
+):
+    from test_cad_pipeline import ENTRIES, upload
+
+    evidence_id = receipt(initialized, monkeypatch)
+    entry = next(item for item in ENTRIES if item["metadata"]["revision_id"] == "A-103-D")
+    assert upload(initialized, entry).status_code == 200
+    statement(initialized, monkeypatch)
+    review(engine, evidence_id, "confirmed")
+    assert plumbing(initialized)["evaluation"] == "satisfied"
+    statement(initialized, monkeypatch, external_id="new-E", label="E", sent_at="2026-11-13T14:00:00Z")
+    flag = next(item for item in initialized.get("/flags").json() if item["type"] == "B"
+                and item["context"]["crew_id"] == "plumbing" and item["context"]["current_revision"] == "E")
+    assert flag["evaluation"] == "unknown"
+    assert flag["context"]["acknowledged_revision"] == "D"
