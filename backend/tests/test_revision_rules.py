@@ -134,7 +134,8 @@ def test_repeat_notes_and_scan_deduplicate_and_reset_restores_baseline(initializ
         rules.evaluate_site(session)
     assert plumbing(initialized)["id"] == first["id"]
     assert len(plumbing(initialized)["sources"]) == 2
-    assert len(plumbing(initialized)["audit"]) == 1
+    assert plumbing(initialized)["audit"] == first["audit"]
+    assert [row["action"] for row in first["audit"]] == ["detected", "blocked_notice_queued", "blocked_notice_queued"]
     assert initialized.post("/seed/import", json=seed.model_dump(mode="json")).status_code == 200
     assert initialized.get("/flags").json() == []
     plan = next(item for item in initialized.get("/plans").json() if item["id"] == "A-103")
