@@ -6,16 +6,21 @@ async function getJson(baseUrl, path) {
   return response.json();
 }
 
+/** Parallel REST reads keyed like `paths`; any failure yields one honest error instead of partial data. */
+export async function fetchAll(baseUrl, paths, error = "Site data could not be loaded from the API.") {
+  try {
+    const entries = await Promise.all(Object.entries(paths).map(async ([key, path]) => [key, await getJson(baseUrl, path)]));
+    return { data: Object.fromEntries(entries), error: null };
+  } catch {
+    return { data: null, error };
+  }
+}
+
 const STATE_PATHS = ["site", "flags", "evidence", "inspections", "plans", "tasks", "crews"];
 
 /** Mutable site status, polled by the browser through /api/site-state. */
-export async function getSiteState(baseUrl) {
-  try {
-    const values = await Promise.all(STATE_PATHS.map((path) => getJson(baseUrl, `/${path}`)));
-    return { data: Object.fromEntries(STATE_PATHS.map((path, i) => [path, values[i]])), error: null };
-  } catch {
-    return { data: null, error: "Site status could not be loaded from the API." };
-  }
+export function getSiteState(baseUrl) {
+  return fetchAll(baseUrl, Object.fromEntries(STATE_PATHS.map((path) => [path, `/${path}`])), "Site status could not be loaded from the API.");
 }
 
 /**

@@ -1,6 +1,6 @@
 ﻿import assert from "node:assert/strict";
 import { test } from "node:test";
-import { observeKeyLayout } from "../lib/key-layout.mjs";
+import { observeRightOverlay } from "../lib/key-layout.mjs";
 import { cameraViewport } from "../lib/site-camera.mjs";
 
 test("an open Key follows desktop/mobile changes, width changes and cleanup", (t) => {
@@ -24,7 +24,7 @@ test("an open Key follows desktop/mobile changes, width changes and cleanup", (t
   const legend = { open: true, offsetWidth: 260, position: "absolute" };
   const viewport = {};
   const reservations = [];
-  const stop = observeKeyLayout(legend, viewport, (right) => reservations.push(right));
+  const stop = observeRightOverlay(legend, viewport, (right) => reservations.push(right));
   assert.deepEqual(observed, [legend, viewport]);
   assert.equal(reservations.at(-1), 276);
 

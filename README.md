@@ -16,9 +16,15 @@ docker compose up --build
 In PowerShell statt `cp`: `Copy-Item .env.example .env`. Beim ersten Start baut auch
 `docker compose up` die noch fehlenden Images; nach Codeänderungen `--build` verwenden.
 
-- Dashboard: http://localhost:3000 – zeigt den aktuellen API- und DB-Status.
-  Der Next.js-Server fragt dafür die API ab, die mit `SELECT 1` PostgreSQL prüft.
-  Zum Aktualisieren die Seite neu laden.
+- Dashboard (GroundIQ, #55): http://localhost:3000 – Startseite mit Kennzahlen,
+  3D-Modell, „Needs your attention“, Activity und den nächsten 48 h; aktualisiert
+  sich alle 5 s. Dunkle Arbeitsansichten: `/flags` (Inbox), `/flags/<id>`
+  (Detail mit getrennten Karten für Kenntnisnahme und Abschluss), `/evidence`
+  (Prüfung, auch ohne Flag), `/activity` (Timeline, Terminplan mit Filtern,
+  Pläne, Inspections, API-/DB-Status). `/chat` und `/proposals` zeigen bis #19/#13
+  ausdrücklich „nicht verfügbar“. Der Demo-Rollenumschalter sitzt in der
+  Navigation und gilt seitenübergreifend (keine Authentifizierung). Gestaltung:
+  [design/HANDOFF.md](design/HANDOFF.md).
 - Statischer Site Record (Issue #5): Nach dem Start in einem zweiten Terminal
   `docker compose exec api python -m app.seed` ausführen. Das Dashboard zeigt dann
   Zonen, Terminplan, Crews, Revisionen/Bestätigungen und Inspections.
@@ -46,8 +52,10 @@ In PowerShell statt `cp`: `Copy-Item .env.example .env`. Beim ersten Start baut 
   Abwasser); Kräne, Gerüst, Zaun, Bäume und Container sind als dekorativer
   Kontext gekennzeichnet. Status kommt aus `/flags`, `/inspections`, `/evidence`
   und wird alle 3 s über `web` (`/api/site-state`) nachgeladen, ohne Reload.
+  Helle Plan-Shell: Geschoss-Leiste mit 2D (Draufsicht-Kamera) / 3D, Infopanel
+  rechts (einklappbar, Kontext bleibt erhalten), Schnellaktionen unten.
   Die Ansicht liest nur; Evidence-Prüfung und Flag-Abschluss bleiben getrennte
-  menschliche Aktionen. Flag-Detail (lesend): `/flags/<id>`.
+  menschliche Aktionen unter `/evidence` und `/flags/<id>`.
 - OpenAPI: http://localhost:8000/openapi.json, interaktive Dokumentation unter `/docs`.
 - MCP: http://localhost:8001/mcp – Streamable HTTP mit neun Kontext-Tools,
   Verbindung und Beispiele unter [MCP-Verbindung](#mcp-verbindung-issue-18).

@@ -2,12 +2,12 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { observeKeyLayout } from "../../lib/key-layout.mjs";
+import { observeRightOverlay } from "../../lib/key-layout.mjs";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  changedElements, elementStatus, elementZone, flagsForZone, floorOf, focusBounds, indexZones, inspectionConfirmedPassed,
-  inspectionKindLabel, viewForZone, zoneDetails, zoneStatus,
+  buildCallouts, focusBounds, indexZones, revisionChanges, sceneStatus, viewForZone, zoneDetails, zoneStatus,
 } from "../../lib/site-model.mjs";
+import { flagTitle } from "../../lib/site.mjs";
 import SiteNav from "./site-nav";
 import { Chip, STATUS, Widget, ZonePanel } from "./zone-panel";
 import "./site-view.css";
@@ -119,7 +119,7 @@ function OverviewPanel({ index, state, geometry, changes }) {
             {flags.map((flag) => (
               <li key={flag.id}>
                 <Link href={`/zones/${encodeURIComponent(flag.zone_id)}`}>
-                  <span className="flag-id">Flag {flag.type}</span> <strong>{flag.zone_id}</strong> · {flag.activity.replaceAll("_", " ")} before {flag.precondition.replaceAll("_", " ")}
+                  <span className="flag-id">Flag {flag.type}</span> {flagTitle(flag)}
                 </Link>
                 <p className="meta">{flag.explanation}</p>
                 <Link className="flag-link" href={`/flags/${flag.id}`}>Flag detail →</Link>
@@ -158,8 +158,7 @@ export default function SiteView({ model, initialState, error }) {
   const [liveState, live] = useLiveState(initialState);
   const state = liveState || EMPTY_STATE;
   const geometry = useMemo(() => model?.geometry || [], [model]);
-  const changes = useMemo(() => geometry.flatMap((plan) => changedElements(plan, model?.previous?.[plan.plan_id])
-    .map((change) => ({ ...change, floorId: plan.floor_id, label: plan.label, previousLabel: model.previous[plan.plan_id].label }))), [geometry, model]);
+  const changes = useMemo(() => revisionChanges(model), [model]);
 
   const route = useMemo(() => viewForZone(index, zoneId), [index, zoneId]);
   const [override, setOverride] = useState({ key: null, mode: null });
@@ -170,8 +169,6 @@ export default function SiteView({ model, initialState, error }) {
   const [panelOpen, setPanelOpen] = useState(true);
   const [copied, setCopied] = useState(false);
   const [webglError, setWebglError] = useState(null);
-  // Key: collapsed by default (its summary still discloses that scenery is decorative); opening it re-lays out the callouts.
-  const [legendOpen, setLegend] = useState(false);
 
   const stageRef = useRef(null);
   const sceneRef = useRef(null);
@@ -244,61 +241,26 @@ export default function SiteView({ model, initialState, error }) {
 
   // Status colours follow API data.
   useEffect(() => {
-    if (!sceneRef.current) return;
-    const rooms = new Map();
-    for (const zone of index.values()) if (zone.kind === "room") rooms.set(zone.id, zoneStatus(index, state, zone.id));
-    const walls = new Map();
-    for (const plan of geometry) for (const element of plan.elements) {
-      const s = element.kind === "wall" ? elementStatus(index, state, element) : null;
-      if (s) walls.set(`${plan.floor_id}:${element.element_id}`, s);
-    }
-    const flagZones = new Set((state.flags || []).map((flag) => flag.zone_id));
-    sceneRef.current.setStatus({ rooms, walls, flagZones });
+    sceneRef.current?.setStatus(sceneStatus(index, state, geometry));
   }, [state, index, geometry, sceneReady]);
 
   useEffect(() => { sceneRef.current?.setFilters(filters); }, [filters, sceneReady]);
-  // An expanded desktop Key floats over the stage's right side: shift the projection so the subject stays
-  // clear of it (mobile shows the Key below the canvas, so no shift there). Also re-lays out the callouts.
-  const legendRef = useRef(null);
+  // The information panel floats over the stage's right side on desktop: shift the projection so the subject
+  // stays clear of it (narrow layouts put the panel below the canvas, so no shift there). Also re-lays out callouts.
+  const panelRef = useRef(null);
   useEffect(() => {
-    const legend = legendRef.current;
+    const panel = panelRef.current;
     const viewport = stageRef.current;
-    if (!legend || !viewport) return;
-    return observeKeyLayout(legend, viewport, (coveredRight) => {
+    if (!panel || !viewport) return;
+    return observeRightOverlay(panel, viewport, (coveredRight) => {
       sceneRef.current?.setCoveredRight(coveredRight);
       sceneRef.current?.refresh();
     });
-  }, [legendOpen, sceneReady]);
+  }, [panelOpen, sceneReady]);
 
-  // Anchored callouts: open Flags (on their flagged element if there is one) and revision changes.
-  const callouts = useMemo(() => {
-    const list = [];
-    for (const flag of state.flags || []) {
-      let anchor = flag.zone_id;
-      let target = flag.zone_id;
-      for (const plan of geometry) for (const element of plan.elements) {
-        const own = elementZone(index, element);
-        if (own && flagsForZone(index, [flag], own).length && element.kind === "wall") { anchor = `${plan.floor_id}:${element.element_id}`; target = own; }
-      }
-      list.push({ key: `flag-${flag.id}`, anchor, floorId: floorOf(index, flag.zone_id), tone: "crit", short: `Flag ${flag.type}`, title: `Flag ${flag.type} · ${flag.zone_id}`, text: `${flag.activity.replaceAll("_", " ")} announced · precondition ${flag.evaluation.replaceAll("_", " ")}`, target });
-    }
-    if (filters.changes) for (const change of changes.filter((c) => c.element.kind === "wall")) {
-      list.push({ key: `rev-${change.element.element_id}`, anchor: `${change.floorId}:${change.element.element_id}`, floorId: change.floorId, tone: "info", short: `Rev ${change.label}`, title: `Rev ${change.label} · ${change.change}`, text: `${change.element.element_id}, dashed = Rev ${change.previousLabel}`, target: elementZone(index, change.element) || change.floorId, below: true });
-    }
-    const floors = new Set((state.flags || []).map((flag) => floorOf(index, flag.zone_id)));
-    if (route.floorId) floors.add(route.floorId);
-    // One callout per floor: the earliest inspection there whose pass is not confirmed and that has claims to review.
-    if (!route.highlight || route.highlight === route.floorId) for (const floorId of floors) {
-      const pending = (state.inspections || [])
-        .filter((inspection) => inspection.zone_id === floorId && !inspectionConfirmedPassed(index, inspection, state.evidence, state.plans))
-        .map((inspection) => ({ inspection, unconfirmed: (state.evidence || []).filter((record) => record.scope.inspection_id === inspection.id && record.review_status === "unconfirmed").length }))
-        .sort((a, b) => b.unconfirmed - a.unconfirmed || a.inspection.scheduled_at.localeCompare(b.inspection.scheduled_at))[0];
-      if (!pending) continue;
-      const { inspection, unconfirmed } = pending;
-      list.push({ key: `insp-${inspection.id}`, anchor: inspection.zone_id, floorId: inspection.zone_id, tone: "warn", short: inspectionKindLabel(inspection.kind), title: `${inspectionKindLabel(inspection.kind)} ${inspection.zone_id} · ${inspection.status}`, text: unconfirmed ? `${unconfirmed} unconfirmed claim${unconfirmed === 1 ? "" : "s"} awaiting review` : "No confirmed pass yet", target: inspection.zone_id });
-    }
-    return list;
-  }, [state, geometry, index, changes, filters.changes, route]);
+  // Anchored callouts: open Flags (on their flagged element if there is one), revision changes, pending inspections.
+  const callouts = useMemo(() => buildCallouts({ state, geometry, index, changes, showChanges: filters.changes, route }),
+    [state, geometry, index, changes, filters.changes, route]);
 
   useEffect(() => {
     sceneRef.current?.setOverlays(callouts.map((c) => ({ el: calloutRefs.current.get(c.key), anchor: c.anchor, floorId: c.floorId, below: c.below, target: c.target, tone: c.tone })));
@@ -320,124 +282,148 @@ export default function SiteView({ model, initialState, error }) {
 
   if (error || !model) return <Shell live={live}><Unavailable error={error} /></Shell>;
 
+  const openFlags = (state.flags || []).length;
+  const unconfirmed = (state.evidence || []).filter((record) => record.review_status === "unconfirmed").length;
+  const context = zoneId || "Site";
+  // The collapsed pill counts the Flags of the current context: the selected zone, or the whole site.
+  const contextFlags = details ? details.flags.length : openFlags;
+
   return (
     <Shell live={live}>
-      <div className={`sv-body${panelOpen ? "" : " collapsed"}`}>
-        <div className="sv-stage">
-          <div className="sv-viewport">
-            <div ref={stageRef} className="sv-canvas" />
-            {!geometry.length && (
-              <div className="sv-state overlay">
-                <h1>No plan geometry imported yet</h1>
-                <p>The 3D view is generated only from imported DXF plans. Run <code>docker compose exec api python -m app.cad_import</code>, then reload.</p>
+      <div className={`sv-stage${panelOpen ? "" : " collapsed"}`}>
+        <div className="sv-viewport">
+          <div ref={stageRef} className="sv-canvas" />
+          {!geometry.length && (
+            <div className="sv-state panel overlay">
+              <h1>No plan geometry imported yet</h1>
+              <p>The 3D view is generated only from imported DXF plans. Run <code>docker compose exec api python -m app.cad_import</code>, then reload.</p>
+            </div>
+          )}
+          {webglError && <div className="sv-state panel overlay"><h1>3D view unavailable</h1><p>{webglError}. Zone details stay available in the information panel.</p></div>}
+
+          {route.known && <div className={`callouts${route.highlight && route.highlight !== route.floorId ? " compact" : ""}`} aria-label="Plan callouts">
+            {callouts.map((c) => (
+              <div key={c.key} ref={(el) => (el ? calloutRefs.current.set(c.key, el) : calloutRefs.current.delete(c.key))} className={`callout t-${c.tone}`} style={{ visibility: "hidden" }}>
+                <button type="button" onClick={() => selectZone(c.target)}>
+                  <strong>{c.title}</strong><span>{c.text}</span><em className="pin" aria-hidden="true">{c.short}</em>
+                </button>
               </div>
-            )}
-            {webglError && <div className="sv-state overlay"><h1>3D view unavailable</h1><p>{webglError}. Zone details stay available in the side panel.</p></div>}
+            ))}
+          </div>}
+          <div ref={tipRef} className="hover-tip" hidden><strong /><span /></div>
+          {zoneId && !route.known && (
+            <div className="sv-state panel overlay" role="alert">
+              <h1>Zone “{zoneId}” is not in the site record</h1>
+              <p>Check the link, or choose a zone from the list. Nothing was changed.</p>
+              <Link className="btn btn-acc" href="/site">Back to the building</Link>
+            </div>
+          )}
+        </div>
 
-            {route.known && <div className={`callouts${route.highlight && route.highlight !== route.floorId ? " compact" : ""}`} aria-label="Plan callouts">
-              {callouts.map((c) => (
-                <div key={c.key} ref={(el) => (el ? calloutRefs.current.set(c.key, el) : calloutRefs.current.delete(c.key))} className={`callout t-${c.tone}`} style={{ visibility: "hidden" }}>
-                  <button type="button" onClick={() => selectZone(c.target)}>
-                    <strong>{c.title}</strong><span>{c.text}</span><em className="pin" aria-hidden="true">{c.short}</em>
-                  </button>
-                </div>
-              ))}
-            </div>}
-            <div ref={tipRef} className="hover-tip" hidden><strong /><span /></div>
-            {zoneId && !route.known && (
-              <div className="sv-state overlay" role="alert">
-                <h1>Zone “{zoneId}” is not in the site record</h1>
-                <p>Check the link, or choose a zone from the list. Nothing was changed.</p>
-                <Link className="primary-btn" href="/site">Back to the building</Link>
-              </div>
-            )}
-          </div>
+        <div className="stage-card panel" data-reserve>
+          {zoneId && !route.known ? (
+            <>
+              <p className="crumbs mono"><Link href="/site">{building?.id}</Link> / ?</p>
+              <h1>Unknown zone</h1>
+            </>
+          ) : details ? (
+            <>
+              <p className="crumbs mono">
+                {details.path.map((zone, i) => (
+                  <span key={zone.id}>{i > 0 && " / "}{zone.id === zoneId ? zone.id : <Link href={zone.kind === "building" ? "/site" : `/zones/${zone.id}`}>{zone.id}</Link>}</span>
+                ))}
+              </p>
+              <h1>{details.zone.name}</h1>
+              <p className="meta mono">{details.plan ? `${details.plan.id} · Rev ${details.plan.current_revision?.label} · ` : ""}/zones/{zoneId}</p>
+              <button type="button" className="ghost-btn" onClick={copyLink}>{copied ? "Link copied" : "Copy share link"}</button>
+            </>
+          ) : (
+            <>
+              <p className="crumbs mono">{state.site?.name || "Site"}</p>
+              <h1>{building?.name || "Building"}</h1>
+              <p className="meta mono">{plansLabel}</p>
+            </>
+          )}
+        </div>
 
-          <div className="stage-card" data-reserve>
-            {zoneId && !route.known ? (
-              <>
-                <p className="crumbs mono"><Link href="/site">{building?.id}</Link> / ?</p>
-                <h1>Unknown zone</h1>
-              </>
-            ) : details ? (
-              <>
-                <p className="crumbs mono">
-                  {details.path.map((zone, i) => (
-                    <span key={zone.id}>{i > 0 && " / "}{zone.id === zoneId ? zone.id : <Link href={zone.kind === "building" ? "/site" : `/zones/${zone.id}`}>{zone.id}</Link>}</span>
-                  ))}
-                </p>
-                <h1>{details.zone.name}</h1>
-                <p className="meta mono">{details.plan ? `${details.plan.id} · Rev ${details.plan.current_revision?.label} · ` : ""}/zones/{zoneId}</p>
-                <button type="button" className="ghost-btn" onClick={copyLink}>{copied ? "Link copied" : "Copy share link"}</button>
-              </>
-            ) : (
-              <>
-                <p className="crumbs mono">{state.site?.name || "Site"}</p>
-                <h1>{building?.name || "Building"}</h1>
-                <p className="meta mono">{plansLabel}</p>
-              </>
-            )}
-          </div>
-
-          {/* Desktop: floating controls on the stage. Mobile: in document flow under the canvas (no overlap). */}
-          <div className="stage-dock">
-            <nav className="floor-rail" data-reserve aria-label="Floor isolation">
+        {/* Desktop: floating glass controls on the stage. Narrow: in document flow under the canvas (no overlap). */}
+        <div className="stage-dock">
+          <div className="floor-rail panel" data-reserve>
+            <nav aria-label="Floor isolation">
               <Link href="/site" className={!route.floorId ? "cur" : ""} aria-current={!route.floorId ? "page" : undefined} title="Whole building">All</Link>
-              {floorsDesc.map((plan) => (
-                <Link key={plan.floor_id} href={`/zones/${plan.floor_id}`} className={route.floorId === plan.floor_id ? "cur" : ""}
-                  aria-current={route.floorId === plan.floor_id ? "true" : undefined} title={`Isolate floor ${plan.floor_id}`}>
-                  {plan.floor_id}<i className={`dot s-${zoneStatus(index, state, plan.floor_id)}`} aria-hidden="true" />
-                </Link>
-              ))}
+              {floorsDesc.map((plan) => {
+                const status = zoneStatus(index, state, plan.floor_id);
+                return (
+                  <Link key={plan.floor_id} href={`/zones/${plan.floor_id}`} className={route.floorId === plan.floor_id ? "cur" : ""}
+                    aria-current={route.floorId === plan.floor_id ? "true" : undefined} title={`Isolate floor ${plan.floor_id} · ${STATUS[status].text}`}>
+                    {plan.floor_id}<i className={`dot s-${status}`} aria-hidden="true" />
+                  </Link>
+                );
+              })}
             </nav>
-
-            <div className="toolbar" data-reserve role="toolbar" aria-label="View">
-              <div className="seg">
-                <button type="button" aria-pressed={mode === "orbit"} onClick={() => setMode("orbit")}>3D</button>
-                <button type="button" aria-pressed={mode === "top"} onClick={() => setMode("top")}>Top-down</button>
-              </div>
-              <span className="sep" />
+            <span className="rail-sep" aria-hidden="true" />
+            <div role="toolbar" aria-label="Camera" className="rail-tools">
+              <button type="button" className="mode" aria-pressed={mode === "top"} onClick={() => setMode("top")} title="Top-down plan view">2D</button>
+              <button type="button" className="mode" aria-pressed={mode === "orbit"} onClick={() => setMode("orbit")} title="3D orbit view">3D</button>
+              <span className="rail-sep" aria-hidden="true" />
               <button type="button" className="icon" aria-label="Zoom in" onClick={() => sceneRef.current?.zoom(0.7)}>+</button>
               <button type="button" className="icon" aria-label="Zoom out" onClick={() => sceneRef.current?.zoom(1.4)}>−</button>
               <button type="button" className="icon" aria-label="Recenter view" title="Recenter" onClick={() => sceneRef.current?.recenter()}>
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true"><circle cx="8" cy="8" r="2.5" /><path d="M8 1.5v3M8 11.5v3M1.5 8h3M11.5 8h3" /></svg>
               </button>
-              <span className="sep" />
-              {[["status", "Status"], ["changes", "Rev diff"], ["context", "Context"]].map(([key, text]) => (
-                <button key={key} type="button" className="toggle" aria-pressed={filters[key]} onClick={() => setFilters((f) => ({ ...f, [key]: !f[key] }))}>{text}</button>
-              ))}
             </div>
-
-            <details ref={legendRef} className="legend" data-reserve open={legendOpen} onToggle={(event) => setLegend(event.currentTarget.open)}>
-              <summary>
-                <span className="sw-row" aria-hidden="true"><i className="sw crit" /><i className="sw warn" /><i className="sw sel" /><i className="sw pipe" /></span>
-                Key<span className="meta"> · scenery is decorative</span>
-              </summary>
-              <div className="legend-body">
-                <span><i className="sw crit" />Open Flag</span>
-                <span><i className="sw warn" />Inspection not confirmed</span>
-                <span><i className="sw sel" />Selected</span>
-                <span><i className="sw ghost" />Previous revision</span>
-                <span><i className="sw pipe" />Drain</span>
-                <p>Building, walls, rooms, door openings, fixtures and drains: imported DXF geometry ({geometry.length} plans). Schematic: fixture sizes, door leaves, swing arcs, lintels, the slab edge overhang, surface textures (concrete, plaster) and contact shading. Decorative context, not plan data: crane, scaffold, fence, street, vehicles, materials, trees and neighbouring buildings.</p>
-              </div>
-            </details>
           </div>
+
+          <details className="legend panel" data-reserve>
+            <summary>
+              <span className="sw-row" aria-hidden="true"><i className="sw crit" /><i className="sw warn" /><i className="sw sel" /><i className="sw ghost" /></span>
+              Layers &amp; key<span className="meta"> · scenery is decorative</span>
+            </summary>
+            <div className="legend-body">
+              <div role="group" aria-label="Layers" className="layer-toggles">
+                {[["status", "Status"], ["changes", "Rev diff"], ["context", "Context"]].map(([key, text]) => (
+                  <button key={key} type="button" className="toggle" aria-pressed={filters[key]} onClick={() => setFilters((f) => ({ ...f, [key]: !f[key] }))}>{text}</button>
+                ))}
+              </div>
+              <span><i className="sw crit" />Open Flag</span>
+              <span><i className="sw warn" />Inspection not confirmed</span>
+              <span><i className="sw sel" />Selected</span>
+              <span><i className="sw ghost" />Previous revision</span>
+              <span><i className="sw pipe" />Drain</span>
+              <p>Building, walls, rooms, door openings, fixtures and drains: imported DXF geometry ({geometry.length} plans). Schematic: fixture sizes, door leaves, swing arcs, lintels, the slab edge overhang, surface textures (concrete, plaster) and contact shading. Decorative context, not plan data: crane, scaffold, fence, street, vehicles, materials, trees and neighbouring buildings.</p>
+            </div>
+          </details>
+
+          <nav className="quick-dock panel" data-reserve aria-label="Quick actions">
+            <Link href="/flags"><i style={{ background: "var(--crit-solid)" }} aria-hidden="true" />Open flags ({openFlags})</Link>
+            <Link href="/evidence"><i style={{ background: "var(--muted)" }} aria-hidden="true" />Review evidence{unconfirmed ? ` (${unconfirmed})` : ""}</Link>
+            <Link href="/chat"><i style={{ background: "var(--blue)" }} aria-hidden="true" />Ask GroundIQ</Link>
+          </nav>
         </div>
 
-        <aside className="sv-side" aria-label="Zone information">
-          <div className="side-head">
-            <button type="button" className="ghost-btn" aria-expanded={panelOpen} onClick={() => setPanelOpen((open) => !open)}>
-              {panelOpen ? "Hide panel" : "Show panel"}
-            </button>
-            {!panelOpen && <span className="pill-sum">{zoneId || building?.id} · {(state.flags || []).length} open</span>}
-          </div>
-          {panelOpen && (
-            <div className="side-scroll" ref={sideRef}>
-              {details ? <ZonePanel details={details} timezone={timezone} changes={changes} newFlagIds={newFlagIds} now={live.at} />
-                : <OverviewPanel index={index} state={state} geometry={geometry} changes={changes} />}
-              <ZoneBrowser zones={model.zones} index={index} state={state} current={zoneId} />
+        <aside ref={panelRef} className="sv-side" data-reserve aria-label="Zone information">
+          {panelOpen ? (
+            <div className="side-card panel">
+              <div className="side-head">
+                <div>
+                  <p className="mono meta">{details ? details.path.slice(0, -1).map((zone) => zone.id).join(" / ") : building?.id}</p>
+                  <h2>{details ? `Zone ${zoneId}` : "Site overview"}</h2>
+                </div>
+                <button type="button" className="collapse-btn" aria-expanded="true" aria-label="Collapse information panel" onClick={() => setPanelOpen(false)}>⟫</button>
+              </div>
+              <div className="side-scroll" ref={sideRef}>
+                {details ? <ZonePanel details={details} timezone={timezone} changes={changes} newFlagIds={newFlagIds} now={live.at} />
+                  : <OverviewPanel index={index} state={state} geometry={geometry} changes={changes} />}
+                <ZoneBrowser zones={model.zones} index={index} state={state} current={zoneId} />
+              </div>
             </div>
+          ) : (
+            <button type="button" className="side-pill panel" aria-expanded="false" onClick={() => setPanelOpen(true)}
+              aria-label={`Expand information panel: ${context}, ${contextFlags} open Flag${contextFlags === 1 ? "" : "s"}`}>
+              <span aria-hidden="true" className="chev">⟪</span>
+              <span className={`count${contextFlags ? "" : " none"}`} aria-hidden="true">{contextFlags}</span>
+              <span className="mono vertical" aria-hidden="true">{context}</span>
+            </button>
           )}
         </aside>
       </div>
@@ -460,23 +446,24 @@ function Unavailable({ error }) {
     return () => clearInterval(t);
   }, [router]);
   return (
-    <div className="sv-body">
-      <div className="sv-stage sv-offline">
-        <div className="sv-state overlay" role="alert">
-          <p className="crumbs mono">GET /zones · /plans · /geometry</p>
-          <h1>Site model unavailable</h1>
-          <p>{error || "The API returned no site model."} Nothing was changed; the view only reads the site record.</p>
-          <div className="retry-row">
-            <button type="button" className="primary-btn" onClick={() => { setLeft(RETRY_S); router.refresh(); }}>Retry now</button>
-            <span className="meta" aria-live="polite">Retrying automatically in {left} s</span>
-          </div>
+    <div className="sv-stage sv-offline">
+      <div className="sv-viewport" />
+      <div className="sv-state panel overlay" role="alert">
+        <p className="crumbs mono">GET /zones · /plans · /geometry</p>
+        <h1>Site model unavailable</h1>
+        <p>{error || "The API returned no site model."} Nothing was changed; the view only reads the site record.</p>
+        <div className="retry-row">
+          <button type="button" className="btn btn-acc" onClick={() => { setLeft(RETRY_S); router.refresh(); }}>Retry now</button>
+          <span className="meta" aria-live="polite">Retrying automatically in {left} s</span>
         </div>
       </div>
       <aside className="sv-side" aria-label="Zone information">
-        <div className="side-scroll">
-          {["Needs attention", "Floors", "Zones"].map((title) => (
-            <Widget key={title} title={title}><p className="empty">Waiting for the API.</p><div className="skeleton" aria-hidden="true"><i /><i /><i /></div></Widget>
-          ))}
+        <div className="side-card panel">
+          <div className="side-scroll">
+            {["Needs attention", "Floors", "Zones"].map((title) => (
+              <Widget key={title} title={title}><p className="empty">Waiting for the API.</p><div aria-hidden="true"><div className="skel" /><div className="skel" style={{ width: "70%" }} /></div></Widget>
+            ))}
+          </div>
         </div>
       </aside>
     </div>
@@ -485,7 +472,7 @@ function Unavailable({ error }) {
 
 function Shell({ live, children }) {
   return (
-    <div className="sv">
+    <div className="sv theme-light">
       <SiteNav current="site"><LiveBadge live={live} /></SiteNav>
       {children}
     </div>

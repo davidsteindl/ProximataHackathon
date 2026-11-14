@@ -49,3 +49,50 @@ export function formatTime(value, timezone) {
     timeStyle: "short",
   }).format(new Date(value));
 }
+
+export const label = (value) => (value || "").replaceAll("_", " ");
+const capitalize = (text) => text.charAt(0).toUpperCase() + text.slice(1);
+
+/** Local calendar date (YYYY-MM-DD) of an instant in the site timezone. */
+function localDate(value, timezone) {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: timezone, year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(value));
+}
+
+/** Scenario day relative to the site's start date (day 1), e.g. "Day 2 · 18:10". Null without a site. */
+export function scenarioTime(value, site) {
+  if (!site?.start_date || !value) return null;
+  const timezone = site.timezone || "UTC";
+  const day = Math.round((Date.parse(localDate(value, timezone)) - Date.parse(site.start_date)) / 86400000) + 1;
+  const time = new Intl.DateTimeFormat("en-GB", { timeZone: timezone, hour: "2-digit", minute: "2-digit" }).format(new Date(value));
+  return `Day ${day} · ${time}`;
+}
+
+/** Human title for a Flag; type A guards work on an inspection, type B a revision receipt. */
+export function flagTitle(flag) {
+  if (flag.type === "B") {
+    const crew = flag.context?.crew_id ? `${label(flag.context.crew_id)} crew` : "crew unresolved";
+    return `Rev ${flag.context?.current_revision || "?"} receipt not confirmed: ${crew} · ${flag.zone_id}`;
+  }
+  return capitalize(`${label(flag.activity)} in ${flag.zone_id} before ${label(flag.precondition)}`);
+}
+
+export const SEVERITY = {
+  high: { text: "Critical", tone: "crit" },
+  medium: { text: "Warning", tone: "warn" },
+  low: { text: "Low", tone: "unk" },
+};
+
+/** Lifecycle position for the stepper; closed states share the last step. */
+export const LIFECYCLE = ["detected", "notified", "acknowledged", "in_progress", "closed"];
+export function lifecycleStep(state) {
+  return LIFECYCLE.indexOf(["resolved", "false_alarm"].includes(state) ? "closed" : state);
+}
+
+export const FLAG_STATE = {
+  detected: { text: "Detected · awaiting notification", tone: "info" },
+  notified: { text: "Notified · open", tone: "info" },
+  acknowledged: { text: "Acknowledged", tone: "info" },
+  in_progress: { text: "In progress", tone: "info" },
+  resolved: { text: "Closed · resolved", tone: "unk" },
+  false_alarm: { text: "Closed · false alarm", tone: "unk" },
+};

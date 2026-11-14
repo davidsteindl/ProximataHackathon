@@ -226,3 +226,32 @@ test("unit boundary strips lie inside the outline whatever its winding", () => {
   }
   assert.deepEqual(insetEdgeStrips(ccw, 0.4)[0], [[12, 0], [24, 0], [24, 0.4], [12, 0.4]]);
 });
+
+test("callouts: a Flag anchors on its flagged wall, the floor's pending inspection is listed, changes are filterable", async () => {
+  const { buildCallouts } = await import("../lib/site-model.mjs");
+  const wall = { element_id: "W-1", kind: "wall", zone_ids: ["3B-BATH-WALL"] };
+  const geometry = [{ floor_id: "F3", elements: [wall] }];
+  const changes = [{ element: wall, change: "moved", floorId: "F3", label: "D", previousLabel: "C" }];
+  const input = { state: state({ evidence: [evidence("claim", "passed", "unconfirmed")] }), geometry, index, changes };
+  const callouts = buildCallouts(input);
+  const flag = callouts.find((c) => c.key === "flag-flag-a");
+  assert.equal(flag.anchor, "F3:W-1");
+  assert.equal(flag.tone, "crit");
+  assert.match(callouts.find((c) => c.key === "insp-rough-in-F3").text, /1 unconfirmed claim awaiting review/);
+  assert.ok(callouts.some((c) => c.key === "rev-W-1"));
+  assert.ok(!buildCallouts({ ...input, showChanges: false }).some((c) => c.key === "rev-W-1"));
+  assert.ok(!buildCallouts({ ...input, route: { floorId: "F3", highlight: "3B" } }).some((c) => c.key.startsWith("insp-")), "a selected zone hides floor-level inspection callouts");
+});
+
+test("next 48 h: a task is blocked only by an open Flag naming it; an unconfirmed claim never reads as a pass", async () => {
+  const { upcoming } = await import("../lib/site-model.mjs");
+  const now = Date.parse("2026-11-14T17:00:00Z");
+  const tasks = [
+    { id: "drywall-F3", name: "Drywall closing", zone_id: "3B", starts_at: "2026-11-15T06:00:00Z" },
+    { id: "later", name: "Later", zone_id: "3A", starts_at: "2026-11-20T06:00:00Z" },
+  ];
+  const inspections = [{ ...roughIn, scheduled_at: "2026-11-15T09:00:00Z" }];
+  const items = upcoming({ tasks, inspections, flags: [{ ...flagA, task_id: "drywall-F3" }], evidence: [evidence("claim", "passed", "unconfirmed")], plans: [] }, index, now);
+  assert.deepEqual(items.map((item) => [item.key, item.chip.text]), [["drywall-F3", "Blocked by Flag"], ["rough-in-F3", "Pass not confirmed"]]);
+  assert.equal(upcoming({ tasks, inspections: [], flags: [], evidence: [], plans: [] }, index, now)[0].chip.text, "No open Flag");
+});

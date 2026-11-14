@@ -37,6 +37,8 @@ async function loadLocal(pathname) {
     "../../lib/site.mjs": await import("../lib/site.mjs"),
     "../../lib/key-layout.mjs": await import("../lib/key-layout.mjs"),
     "./site-view.css": {},
+    // Role switcher and clock read browser state; they are covered by the app itself, not this harness.
+    "../app-context": { RoleSwitch: () => null, ScenarioClock: () => null },
   };
   const loaded = new Map();
   const load = (id) => {
@@ -79,6 +81,24 @@ test("with data the stage, floor rail and key render (sanity check of the harnes
   assert.match(html, /Building B1/);
   assert.match(html, /scenery is decorative/);
   assert.doesNotMatch(html, /Site model unavailable/);
+});
+
+test("the light GroundIQ shell: active Site plan pill, 2D/3D camera modes, quick actions and a collapsible panel", async () => {
+  const SiteView = await loadSiteView("/site");
+  const zones = [{ id: "B1", kind: "building", name: "Building B1", parent_id: null, children: [] }];
+  const html = renderToString(React.createElement(SiteView, {
+    model: { zones, geometry: [], previous: {} },
+    initialState: { site: { name: "Synthetic site" }, flags: [], evidence: [], inspections: [], plans: [], tasks: [], crews: [] },
+    error: null,
+  }));
+  assert.match(html, /class="sv theme-light"/);
+  assert.match(html, /class="pill cur" aria-current="page" href="\/site"|href="\/site" class="pill cur" aria-current="page"/);
+  assert.match(html, />2D<\/button>/);
+  assert.match(html, />3D<\/button>/);
+  assert.match(html, /aria-label="Quick actions"/);
+  assert.match(html, /href="\/chat"[^>]*>.*Ask GroundIQ/);
+  assert.match(html, /aria-label="Collapse information panel"/);
+  assert.doesNotMatch(html, /FF8A4A/i, "no orange brand accent left in the markup");
 });
 
 test("a confirmation of a superseded revision is never shown in the positive green", async () => {
