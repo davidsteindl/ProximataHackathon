@@ -247,9 +247,9 @@ Grundsätze:
 - **Diagramme:** siehe [README → Architektur](../README.md#architektur). Plan und Diagramme werden gemeinsam geändert.
 - **CAD-Eingang im MVP: DXF direkt in die Extraktion.** Für die spätere DWG-Erweiterung ist LibreDWG (`dwg2dxf`, GPL-3.0-or-later) als separates Programm in einem optionalen Container vorbereitet. Entscheidung, Testanleitung und bekannte Grenzen: [CAD-Konverter](CAD-CONVERTER.md). Die Extraktion bleibt unabhängig davon, ob eine DXF-Datei direkt geliefert oder konvertiert wurde.
 - **Polling statt Webhooks** (keine öffentliche URL nötig, lokales Deployment).
-- **LLM-Provider austauschbar über die Konfiguration.** Voraussetzungen: strukturierte Ausgaben und Tool-Calling; bevorzugt mit EU-Region. Ausnahme: Das Q&A-Routing (#19) braucht einen OpenAI-Key (Decisions API, EU-Verarbeitung verfügbar); ohne Key läuft es im Cache-Modus.
+- **LLM-Provider austauschbar über die Konfiguration.** Voraussetzungen: strukturierte Ausgaben und Tool-Calling; EU-Verarbeitung vor produktivem Einsatz vertraglich und technisch prüfen. Ausnahme: Das Q&A-Routing (#19) nutzt bei explizitem `QA_ROUTER_PROVIDER=decisions` einen OpenAI-Key und einen festen globalen Decisions-Endpunkt; ein EU-Endpunkt ist im MVP nicht konfigurierbar. Standard ist `cached`, ohne Live-Aufruf. DPA, Region und Zero Data Retention sind keine zugesicherten Eigenschaften der Konfiguration; siehe [COMPLIANCE.md](../COMPLIANCE.md).
 - **Für die Demo funktioniert alles auch offline:** Replay direkt in den Ingestion-Eingang, LLM-Antworten des Demo-Szenarios gecacht.
-- **Replay-Vertrag (#22):** `GET /replay/config` liefert nur `offline_ready` (Extraktion und Advisor verwenden `LLM_PROVIDER=cached`). Der Replay-Client prueft dies vor jedem Reset, auch online fuer den reproduzierbaren Lernfall; er aendert keine Provider-Einstellungen. Seed-Reset und Nachrichten nutzen die bestehenden REST-Eingaenge. Es gibt keine automatische Nachweisbestaetigung, Proposal-Freigabe oder Flag-Schliessung. Online bleiben Kanal und echte Provider-ID erhalten; `replay-transport.json` dokumentiert originale Transportzeit und simulierte Szenariozeit. Zustellungen verwenden die bestehenden Worker-Outbox-Sender; offline werden sie explizit lokal protokolliert. Ablauf und offene Q&A-Abhaengigkeit #20: [REPLAY.md](REPLAY.md).
+- **Replay-Vertrag (#22):** `GET /replay/config` liefert nur `offline_ready` (Extraktion und Advisor verwenden `LLM_PROVIDER=cached`). Der Replay-Client prueft dies vor jedem Reset, auch online fuer den reproduzierbaren Lernfall; er aendert keine Provider-Einstellungen. Seed-Reset und Nachrichten nutzen die bestehenden REST-Eingaenge. Es gibt keine automatische Nachweisbestaetigung, Proposal-Freigabe oder Flag-Schliessung. Online bleiben Kanal und echte Provider-ID erhalten; `replay-transport.json` dokumentiert originale Transportzeit und simulierte Szenariozeit. Zustellungen verwenden die bestehenden Worker-Outbox-Sender; offline werden sie explizit lokal protokolliert. Ablauf und Q&A-Grenzen: [REPLAY.md](REPLAY.md).
 
 ---
 
@@ -271,7 +271,7 @@ nachvollziehbar erhalten. Telegram-Kommandos treffen keine Nachweis-, Proposal- 
 - **Keine Secrets im Repo**, nur `.env.example`
 - **Lizenzen der CAD-Werkzeuge:** Der Code gehört Talona und ist proprietär. GPL-Werkzeuge (z. B. LibreDWG) nur als **separates Programm** aufrufen, nie als Library einbinden. Die ODA-Lizenz vor Nutzung prüfen. Python-Libraries für DXF nur mit permissiver Lizenz.
 
-**Dokumentieren in `COMPLIANCE.md`:**
+**Submission-Dokumentation:** [COMPLIANCE.md](../COMPLIANCE.md) beschreibt die implementierten Kontrollen und offenen Produktionsanforderungen. Abgedeckte Themen:
 - Rechtsgrundlage
 - Betriebsvereinbarung (AT: ArbVG §96/§96a), da das System potenziell Leistung überwachen könnte
 - Auftragsverarbeitungsvertrag, EU-Region und Zero Data Retention beim LLM-Provider
