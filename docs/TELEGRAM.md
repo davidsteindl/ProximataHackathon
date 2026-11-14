@@ -77,7 +77,7 @@ unconfirmed Evidence policy apply unchanged. Free text is not fully anonymized.
 
 ## REST/schema changes
 
-- Migration `0008` extends outbox channels with `telegram` and makes `flag_id`
+- Migration `0009` extends outbox channels with `telegram` and makes `flag_id`
   nullable for compliance replies. The `cancelled` status marks erased/expired
   undelivered replies without claiming they were sent. The one-warning-per-Flag
   constraint remains.
