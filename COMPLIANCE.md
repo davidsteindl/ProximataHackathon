@@ -34,6 +34,25 @@ The offline cache contains explicitly authored synthetic extraction fixtures and
 uses the same validation and evidence policy. No live messages or responses are
 automatically copied into it. See [the ingestion contract](docs/INGESTION.md).
 Dashboard/API authentication is still absent in the MVP; public exposure is not
-part of this implementation. Automated Telegram retention and channel allowlisting
-remain in #12, the human review action in #9, and provider-specific production
+part of this implementation. Telegram retention and channel allowlisting are
+documented in [Telegram](docs/TELEGRAM.md), the human review action in #9, and provider-specific production
 compliance documentation in #23.
+
+## Telegram (Issue #12)
+
+The bot reads whole allowlisted groups (privacy mode off), but only messages from
+allowlisted numeric sender IDs enter ingestion. It posts a purpose, retention,
+operator and rights notice when an allowlisted team account adds it. Private
+access/deletion commands use the API-owned outbox; no per-person metrics or
+rankings are introduced. Deletion/retention clears raw text and attachments, not
+the safety record: source/dedup metadata, derived Events/Evidence, relevant Flag
+quotes and audit remain, explicitly disclosed in notices and deletion replies.
+Delivered privacy-export bodies are scrubbed from the outbox. See the Telegram
+guide for retained fields, provider copies, retries and operator responsibilities.
+
+This is a synthetic demo, not legal approval for real worker surveillance.
+Production legal basis, Austrian works agreement (ArbVG §96/§96a), processor
+contracts, EU-region/zero-retention LLM arrangements and authenticated dashboard
+access remain separate compliance work (#23). Telegram has non-EU infrastructure
+and no end-to-end encryption for bot chats; evaluate Teams or WhatsApp Business
+for production rather than treating the demo allowlist as sufficient protection.

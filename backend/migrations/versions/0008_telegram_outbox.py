@@ -13,6 +13,8 @@ def upgrade():
         batch.alter_column("flag_id", existing_type=sa.String(64), nullable=True)
         batch.drop_constraint("outbox_channel", type_="check")
         batch.create_check_constraint("outbox_channel", "channel IN ('gmail','telegram')")
+        batch.drop_constraint("outbox_status", type_="check")
+        batch.create_check_constraint("outbox_status", "status IN ('pending','sending','sent','failed','cancelled')")
 
 
 def downgrade():
@@ -21,3 +23,5 @@ def downgrade():
         batch.alter_column("flag_id", existing_type=sa.String(64), nullable=False)
         batch.drop_constraint("outbox_channel", type_="check")
         batch.create_check_constraint("outbox_channel", "channel = 'gmail'")
+        batch.drop_constraint("outbox_status", type_="check")
+        batch.create_check_constraint("outbox_status", "status IN ('pending','sending','sent','failed')")

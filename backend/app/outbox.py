@@ -25,7 +25,7 @@ class OutboxView(Record):
     channel: Literal["gmail", "telegram"]
     subject: str
     content: str
-    status: Literal["pending", "sending", "sent", "failed"]
+    status: Literal["pending", "sending", "sent", "failed", "cancelled"]
     attempts: int
     available_at: Timestamp
     error_code: str | None
@@ -87,7 +87,7 @@ def claim_outbox(session: Database, channel: Literal["gmail", "telegram"] = "gma
     now = datetime.now(UTC)
     with session.begin():
         message = session.scalar(select(models.OutboxMessage).where(
-            models.OutboxMessage.status != "sent", models.OutboxMessage.available_at <= now,
+            models.OutboxMessage.status.in_(["pending", "sending", "failed"]), models.OutboxMessage.available_at <= now,
             models.OutboxMessage.channel == channel,
         ).order_by(models.OutboxMessage.available_at, models.OutboxMessage.id)
           .with_for_update(skip_locked=True).limit(1))

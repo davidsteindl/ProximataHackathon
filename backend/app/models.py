@@ -323,7 +323,7 @@ class OutboxMessage(Base):
     __tablename__ = "outbox_messages"
     __table_args__ = (
         UniqueConstraint("flag_id", name="outbox_flag_notification"),
-        CheckConstraint("status IN ('pending','sending','sent','failed')", name="outbox_status"),
+        CheckConstraint("status IN ('pending','sending','sent','failed','cancelled')", name="outbox_status"),
         CheckConstraint("channel IN ('gmail','telegram')", name="outbox_channel"),
         CheckConstraint("attempts >= 0", name="outbox_attempts"),
     )
