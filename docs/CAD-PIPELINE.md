@@ -162,3 +162,20 @@ Tests use all five #3 plans and the real migrations, covering metre scaling,
 Zone/room/element associations, shared walls/doors, source-byte retention,
 stable C/D IDs, selection semantics, unknown layers, malformed input, atomic
 failure/idempotency, no fabricated confirmations and cleanup on seed reset.
+
+## Plan diff (#17)
+
+`GET /geometry/revisions/{revision_id}/diff` compares the revision with the
+immediately preceding `Revision.sequence` of the same Plan. Both geometries must
+be imported (`409` otherwise; unknown revision: `404`). The response contains
+`revision_id`, `previous_revision_id`, `origin: deterministic_plan_diff`,
+`affected_zone_ids` and `zones: [{zone_id, changes}]`. Each change has an
+`element_id`, `change` (`added`, `removed`, `moved`) and full `before`/`after`
+elements (null for an absent side). `moved` includes shape, layer, kind and zone
+membership changes of the same stable ID. Unchanged elements are omitted.
+
+Changes are grouped by affected unit Zone from both revisions. Building/floor
+coverage is excluded to avoid flagging unrelated apartments. Stable SITEMIND IDs
+are preferred; handle-based IDs can only match when handles persist across files.
+Identical extracted geometry yields an empty diff, regardless of DXF metadata.
+The comparison never creates Evidence or certifies any Precondition.

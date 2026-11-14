@@ -334,3 +334,11 @@ Schlaf in Schichten, sodass nachts immer jemand reviewen und mergen kann.
 - [x] DWG-Konverter gewählt: LibreDWG als separater Prozess; Details in docs/CAD-CONVERTER.md. Lizenz und Plattformen dokumentiert.
 - [x] Layer-Konvention für die synthetischen Pläne festgelegt und in §3.5 eingetragen (Details: `cad/README.md`)
 - [ ] Mentor fragen: Wie liegen Pläne bei Talonas Kunden typischerweise vor (DWG, PDF, beides)?
+
+### Implementierter Plan-Diff (#17)
+
+Der lesende REST-Vertrag `/geometry/revisions/{revision_id}/diff` vergleicht
+stabile Element-IDs mit der unmittelbar vorherigen Planrevision nach `sequence`.
+Änderungen werden nach betroffenen Wohnungen gruppiert, aus alter und neuer
+Geometrie; übergeordnete Etagenzuordnungen erweitern den Konfliktbereich nicht.
+Details und Grenzen: [CAD-PIPELINE.md](CAD-PIPELINE.md#plan-diff-17).
