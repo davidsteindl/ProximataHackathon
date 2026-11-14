@@ -236,13 +236,13 @@ function facadeTexture() {
           const w = 1.3 * m;
           const h = 1.4 * m;
           const glass = ctx.createLinearGradient(0, y, 0, y + h);
-          glass.addColorStop(0, "rgb(128,134,138)");
-          glass.addColorStop(1, "rgb(92,98,104)");
-          ctx.fillStyle = "rgba(40,38,34,0.35)";
+          glass.addColorStop(0, "rgb(156,158,158)");
+          glass.addColorStop(1, "rgb(136,139,141)");
+          ctx.fillStyle = "rgba(40,38,34,0.16)";
           ctx.fillRect(x - 2, y - 2, w + 4, h + 4); // reveal shadow
           ctx.fillStyle = glass;
           ctx.fillRect(x, y, w, h);
-          ctx.fillStyle = "rgba(230,228,220,0.55)";
+          ctx.fillStyle = "rgba(230,228,220,0.3)";
           ctx.fillRect(x + w / 2 - 1, y, 2, h); // mullion
           ctx.fillRect(x - 4, y + h + 2, w + 8, 3); // sill
         }
@@ -342,8 +342,7 @@ function crane({ x, z, height, jib, counter, angle }, steel, dark, weight) {
 
 /**
  * @param bounds world-space building bounds {minX,maxX,minZ,maxZ,height}
- * @returns {{ group, tall, slew, focus: THREE.Box3 }} `tall` is hidden in top-down mode; `slew` is the
- *   crane's rotating part; `focus` is what the overview camera should frame (building plus crane).
+ * @returns {{ group, tall, slew }} `tall` is hidden in top-down mode; `slew` is the crane's rotating part.
  */
 export function buildSiteContext(bounds) {
   const group = new THREE.Group();
@@ -363,7 +362,7 @@ export function buildSiteContext(bounds) {
   // ---------- ground ----------
   const pad = { minX: minX - 16, maxX: maxX + 18, minZ: minZ - 13, maxZ: maxZ + 15 };
   // Surroundings: dark charcoal earth with a faint olive cast, so the site and the building lead.
-  const earth = worldUV(mat(0xFFFFFF, { map: surfaceTexture({ color: [48, 49, 43], stain: 9, grain: 5, seed: 7, base: 3 }) }), 34);
+  const earth = worldUV(mat(0xFFFFFF, { map: surfaceTexture({ color: [37, 38, 36], stain: 9, grain: 5, seed: 7, base: 3 }) }), 34);
   const ground = new THREE.Mesh(new THREE.PlaneGeometry(700, 700), earth);
   ground.rotation.x = -Math.PI / 2;
   ground.position.y = -0.1;
@@ -382,8 +381,8 @@ export function buildSiteContext(bounds) {
       }
     }
   };
-  // Compacted site gravel: warm grey, stained, with tyre tracks; its texture also shades as bump.
-  const gravelMap = surfaceTexture({ size: 512, color: [94, 90, 82], stain: 15, grain: 16, seed: 3, base: 3, paint: tracks(0.16, 7) });
+  // Compacted site gravel: charcoal grey, stained, with tyre tracks; its texture also shades as bump.
+  const gravelMap = surfaceTexture({ size: 512, color: [76, 75, 71], stain: 15, grain: 16, seed: 3, base: 3, paint: tracks(0.16, 7) });
   const gravel = new THREE.Mesh(new THREE.PlaneGeometry(pad.maxX - pad.minX, pad.maxZ - pad.minZ), worldUV(mat(0xFFFFFF, { map: gravelMap, bumpMap: gravelMap, bumpScale: 1.2, roughness: 0.97 }), 16));
   gravel.rotation.x = -Math.PI / 2;
   gravel.position.set((pad.minX + pad.maxX) / 2, -0.05, (pad.minZ + pad.maxZ) / 2); // below the F1 slab top
@@ -404,7 +403,7 @@ export function buildSiteContext(bounds) {
     kerbs.push({ x: 0, y: -0.01, z: roadZ + side * 5.6, sx: 700, sy: 0.14, sz: 2.8 });
   }
   const gateX = (pad.minX + pad.maxX) / 2 + 9;
-  const haul = surfaceTexture({ color: [108, 102, 90], stain: 12, grain: 14, seed: 5, paint: tracks(0.2, 3) });
+  const haul = surfaceTexture({ color: [90, 88, 83], stain: 12, grain: 14, seed: 5, paint: tracks(0.2, 3) });
   const haulRoad = new THREE.Mesh(new THREE.PlaneGeometry(6, pad.maxZ - maxZ + 1), worldUV(mat(0xFFFFFF, { map: haul, bumpMap: haul, bumpScale: 1 }), 8));
   haulRoad.rotation.x = -Math.PI / 2;
   haulRoad.position.set(gateX, -0.035, (pad.maxZ + maxZ) / 2 + 0.5);
@@ -577,14 +576,14 @@ export function buildSiteContext(bounds) {
   // ---------- neighbouring blocks: distant, low-contrast, varied massing with a facade texture ----------
   // Stepped and L-shaped massing breaks the repeated-box read; fog and muted tints keep them behind the site.
   const neighbours = [
-    { x: -40, z: pad.minZ - 48, sx: 22, sy: 9, sz: 12, color: 0x7E7C76 },
-    { x: -44, z: pad.minZ - 48, sx: 9, sy: 3, sz: 7, base: 9, color: 0x75736D },
-    { x: -8, z: pad.minZ - 58, sx: 16, sy: 14, sz: 11, color: 0x73726D },
-    { x: 26, z: pad.minZ - 50, sx: 24, sy: 9, sz: 11, color: 0x827E76 },
-    { x: 34, z: pad.minZ - 39, sx: 8, sy: 9, sz: 12, color: 0x827E76 },
-    { x: pad.maxX + 44, z: -6, sx: 12, sy: 11, sz: 26, color: 0x7A7873 },
-    { x: pad.minX - 34, z: -6, sx: 11, sy: 6, sz: 18, roof: "pitch", color: 0x8E8980 },
-    { x: pad.minX - 34, z: 22, sx: 11, sy: 6, sz: 14, roof: "pitch", color: 0x878279 },
+    { x: -40, z: pad.minZ - 48, sx: 22, sy: 9, sz: 12, color: 0x6B6A65 },
+    { x: -44, z: pad.minZ - 48, sx: 9, sy: 3, sz: 7, base: 9, color: 0x65645F },
+    { x: -8, z: pad.minZ - 58, sx: 16, sy: 14, sz: 11, color: 0x63625E },
+    { x: 26, z: pad.minZ - 50, sx: 24, sy: 9, sz: 11, color: 0x6E6B65 },
+    { x: 34, z: pad.minZ - 39, sx: 8, sy: 9, sz: 12, color: 0x6E6B65 },
+    { x: pad.maxX + 44, z: -6, sx: 12, sy: 11, sz: 26, color: 0x686763 },
+    { x: pad.minX - 34, z: -6, sx: 11, sy: 6, sz: 18, roof: "pitch", color: 0x77736C },
+    { x: pad.minX - 34, z: 22, sx: 11, sy: 6, sz: 14, roof: "pitch", color: 0x726E68 },
   ];
   const facade = worldUV(mat(0xFFFFFF, { map: facadeTexture(), roughness: 0.92 }), 6);
   const roofMat = mat(0x5E5C56, { roughness: 0.95 });
@@ -614,7 +613,7 @@ export function buildSiteContext(bounds) {
   const foliage = (l) => new THREE.Color().setHSL(0.2 + random() * 0.08, 0.16 + random() * 0.12, l).getHex();
   const tree = (x, z, s) => {
     trunks.push({ x, y: s * 0.9, z, sx: 0.26 * s, sy: s * 1.8, sz: 0.26 * s });
-    const light = 0.2 + random() * 0.07;
+    const light = 0.17 + random() * 0.05;
     const clumps = 3 + Math.floor(random() * 3);
     for (let k = 0; k < clumps; k++) {
       const a = random() * Math.PI * 2;
@@ -667,10 +666,5 @@ export function buildSiteContext(bounds) {
   group.add(blobs);
 
   group.traverse((object) => { object.userData.decorative = true; });
-  const focus = new THREE.Box3(V(minX - 4, 0, minZ - 8), V(maxX + 4, height + 2, maxZ + 6));
-  focus.expandByPoint(V(maxX + 5.5, height + 17 + 6, minZ - 5.5));
-  // Jib tip at its initial slew angle, so the overview opens on the complete crane.
-  const slewAngle = Math.PI * 0.9;
-  focus.expandByPoint(V(maxX + 5.5 + Math.cos(slewAngle) * 31, height + 18, minZ - 5.5 - Math.sin(slewAngle) * 31));
-  return { group, tall, slew: towerCrane.slew, focus };
+  return { group, tall, slew: towerCrane.slew };
 }

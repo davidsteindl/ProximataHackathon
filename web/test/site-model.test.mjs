@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   ancestors, changedElements, describeChange, elementStatus, flagsForZone, floorOf, floorVisible, indexZones,
-  focusBounds, inspectionConfirmedPassed, inspectionKindLabel, inspectionPass, revisionAcknowledgments, splitTasks, viewForZone, zoneBounds, zoneDetails, zoneStatus,
+  focusBounds, inspectionConfirmedPassed, inspectionKindLabel, inspectionPass, revisionAcknowledgments, splitTasks, insetEdgeStrips, viewForZone, zoneBounds, zoneDetails, zoneStatus,
 } from "../lib/site-model.mjs";
 
 const zone = (id, kind, children = []) => ({ id, kind, name: id, children });
@@ -214,4 +214,15 @@ test("a confirmed pass scheduled before the current plan revision is not shown a
   assert.equal(inspectionPass(index, roughIn, [passed], [planF3]), "revised", "unknown order is not a pass");
   assert.equal(zoneStatus(index, state({ flags: [], inspections: [before], evidence: [passed], plans: [planF3] }), "3A"), "open");
   assert.equal(zoneStatus(index, state({ flags: [], inspections: [after], evidence: [passed], plans: [planF3] }), "3A"), "ok");
+});
+
+test("unit boundary strips lie inside the outline whatever its winding", () => {
+  const ccw = [[12, 0], [24, 0], [24, 8.5], [12, 8.5]];
+  const inside = ([x, y]) => x >= 12 && x <= 24 && y >= 0 && y <= 8.5;
+  for (const outline of [ccw, [...ccw].reverse()]) {
+    const strips = insetEdgeStrips(outline, 0.4);
+    assert.equal(strips.length, 4);
+    for (const quad of strips) for (const point of quad) assert.ok(inside(point), `${point} lies outside`);
+  }
+  assert.deepEqual(insetEdgeStrips(ccw, 0.4)[0], [[12, 0], [24, 0], [24, 0.4], [12, 0.4]]);
 });

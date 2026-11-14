@@ -22,7 +22,10 @@ export function Chip({ tone, children }) {
   return <span className={`chip t-${tone}`}>{children}</span>;
 }
 
-export function reviewTone(status) {
+// A confirmation recorded for a superseded revision stays a true historical decision, but it is not proof
+// for the current revision, so it never gets the positive green.
+export function reviewTone(status, superseded = false) {
+  if (superseded && status === "confirmed") return "unk";
   return status === "confirmed" ? "ok" : status === "rejected" ? "unk" : "warn";
 }
 
@@ -227,8 +230,8 @@ export function ZonePanel({ details, timezone, changes, newFlagIds, now }) {
                     ))}
                   {evidence.map((record) => (
                     <p className="meta" key={record.id}>
-                      <Chip tone={reviewTone(record.review_status)}>{record.review_status}</Chip>
-                      {revision.id !== plan.current_revision?.id && <> <Chip tone="unk">superseded revision</Chip></>}
+                      <Chip tone={reviewTone(record.review_status, revision.id !== plan.current_revision?.id)}>{record.review_status}</Chip>
+                      {revision.id !== plan.current_revision?.id && <> <Chip tone="warn">superseded revision · stale</Chip></>}
                       {" "}{ORIGIN[record.origin]} · <span className="mono">{record.source_ref}</span>
                     </p>
                   ))}

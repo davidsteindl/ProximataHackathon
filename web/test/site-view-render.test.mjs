@@ -24,6 +24,10 @@ async function compile(name) {
 }
 
 async function loadSiteView(pathname) {
+  return (await loadLocal(pathname))("./site-view").default;
+}
+
+async function loadLocal(pathname) {
   const local = Object.fromEntries(await Promise.all(["site-view", "site-nav", "zone-panel"].map(async (name) => [`./${name}`, await compile(name)])));
   const stubs = {
     "next/navigation": { usePathname: () => pathname, useRouter: () => ({ push() {} }) },
@@ -31,6 +35,7 @@ async function loadSiteView(pathname) {
     // The pure view model is ESM; import it up front so the CommonJS output can require it synchronously.
     "../../lib/site-model.mjs": await import("../lib/site-model.mjs"),
     "../../lib/site.mjs": await import("../lib/site.mjs"),
+    "../../lib/key-layout.mjs": await import("../lib/key-layout.mjs"),
     "./site-view.css": {},
   };
   const loaded = new Map();
@@ -44,7 +49,7 @@ async function loadSiteView(pathname) {
     }
     return loaded.get(id).exports;
   };
-  return load("./site-view").default;
+  return load;
 }
 
 test("an initial API failure renders the error card instead of crashing (site state data:null)", async () => {
@@ -74,4 +79,12 @@ test("with data the stage, floor rail and key render (sanity check of the harnes
   assert.match(html, /Building B1/);
   assert.match(html, /scenery is decorative/);
   assert.doesNotMatch(html, /Site model unavailable/);
+});
+
+test("a confirmation of a superseded revision is never shown in the positive green", async () => {
+  const { reviewTone } = (await loadLocal("/site"))("./zone-panel");
+  assert.equal(reviewTone("confirmed"), "ok");
+  assert.equal(reviewTone("confirmed", true), "unk", "historical decision kept, but neutral");
+  assert.equal(reviewTone("unconfirmed", true), "warn");
+  assert.equal(reviewTone("rejected", true), "unk");
 });

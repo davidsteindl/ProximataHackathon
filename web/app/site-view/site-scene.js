@@ -3,7 +3,9 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
-import { floorVisible as isFloorVisible } from "../../lib/site-model.mjs";
+import { cameraFrame, cameraViewport } from "../../lib/site-camera.mjs";
+import { leaderClash } from "../../lib/callout-layout.mjs";
+import { floorVisible as isFloorVisible, insetEdgeStrips } from "../../lib/site-model.mjs";
 import { buildSiteContext, concreteTexture, surfaceTexture, worldUV } from "./site-context";
 
 const C = {
@@ -96,7 +98,7 @@ export function createSiteScene(container, { geometry, zones, changes, onHover, 
   // Lights.
   // Low warm key from the south-west for long shadows, cool sky fill.
   scene.add(new THREE.HemisphereLight(0xDCE4EA, 0x26231D, 0.8));
-  const sun = new THREE.DirectionalLight(0xFFD7A6, 3.2);
+  const sun = new THREE.DirectionalLight(0xFFE0BC, 3.2);
   sun.position.set(-50, 36, 34);
   sun.castShadow = true;
   sun.shadow.mapSize.set(2048, 2048);
@@ -142,6 +144,7 @@ export function createSiteScene(container, { geometry, zones, changes, onHover, 
     volumeIso: new THREE.MeshBasicMaterial({ color: C.conflict, transparent: true, opacity: 0.16, depthWrite: false, side: THREE.DoubleSide }),
     unitLine: new THREE.LineBasicMaterial({ color: 0x5F5B52, transparent: true, opacity: 0.75 }),
     highlight: new THREE.MeshBasicMaterial({ color: C.selected, polygonOffset: true, polygonOffsetFactor: -2 }),
+    hit: new THREE.MeshBasicMaterial({ visible: false, side: THREE.DoubleSide }), // raycast-only surfaces
   };
 
   const building = new THREE.Group();
@@ -252,7 +255,14 @@ export function createSiteScene(container, { geometry, zones, changes, onHover, 
           group.add(plate);
         } else {
           const line = new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(pts.map(([x, y]) => P(x, y, elev + 0.03))), M.unitLine);
-          group.add(line);
+          // Rooms tile the unit, so the unit gets invisible hit strips 0.45 m inside its outline (above the room
+          // plates): clicks along a unit's edge select the unit, clicks inside a room still select the room.
+          const quads = insetEdgeStrips(pts, 0.45);
+          const g = new THREE.BufferGeometry().setFromPoints(quads.flatMap(([a, b, c, d]) => [a, b, c, a, c, d].map(([x, y]) => P(x, y, elev + 0.03))));
+          const hit = new THREE.Mesh(g, M.hit);
+          hit.userData.zoneId = element.element_id;
+          pickables.push(hit);
+          group.add(line, hit);
         }
       } else if (element.kind === "door") {
         // The opening and hinge point come from the DXF door block. Leaf angle, swing side, swing arc and the
@@ -473,7 +483,7 @@ export function createSiteScene(container, { geometry, zones, changes, onHover, 
     const ribbon = (a, b, y, width) => {
       const mesh = new THREE.Mesh(boxGeom, M.highlight);
       mesh.renderOrder = 26;
-      mesh.scale.set(a.distanceTo(b) + width, 0.06, width);
+      mesh.scale.set(a.distanceTo(b) + width, 0.04, width);
       mesh.position.set((a.x + b.x) / 2, y, (a.z + b.z) / 2);
       mesh.rotation.y = -Math.atan2(b.z - a.z, b.x - a.x);
       highlightGroup.add(mesh);
@@ -484,7 +494,7 @@ export function createSiteScene(container, { geometry, zones, changes, onHover, 
       const y = elevation + wallHeight + 0.05;
       outline.points.forEach((p, i) => {
         const q = outline.points[(i + 1) % outline.points.length];
-        ribbon(P(p[0], p[1], y), P(q[0], q[1], y), y, 0.24);
+        ribbon(P(p[0], p[1], y), P(q[0], q[1], y), y, 0.1);
       });
     } else if (wall) {
       // Selected element: an orange frame with a dark keyline, drawn on top and outside the red conflict halo,
@@ -495,18 +505,18 @@ export function createSiteScene(container, { geometry, zones, changes, onHover, 
       const pbb = P(b[0], b[1]);
       const along = new THREE.Vector3().subVectors(pbb, pa).setY(0).normalize();
       const across = new THREE.Vector3(-along.z, 0, along.x);
-      const hl = pa.distanceTo(pbb) / 2 + 0.6;
-      const hw = wall.thickness / 2 + 0.6;
+      const hl = pa.distanceTo(pbb) / 2 + 0.3;
+      const hw = wall.thickness / 2 + 0.3;
       const mid = pa.clone().add(pbb).multiplyScalar(0.5);
       const corner = (sa, sc, y) => mid.clone().addScaledVector(along, sa * hl).addScaledVector(across, sc * hw).setY(y);
       const ring = [[-1, -1], [1, -1], [1, 1], [-1, 1]];
-      for (const [y, width] of [[elevation + wallHeight + 0.08, 0.1]]) {
+      for (const [y, width] of [[elevation + wallHeight + 0.08, 0.06]]) {
         ring.forEach((c, i) => {
           const n = ring[(i + 1) % 4];
           const p0 = corner(c[0], c[1], y);
           const p1 = corner(n[0], n[1], y);
           const back = new THREE.Mesh(boxGeom, M.keyline);
-          back.scale.set(p0.distanceTo(p1) + width + 0.1, 0.04, width + 0.1);
+          back.scale.set(p0.distanceTo(p1) + width + 0.05, 0.04, width + 0.05);
           back.position.copy(p0).add(p1).multiplyScalar(0.5);
           back.rotation.y = -Math.atan2(p1.z - p0.z, p1.x - p0.x);
           back.renderOrder = 27;
@@ -519,7 +529,7 @@ export function createSiteScene(container, { geometry, zones, changes, onHover, 
       }
       ring.forEach((c) => {
         const post = new THREE.Mesh(boxGeom, M.highlight);
-        post.scale.set(0.06, wallHeight, 0.06);
+        post.scale.set(0.04, wallHeight, 0.04);
         post.position.copy(corner(c[0], c[1], elevation + wallHeight / 2));
         post.renderOrder = 28;
         highlightGroup.add(post);
@@ -541,9 +551,10 @@ export function createSiteScene(container, { geometry, zones, changes, onHover, 
       if (s === "conflict") { color = C.conflict; opacity = isolated ? 0.26 : 0.14; }
       else if (s === "open") { color = C.open; opacity = 0.12; }
       else if (s === "ok") { color = C.ok; opacity = 0.14; }
-      if (plate.zoneId === view.highlight) { color = C.selected; opacity = 0.42; }
-      else if (selectedUnit && plate.unitId === selectedUnit) { color = C.selected; opacity = Math.max(opacity, 0.22); }
-      if (plate.zoneId === hovered) opacity = Math.min(0.75, opacity + 0.22) || 0.18;
+      // Selection is carried by the orange outline; a conflicting room keeps its red fill so it still reads flagged.
+      if (plate.zoneId === view.highlight) { if (s === "conflict") opacity = 0.34; else { color = C.selected; opacity = 0.42; } }
+      else if (selectedUnit && plate.unitId === selectedUnit && s !== "conflict") { color = C.selected; opacity = Math.max(opacity, 0.22); }
+      if (plate.zoneId === hovered || plate.unitId === hovered) opacity = Math.min(0.75, opacity + 0.22) || 0.18; // hovering a unit edge lights its rooms
       plate.mesh.material.color.setHex(color);
       plate.mesh.material.opacity = opacity;
     }
@@ -568,50 +579,12 @@ export function createSiteScene(container, { geometry, zones, changes, onHover, 
   motion?.addEventListener?.("change", onMotion);
   controls.enableDamping = !reduced;
 
-  const half = (box) => ({ x: (box.maxX - box.minX) / 2, z: (box.maxY - box.minY) / 2 });
   function frame(bounds, elevation, mode) {
-    const w = container.clientWidth || 1;
-    const h = container.clientHeight || 1;
-    const aspect = w / h;
-    if (bounds === pb && !view.floorId && mode !== "top") {
-      // Overview: a composed three-quarter view that fits the building and the whole crane (context.focus).
-      const sphere = context.focus.getBoundingSphere(new THREE.Sphere());
-      const fov = 30;
-      const vfov = THREE.MathUtils.degToRad(fov / 2);
-      const hfov = Math.atan(Math.tan(vfov) * aspect);
-      const radius = (sphere.radius / Math.sin(Math.min(vfov, hfov))) * 0.95;
-      const target = sphere.center.clone().setY(topElevation * 0.75);
-      return { target, position: target.clone().add(new THREE.Vector3().setFromSphericalCoords(radius, THREE.MathUtils.degToRad(55), THREE.MathUtils.degToRad(36))), fov };
-    }
-    const focused = bounds !== pb;
-    // A room or element keeps a modest minimum frame so its neighbours give context and callouts fit beside it.
-    const portrait = aspect < 1;
-    const sx = Math.max(bounds.maxX - bounds.minX, focused ? (portrait ? 5 : 8) : 14);
-    const sz = Math.max(bounds.maxY - bounds.minY, focused ? (portrait ? 5 : 6) : 10);
-    const center = P((bounds.minX + bounds.maxX) / 2, (bounds.minY + bounds.maxY) / 2, elevation);
-    const pad = focused ? (portrait ? 1.45 : 1.7) : 1.35;
-    const chrome = aspect < 1 ? 1.5 : 2; // floating cards on desktop; mobile controls sit below the canvas
-    if (mode === "top") {
-      // Straight down with a very narrow FOV: reads as an orthographic plan, wall sides stay hidden.
-      const fov = 8;
-      const needed = Math.max(sz * pad, (sx * pad) / aspect) + chrome;
-      // Keep the frame on the building: shift the centre inward instead of showing empty ground beside it.
-      const hb = half(pb);
-      const visible = { x: (needed * aspect) / 2, z: needed / 2 };
-      const margin = 2;
-      for (const axis of ["x", "z"]) {
-        const room = hb[axis] + margin - visible[axis];
-        center[axis] = room > 0 ? THREE.MathUtils.clamp(center[axis], -room, room) : 0;
-      }
-      const dist = needed / 2 / Math.tan(THREE.MathUtils.degToRad(fov / 2));
-      return { target: center, position: center.clone().add(new THREE.Vector3(0, dist, 0.0001)), fov };
-    }
-    const fov = 32;
-    const radius = Math.max(Math.hypot(sx, sz), 8) * (aspect < 1 ? 1.6 : 1.25) / Math.tan(THREE.MathUtils.degToRad(fov / 2)) * (focused ? 0.62 : 0.55);
-    const polar = THREE.MathUtils.degToRad(view.floorId ? 50 : 62);
-    const azimuth = THREE.MathUtils.degToRad(36);
-    const offset = new THREE.Vector3().setFromSphericalCoords(radius, polar, azimuth);
-    return { target: center, position: center.clone().add(offset), fov };
+    return cameraFrame({
+      width: container.clientWidth || 1, height: container.clientHeight || 1, coveredRight,
+      buildingBounds: pb, bounds, buildingHeight: topElevation, elevation,
+      floorId: view.floorId, mode,
+    });
   }
 
   function applyGoal(goal) {
@@ -622,16 +595,19 @@ export function createSiteScene(container, { geometry, zones, changes, onHover, 
     invalidate();
   }
 
-  function animateCamera() {
+  function animateCamera(instant = false) {
     const iso = view.floorId ? floorGroups.get(view.floorId) : null;
     const bounds = view.focus || pb;
     const elevation = iso ? iso.userData.elevation : topElevation * 0.38;
     const goal = frame(bounds, elevation, view.mode);
+    const distance = goal.position.distanceTo(goal.target);
+    controls.maxDistance = Math.max(520, distance * 1.5);
+    camera.far = Math.max(1200, distance * 3);
     // Flush leftover damping momentum so the camera ends exactly on the goal (no drift off true overhead).
     controls.enableDamping = false;
     controls.update();
     controls.enableDamping = !reduced;
-    if (reduced) { tween = null; applyGoal(goal); } else {
+    if (reduced || instant) { tween = null; applyGoal(goal); controls.update(); } else {
       tween = {
         start: performance.now(), duration: 950,
         from: { position: camera.position.clone(), target: controls.target.clone(), fov: camera.fov },
@@ -654,7 +630,8 @@ export function createSiteScene(container, { geometry, zones, changes, onHover, 
     const rect = renderer.domElement.getBoundingClientRect();
     ndc.set(((clientX - rect.left) / rect.width) * 2 - 1, -((clientY - rect.top) / rect.height) * 2 + 1);
     raycaster.setFromCamera(ndc, camera);
-    const hit = raycaster.intersectObjects(pickables, false).find((h) => visibleChain(h.object));
+    // Unzoned partition walls pass the click through to the room or unit surface beneath them.
+    const hit = raycaster.intersectObjects(pickables, false).find((h) => h.object.userData.zoneId && visibleChain(h.object));
     return hit?.object.userData.zoneId || null;
   }
   const onMove = (event) => { pointer = { x: event.clientX, y: event.clientY }; };
@@ -671,13 +648,18 @@ export function createSiteScene(container, { geometry, zones, changes, onHover, 
   el.addEventListener("pointerup", onUp);
 
   // ---------- loop ----------
+  // Use the uncovered area for both the camera fit and its projection centre.
+  let coveredRight = 0;
   const resize = () => {
     const w = container.clientWidth;
     const h = container.clientHeight;
     if (!w || !h) return;
     renderer.setSize(w, h, false);
     camera.aspect = w / h;
+    const { offsetX } = cameraViewport(w, h, coveredRight);
+    if (offsetX) camera.setViewOffset(w, h, offsetX, 0, w, h); else camera.clearViewOffset();
     camera.updateProjectionMatrix();
+    animateCamera(true);
     measureDirty = true;
     invalidate();
   };
@@ -779,20 +761,15 @@ export function createSiteScene(container, { geometry, zones, changes, onHover, 
             const rect = { l, t, r: l + bw, b: t + bh };
             if (rect.t < EDGE || rect.b > h - EDGE || taken.some((r) => overlap(rect, r) > 0)) continue; // hard
             const subject = subjects.reduce((sum, r) => sum + overlap(rect, r), 0);
-            // A leader line crossing a placed card reads as clutter: strongly avoided, not forbidden.
-            const lx = THREE.MathUtils.clamp(it.x, rect.l, rect.r);
-            const ly = THREE.MathUtils.clamp(it.y, rect.t, rect.b);
-            const crosses = cards.some((r) => [0.2, 0.4, 0.6, 0.8].some((k) => {
-              const px = it.x + (lx - it.x) * k;
-              const py = it.y + (ly - it.y) * k;
-              return px > r.l && px < r.r && py > r.t && py < r.b;
-            }));
-            const cost = subject * 40 + dots.reduce((sum, r) => sum + overlap(rect, r) * 20, 0) + (crosses ? 4e4 : 0) + gap * 3 + order * 40;
-            if (!best || cost < best.cost) best = { cost, rect, subject, mode };
+            // A leader through another card (or a card over another leader) is avoided ahead of everything
+            // except the hard limits; if no candidate avoids it, the card keeps its place without a leader.
+            const clash = leaderClash(it, rect, cards);
+            const cost = (clash ? 1e9 : 0) + subject * 40 + dots.reduce((sum, r) => sum + overlap(rect, r) * 20, 0) + gap * 3 + order * 40;
+            if (!best || cost < best.cost) best = { cost, rect, subject, mode, clash };
           }
         });
-        if (best && best.subject === 0) { chosen = best; break; }
-        if (best && (!fallback || best.subject < fallback.subject)) fallback = best;
+        if (best && best.subject === 0 && !best.clash) { chosen = best; break; }
+        if (best && (!fallback || best.clash < fallback.clash || (best.clash === fallback.clash && best.subject < fallback.subject))) fallback = best;
       }
       chosen ||= fallback;
       el.style.visibility = "visible";
@@ -800,11 +777,11 @@ export function createSiteScene(container, { geometry, zones, changes, onHover, 
       el.dataset.mode = chosen.mode;
       const { rect } = chosen;
       taken.push({ l: rect.l - 4, t: rect.t - 4, r: rect.r + 4, b: rect.b + 4 });
-      cards.push(rect);
       const nx = THREE.MathUtils.clamp(it.x, rect.l, rect.r);
       const ny = THREE.MathUtils.clamp(it.y, rect.t, rect.b);
+      cards.push({ rect, leader: chosen.clash ? null : [it.x, it.y, nx, ny] });
       el.style.transform = `translate(${it.x}px, ${it.y}px)`;
-      el.style.setProperty("--len", `${Math.hypot(nx - it.x, ny - it.y)}px`);
+      el.style.setProperty("--len", `${chosen.clash ? 0 : Math.hypot(nx - it.x, ny - it.y)}px`);
       el.style.setProperty("--ang", `${Math.atan2(ny - it.y, nx - it.x)}rad`);
       it.button.style.transform = `translate(${rect.l - it.x}px, ${rect.t - it.y}px)`;
     }
@@ -842,8 +819,9 @@ export function createSiteScene(container, { geometry, zones, changes, onHover, 
       if (M.halo.opacity !== 0.5) { M.halo.opacity = 0.5; dirty = true; }
     }
     const distance = camera.position.distanceTo(controls.target);
-    scene.fog.near = distance * 0.95;
-    scene.fog.far = distance * 2.4 + 20;
+    // Aerial haze: the far side of the site and the scenery fade into the graphite horizon.
+    scene.fog.near = distance * 0.9;
+    scene.fog.far = distance * 1.9 + 10;
     if (pointer && pointer !== lastPointer && !down) {
       lastPointer = pointer;
       const id = pick(pointer.x, pointer.y);
@@ -874,6 +852,7 @@ export function createSiteScene(container, { geometry, zones, changes, onHover, 
     setStatus(next) { status = next; applyMaterials(); },
     setFilters(next) { filters = next; applyMaterials(); },
     setOverlays(next) { overlays = next; measureDirty = true; invalidate(); },
+    setCoveredRight(px) { if (px !== coveredRight) { coveredRight = px; resize(); } },
     refresh: invalidate,
     hasAnchor: (key) => anchors.has(key),
     zoom(factor) {

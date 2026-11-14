@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { observeKeyLayout } from "../../lib/key-layout.mjs";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   changedElements, elementStatus, elementZone, flagsForZone, floorOf, focusBounds, indexZones, inspectionConfirmedPassed,
@@ -256,7 +257,18 @@ export default function SiteView({ model, initialState, error }) {
   }, [state, index, geometry, sceneReady]);
 
   useEffect(() => { sceneRef.current?.setFilters(filters); }, [filters, sceneReady]);
-  useEffect(() => { sceneRef.current?.refresh(); }, [legendOpen]); // re-layout callouts around the key
+  // An expanded desktop Key floats over the stage's right side: shift the projection so the subject stays
+  // clear of it (mobile shows the Key below the canvas, so no shift there). Also re-lays out the callouts.
+  const legendRef = useRef(null);
+  useEffect(() => {
+    const legend = legendRef.current;
+    const viewport = stageRef.current;
+    if (!legend || !viewport) return;
+    return observeKeyLayout(legend, viewport, (coveredRight) => {
+      sceneRef.current?.setCoveredRight(coveredRight);
+      sceneRef.current?.refresh();
+    });
+  }, [legendOpen, sceneReady]);
 
   // Anchored callouts: open Flags (on their flagged element if there is one) and revision changes.
   const callouts = useMemo(() => {
@@ -396,7 +408,7 @@ export default function SiteView({ model, initialState, error }) {
               ))}
             </div>
 
-            <details className="legend" data-reserve open={legendOpen} onToggle={(event) => setLegend(event.currentTarget.open)}>
+            <details ref={legendRef} className="legend" data-reserve open={legendOpen} onToggle={(event) => setLegend(event.currentTarget.open)}>
               <summary>
                 <span className="sw-row" aria-hidden="true"><i className="sw crit" /><i className="sw warn" /><i className="sw sel" /><i className="sw pipe" /></span>
                 Key<span className="meta"> · scenery is decorative</span>
