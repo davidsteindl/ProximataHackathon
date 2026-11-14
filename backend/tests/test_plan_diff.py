@@ -232,3 +232,35 @@ def test_failed_text_and_diff_leave_source_retryable_without_partial_events(seed
     assert retried.status_code == 200
     assert retried.json()['source']['id'] == failed.json()['source']['id']
     assert retried.json()['events'][0]['origin'] == 'deterministic_plan_diff'
+
+
+@pytest.mark.parametrize('missing_baseline', [False, True])
+def test_attachment_only_diff_failure_is_visible_and_retryable(seeded, client, missing_baseline):
+    if not missing_baseline:
+        assert upload(client, ENTRIES[2]).status_code == 200
+    payload = hero_payload(None if missing_baseline else b'broken DXF', text='')
+    failed = client.post('/ingestion/messages', json=payload)
+    result = failed.json()
+    assert failed.status_code == 502, result
+    assert result['source']['status'] == 'failed'
+    assert result['source']['error_code'] == 'plan_diff_failed'
+    assert result['source']['attachments']
+    assert result['events'] == []
+    assert client.get('/flags').json() == []
+    assert client.get('/geometry/revisions/A-103-D/source').status_code == 404
+
+    if missing_baseline:
+        assert upload(client, ENTRIES[2]).status_code == 200
+    retried = client.post('/ingestion/messages', json=payload)
+    assert retried.json()['source']['id'] == result['source']['id']
+    assert retried.json()['duplicate'] is True
+    if missing_baseline:
+        assert retried.status_code == 200, retried.text
+        assert retried.json()['source']['status'] == 'processed'
+        assert retried.json()['source']['error_code'] is None
+        assert retried.json()['events'][0]['origin'] == 'deterministic_plan_diff'
+        assert retried.json()['events'][0]['zone_ids'] == ['3B']
+        assert {flag['zone_id'] for flag in client.get('/flags').json()} == {'3B'}
+    else:
+        assert retried.status_code == 502
+        assert retried.json()['source']['status'] == 'failed'

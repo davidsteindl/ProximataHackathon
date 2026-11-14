@@ -12,6 +12,7 @@ from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
 from app import models, schemas
 from app import rules  # Register atomic Event/EvidenceReview rule evaluation hooks.
+from app.cad_extract import InvalidPlan
 from app.event_mapping import build_events
 from app.extraction import ExtractionError, get_extractor, redact_text, validate_quotes
 from app.ingestion_schemas import EventView, IngestionResult, SourceMessageView
@@ -119,6 +120,13 @@ def process_source(session, source_id, extractor_factory=None):
                     process_plan_attachments(session, source, events)
                     if extraction_error and not any(event.details.get("diff_status") == "succeeded" for event in events):
                         raise extraction_error
+                    if not any(
+                        event.details.get("diff_status") == "succeeded" or (
+                            event.details.get("diff_status") == "failed"
+                            and event.details.get("revision_id") and event.zone_ids
+                        ) for event in events if event.intent == "revision"
+                    ):
+                        raise InvalidPlan("No DXF diff or usable revision-note fallback")
                     session.flush()
                 finally:
                     session.info.pop("defer_rules", None)
@@ -128,9 +136,14 @@ def process_source(session, source_id, extractor_factory=None):
             source.status, source.error_code = "processed", extraction_error.code if extraction_error else None
             source.processing_token, source.processing_started_at = None, None
             source.extraction_backend = backend
-    except (ExtractionError, SQLAlchemyError) as error:
+    except (ExtractionError, InvalidPlan, SQLAlchemyError) as error:
         session.rollback()
-        code = error.code if isinstance(error, ExtractionError) else "storage_failed"
+        if isinstance(error, ExtractionError):
+            code = error.code
+        elif isinstance(error, InvalidPlan):
+            code = "plan_diff_failed"
+        else:
+            code = "storage_failed"
         with session.begin():
             session.execute(update(models.SourceMessage).where(
                 models.SourceMessage.id == source_id, models.SourceMessage.processing_token == token,

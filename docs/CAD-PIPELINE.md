@@ -205,6 +205,11 @@ note no affected zones are invented. A successful DXF comparison can proceed
 even when text extraction fails; the processed Source Message retains the safe
 extraction `error_code`, and its original text remains available. Otherwise the
 existing failed-source retry behavior applies.
+If DXF processing yields neither a successful diff nor a usable scoped revision
+note, the source is `failed` with `plan_diff_failed` and returns `502`. Its original
+attachments remain available, and re-delivery retries processing after missing
+baseline geometry has been imported. An existing text-extraction failure retains
+its own safe error code.
 
 Neither deterministic Events nor fallback notes create receipt Evidence.
 Confirmed, correctly scoped Crew/Revision Evidence is still required for B;

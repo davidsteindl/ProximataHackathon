@@ -60,13 +60,13 @@ def test_idempotency_reuses_events_and_distinguishes_source_accounts(initialized
     assert len(initialized.get("/events").json()) == 3
 
 
-def test_irrelevant_and_attachment_only_sources_are_preserved_without_events(initialized, monkeypatch):
+def test_irrelevant_and_non_dxf_attachment_only_sources_are_preserved_without_events(initialized, monkeypatch):
     response = initialized.post("/ingestion/messages", json=message_payload(text="Danke, bis später!"))
     assert response.status_code == 201
     assert response.json()["events"] == []
     assert response.json()["source"]["status"] == "processed"
-    content = b"synthetic original DXF content"
-    attachment = {"file_name": "A-103_RevD.dxf", "media_type": "application/dxf", "content_base64": base64.b64encode(content).decode()}
+    content = b"synthetic original attachment content"
+    attachment = {"file_name": "note.txt", "media_type": "text/plain", "content_base64": base64.b64encode(content).decode()}
     monkeypatch.setattr(ingestion, "get_extractor", Mock(side_effect=AssertionError("Attachment sent to LLM")))
     result = initialized.post("/ingestion/messages", json=message_payload(external_id="attachment", text="", attachments=[attachment])).json()
     assert result["source"]["status"] == "processed"

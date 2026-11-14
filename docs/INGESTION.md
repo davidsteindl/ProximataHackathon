@@ -136,6 +136,12 @@ channel adapters and pauses for human decisions remain in #22.
   returned as error text. Exception: if a DXF diff succeeds despite text extraction
   failure, the source is `processed` and retains the extraction `error_code`;
   its deterministic Event is committed with no extracted statements.
+- A DXF import/comparison failure without a successful diff or a usable scoped
+  revision-note fallback returns `502`, `status: failed`, and
+  `error_code: plan_diff_failed` (or the extraction error if text extraction also
+  failed). No partial Events or geometry are committed. Source attachments are
+  retained; re-deliver the exact request after supplying missing baseline geometry
+  to retry the same source.
 - Re-deliver the exact request to retry a failed source. Requests already being
   processed return `202`; they do not launch a second extraction. A crashed
   processing attempt can be reclaimed by re-delivery after five minutes. Attempt
