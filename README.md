@@ -388,7 +388,7 @@ flowchart LR
   EXTAG["Externer Agent<br/>z. B. Talona"]:::ext
 
   subgraph SITEMIND["SiteMind · docker compose"]
-    WEB["web<br/>Next.js · Dashboard · 3D · Chat"]:::svc
+    WEB["web<br/>Next.js · Dashboard · 3D"]:::svc
     API["api<br/>FastAPI · Context Engine"]:::svc
     WORKER["worker<br/>Kanal-Adapter · Scheduler"]:::svc
     MCP["mcp<br/>MCP-Server"]:::svc
@@ -405,10 +405,10 @@ flowchart LR
   WORKER -->|"REST: Ingest, Outbox, Trigger"| API
   WEB -->|"REST"| API
   MCP -->|"REST"| API
-  API -->|"MCP (Chat-Agent)"| MCP
+  API -->|"MCP (Q&A-Kern)"| MCP
   EXTAG -->|"MCP"| MCP
   API <-->|"SQL"| DB
-  API -.->|"Extraktion, Erklärung, Chat"| LLM
+  API -.->|"Extraktion, Erklärung, Q&A-Routing"| LLM
   SEED -->|"Seed-Import"| API
   REPLAY -->|"echte Mails"| GMAIL
   REPLAY -->|"echte Nachrichten"| TG
@@ -488,7 +488,7 @@ flowchart LR
 - **Fehlende oder widersprüchliche Daten sind keine Freigabe.** Preconditions werden als erfüllt / nicht erfüllt / unbekannt / widersprüchlich bewertet. Nur gültige bestätigte Nachweise erlauben „erfüllt“. Neue Gegenmeldungen gehen in die Prüfung ein, ohne menschliche Bestätigungen durch das LLM zu überschreiben. Nachweisentscheidungen lösen erneut die Regelprüfung aus; bestehende Flags bleiben bis zum menschlichen Abschluss offen.
 - **Seed und CAD haben explizite Herkunft.** Synthetische bestätigte Ausgangsnachweise werden als Seed markiert; LLM-Aussagen bleiben auch im Offline-Replay unbestätigt. Deterministische CAD-Events aktualisieren Geometrie/betroffene Zonen, bestätigen aber keine Inspection, Crew-Kenntnisnahme oder Task-Abschlüsse.
 - **Learning ersetzt keinen Nachweis.** Im MVP korrigiert Feedback fallbezogen die Extraktion. Es deaktiviert keine Sicherheitsprüfung und umgeht keine Bestätigungspflicht. Änderungen sicherheitsrelevanter Regeln brauchen gesonderte menschliche Freigabe, begrenzten Geltungsbereich und Audit.
-- **Der Chat-Agent nutzt dieselben MCP-Tools wie externe Agents.** Was unser Chat kann, kann auch Talonas Agent.
+- **Der Q&A-Kern nutzt dieselben MCP-Tools wie externe Agents.** Was unser Telegram-Bot beantwortet, kann auch Talonas Agent beantworten.
 - **Kanal-Zugangsdaten** (Gmail, Telegram) liegen nur im `worker`, der LLM-Key nur in `api`.
 
 ## CAD-Eingabe im MVP
