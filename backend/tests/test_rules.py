@@ -409,3 +409,77 @@ def test_earlier_failed_or_unresolved_counterclaim_is_not_superseded(initialized
     review(engine, proof, "confirmed")
     ingest(initialized, sent_at="2026-11-16T18:05:00+01:00")
     assert initialized.get("/flags").json()[0]["evaluation"] == "contradictory"
+
+
+def close_flag_for_test(engine, flag_id, state):
+    # Simulate #9's documented ORM contract; no lifecycle endpoint is added here.
+    with Session(engine) as session, session.begin():
+        flag = session.get(models.Flag, flag_id)
+        now = datetime.now(UTC)
+        flag.state, flag.open_key, flag.updated_at = state, None, now
+        flag.audit.append(models.FlagAudit(
+            action=state, actor="synthetic-superintendent", channel="dashboard",
+            source_ref="feedback:synthetic-human-closure", recorded_at=now,
+        ))
+
+
+@pytest.mark.parametrize("state", ["false_alarm", "resolved"])
+def test_human_closed_work_is_not_replayed_by_question_or_scan(initialized, engine, state):
+    ingest(initialized)
+    first = initialized.get("/flags").json()[0]
+    close_flag_for_test(engine, first["id"], state)
+    closed = initialized.get(f"/flags/{first['id']}").json()
+    assert initialized.get("/flags").json() == []
+    ingest(initialized, external_id="unrelated-question", text="welcher plan gilt für 3B?")
+    for _ in range(2):
+        with Session(engine) as session, session.begin():
+            rules.evaluate_site(session)
+    assert initialized.get("/flags").json() == []
+    assert initialized.get(f"/flags/{first['id']}").json() == closed
+    # A genuinely new announcement is not hidden by the earlier human closure.
+    new = ingest(initialized, external_id="new-work")
+    reopened = initialized.get("/flags").json()
+    assert len(reopened) == 1
+    assert reopened[0]["id"] != first["id"]
+    assert [item["id"] for item in reopened[0]["sources"]] == [new["events"][0]["id"]]
+    assert initialized.get(f"/flags/{first['id']}").json() == closed
+
+
+def test_closed_work_stays_closed_after_evidence_confirmation_and_rejection(initialized, engine):
+    proof = inspection_claim(initialized)
+    ingest(initialized)
+    original = initialized.get("/flags").json()[0]
+    close_flag_for_test(engine, original["id"], "false_alarm")
+    review(engine, proof, "confirmed")
+    review(engine, proof, "rejected")
+    assert initialized.get("/flags").json() == []
+    assert initialized.get(f"/flags/{original['id']}").json()["state"] == "false_alarm"
+    # New work still sees the rejected proof and creates an unknown-precondition Flag.
+    ingest(initialized, external_id="new-work-after-rejection")
+    assert initialized.get("/flags").json()[0]["evaluation"] == "unknown"
+
+
+def test_closing_one_zone_does_not_skip_other_zone_from_same_event(initialized, engine, monkeypatch):
+    from unittest.mock import Mock
+    from app import ingestion
+    from app.extraction import ExtractedBatch, ExtractedEvent
+
+    original = ingestion.get_extractor
+    extractor = Mock()
+    extractor.name = "test"
+    extractor.extract.return_value = ExtractedBatch(events=[ExtractedEvent(
+        intent="planned_work", quote="Synthetic closing work in 3B and 3C.", confidence=1,
+        zones=["3B", "3C"], activity="closing_work", trade="drywall",
+    )])
+    monkeypatch.setattr(ingestion, "get_extractor", lambda: extractor)
+    ingest(initialized, text="Synthetic closing work in 3B and 3C.")
+    monkeypatch.setattr(ingestion, "get_extractor", original)
+    flags = {flag["zone_id"]: flag for flag in initialized.get("/flags").json()}
+    assert set(flags) == {"3B", "3C"}
+    assert flags["3B"]["sources"][0]["id"] == flags["3C"]["sources"][0]["id"]
+    close_flag_for_test(engine, flags["3B"]["id"], "false_alarm")
+    proof = inspection_claim(initialized)
+    review(engine, proof, "confirmed")
+    remaining = initialized.get("/flags").json()
+    assert [(flag["zone_id"], flag["evaluation"]) for flag in remaining] == [("3C", "satisfied")]
+    assert remaining[0]["id"] == flags["3C"]["id"]

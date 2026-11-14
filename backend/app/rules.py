@@ -176,13 +176,24 @@ def evaluate_site(session, *, source_ref="rules:scan", actor="rule_engine", chan
     """
     session.scalar(select(models.Site).with_for_update())
     zones = {zone.id: zone for zone in session.scalars(select(models.Zone))}
-    flags = {flag.open_key: flag for flag in session.scalars(select(models.Flag)) if flag.open_key}
+    existing_flags = session.scalars(select(models.Flag)).all()
+    flags = {flag.open_key: flag for flag in existing_flags if flag.open_key}
+    closed_sources = {
+        (source.event_id, flag.type, flag.zone_id, flag.precondition)
+        for flag in existing_flags if flag.state in {"resolved", "false_alarm"}
+        for source in flag.sources
+    }
     statements = session.scalars(select(models.Event).order_by(models.Event.created_at, models.Event.id)).all()
     now = datetime.now(UTC)
     for statement in statements:
         for work in affected_work(session, statement, zones):
             for rule in PRECONDITIONS:
                 if not rule.applies(work):
+                    continue
+                # A human closure settles these work sources for this conflict.
+                # Rechecks must not replay them into a new Flag. New work Events
+                # remain eligible, including another announcement in this Zone.
+                if (statement.id, rule.type, work.zone_id, rule.name) in closed_sources:
                     continue
                 result = rule.evaluate(session, work, zones)
                 key = ":".join((rule.type, work.zone_id,

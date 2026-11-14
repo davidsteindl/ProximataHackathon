@@ -74,8 +74,13 @@ back Events, Flags and audit together.
 
 A satisfied Precondition only updates the evaluation/explanation; the Flag stays
 open for human closure. #9 must clear `open_key` when closing a Flag so a future
-conflict can be recorded. No automatic closure, outgoing notification, Proposal
-or lifecycle transition is implemented in #7. Seed reset clears Flags, source
+conflict can be recorded. Its linked work Events are then settled for that
+Flag type, Zone and Precondition: later scans, questions or Evidence reviews do
+not replay them into a new Flag. This does not suppress a new work announcement
+or a different Zone/Precondition from the same Event. Work that never had a
+closed Flag and all open Flags still participate in Evidence-triggered rechecks.
+No automatic closure, outgoing notification, Proposal or lifecycle transition is
+implemented in #7. Seed reset clears Flags, source
 links and audit before their referenced Site Record tables.
 
 ## Verify offline
