@@ -43,7 +43,7 @@ class GmailSettings:
             if not 1 <= interval <= 3600:
                 raise ValueError
             roles = TypeAdapter(dict[str, SenderRole]).validate_python(
-                json.loads(os.environ.get("GMAIL_SENDER_ROLES_JSON", "{}")),
+                json.loads(os.environ.get("GMAIL_SENDER_ROLES_JSON") or "{}"),
             )
         except (ValueError, TypeError):
             raise GmailError("invalid_polling_configuration") from None

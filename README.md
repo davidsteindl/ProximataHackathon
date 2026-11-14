@@ -52,8 +52,8 @@ Stoppen: `docker compose down`. Die Daten bleiben im Volume `db-data` erhalten.
 
 Enthalten sind Infrastruktur, Health-Prüfungen, der statische Site Record aus
 Issue #5, Nachrichten-Ingestion, Event-Extraktion und Timeline aus #6 sowie
-DXF-Extraktion und Geometrie-API aus #15. Flags, 3D-Ansicht, Plan-Diff,
-Kanal-Adapter, MCP-Tools, Authentifizierung
+DXF-Extraktion und Geometrie-API aus #15 sowie Gmail-Eingang aus #11. Flags, 3D-Ansicht, Plan-Diff,
+Telegram-Adapter, Gmail-Versand, MCP-Tools, Authentifizierung
 und Hosting folgen in ihren eigenen Issues.
 
 ### Nachricht → Event → Timeline (Issue #6)
@@ -87,6 +87,15 @@ vorhandene Bestätigung und geben keine Arbeit frei. Die menschliche Prüfung fo
 in #9, die Regelprüfung in #7/#8. Der Seed-Befehl setzt auch die neuen Nachrichten
 und Events zurück. REST-Vertrag, Cache-Inhalte, Fehler-/Retry-Verhalten und
 Datenschutzgrenzen: [docs/INGESTION.md](docs/INGESTION.md).
+
+### Gmail-Eingang (Issue #11)
+
+Der optionale Worker-Adapter liest ein verifiziertes Projekt-Testpostfach/Label
+und übergibt Betreff, Text und Originalanhänge an dieselbe Ingestion. Bereits
+verarbeitete Quellen werden über eine exakte REST-Abfrage nach Kanal, Konto und
+Gmail-ID übersprungen. Einrichtung und Grenzen: [docs/GMAIL.md](docs/GMAIL.md).
+Die OAuth-Zugangsdaten erhält ausschließlich der Worker; ohne Konfiguration
+bleibt Gmail deaktiviert.
 
 ### Lokale Checks
 
