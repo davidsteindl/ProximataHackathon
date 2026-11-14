@@ -216,6 +216,7 @@ Grundsätze:
 - **Polling statt Webhooks** (keine öffentliche URL nötig, lokales Deployment).
 - **LLM-Provider austauschbar über die Konfiguration.** Voraussetzungen: strukturierte Ausgaben und Tool-Calling; bevorzugt mit EU-Region. Ausnahme: Das Q&A-Routing (#19) braucht einen OpenAI-Key (Decisions API, EU-Verarbeitung verfügbar); ohne Key läuft es im Cache-Modus.
 - **Für die Demo funktioniert alles auch offline:** Replay direkt in den Ingestion-Eingang, LLM-Antworten des Demo-Szenarios gecacht.
+- **Replay-Vertrag (#22):** `GET /replay/config` liefert nur `offline_ready` (Extraktion und Advisor verwenden `LLM_PROVIDER=cached`). Der Replay-Client prueft dies vor jedem Reset, auch online fuer den reproduzierbaren Lernfall; er aendert keine Provider-Einstellungen. Seed-Reset und Nachrichten nutzen die bestehenden REST-Eingaenge. Es gibt keine automatische Nachweisbestaetigung, Proposal-Freigabe oder Flag-Schliessung. Online bleiben Kanal und echte Provider-ID erhalten; `replay-transport.json` dokumentiert originale Transportzeit und simulierte Szenariozeit. Zustellungen verwenden die bestehenden Worker-Outbox-Sender; offline werden sie explizit lokal protokolliert. Ablauf und offene Q&A-Abhaengigkeit #20: [REPLAY.md](REPLAY.md).
 
 ---
 
