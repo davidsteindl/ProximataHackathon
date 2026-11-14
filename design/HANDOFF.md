@@ -25,6 +25,7 @@ Start page: `mockup/screenshots/Main.png`.
 | `Main` | dark | Superintendent start: KPI row, site model with markers, "Needs your attention", activity, next 48 h | #5, #37 |
 | `SiteOverview` | light | Plan with no zone selected, widget expanded | #16 |
 | `SiteZone3B` | light | Zone 3B selected; widget shows preconditions and attention items | #16 |
+| `SiteCollapsedNone` | light | Widget collapsed with no selected Zone; reopen returns to Site context | #16 |
 | `SiteCollapsed` | light | Widget collapsed to a pill (count + zone). Selection kept, reopen with `⟪` | #16 |
 | `Site3D` | light | Isometric 3D placeholder with floor rail and markers | #16, #17 |
 | `RoomView` | light | `/zones/3B`: room plan with the Rev D wall diff, status, tasks, inspections | #15, #17 |
@@ -93,3 +94,5 @@ are 14–16 px radius, and pills and buttons are fully rounded.
 Open the hero Flag, then Evidence review to use the Day 4 positive-result fixture. Confirming or rejecting changes only that Evidence. Return to the Flag: a confirmed inspection is shown as satisfied while the Flag stays open. Proposal approval/rejection, acknowledgment and closure are independent local actions. Closure requires Resolved/False alarm plus a non-empty reason. The timeline records synthetic demo decisions. Reset walkthrough on the Flag clears them.
 
 State is kept in browser session storage for navigation between local pages; if storage is unavailable, changes apply only to the current page and a notice explains this. No API requests, real schedule changes or notifications occur. Production actions and validation remain in #9, #13 and #30; this defines no new API contract.
+
+Collapse/reopen preserves context through separate linked fixtures: `SiteOverview` -> `SiteCollapsedNone` -> `SiteOverview` has no selected Zone; `SiteZone3B` -> `SiteCollapsed` -> `SiteZone3B` retains 3B.

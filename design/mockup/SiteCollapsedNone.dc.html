@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>GroundIQ — Site plan, widget collapsed, no zone selected</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=JetBrains+Mono:wght@400;500&amp;family=Space+Grotesk:wght@500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:linear-gradient(155deg,#EDF1F5 0%,#DDE4EB 55%,#CCD6E0 100%);color:#171A1F;font:14px/1.5 Inter,system-ui,sans-serif}
+a{color:#171A1F;text-decoration:none}a:hover{color:#176AC6}
+h1,h2,h3{font-family:'Space Grotesk',Inter,sans-serif;margin:0;letter-spacing:-.01em}
+.mono{font-family:'JetBrains Mono',monospace;font-size:12px}
+.stage{position:relative;min-height:100vh;overflow:hidden}
+.glass{background:rgba(255,255,255,.85);border:1px solid rgba(255,255,255,.95);border-radius:16px;box-shadow:0 14px 36px rgba(23,26,31,.12)}
+.bar{position:absolute;top:18px;left:24px;right:24px;display:flex;align-items:center;gap:16px;z-index:5}
+.logo{height:30px;display:block}
+.pills{display:flex;gap:8px;position:absolute;left:50%;transform:translateX(-50%)}
+.pill{display:inline-flex;align-items:center;padding:9px 18px;border-radius:999px;font:600 13.5px Inter,sans-serif;background:rgba(255,255,255,.78);border:1px solid rgba(255,255,255,.95);color:#4A525C;box-shadow:0 6px 18px rgba(23,26,31,.08)}
+.pill:hover{color:#171A1F}
+.pill.cur,.pill.cur:hover{background:#176AC6;border-color:#176AC6;color:#fff}
+.right{margin-left:auto;display:flex;align-items:center;gap:12px}
+.clock{font-family:'JetBrains Mono',monospace;font-size:12px;color:#5A6470}
+.rolebtn{font:600 13px Inter,sans-serif;color:#171A1F;background:rgba(255,255,255,.85);border:1px solid rgba(255,255,255,.95);border-radius:999px;padding:8px 16px;cursor:pointer;box-shadow:0 6px 18px rgba(23,26,31,.08)}
+.muted{color:#5A6470}
+.small{font-size:12.5px}
+.floor{font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:500;width:40px;height:36px;border:0;background:transparent;border-radius:10px;cursor:pointer;color:#5A6470}
+.floor.cur{background:#171A1F;color:#fff}
+.vbtn{font:600 12px Inter,sans-serif;width:40px;padding:7px 0;border:0;background:transparent;border-radius:10px;cursor:pointer;color:#5A6470;text-align:center;text-decoration:none;display:block;box-sizing:border-box}
+.vbtn.cur{background:#176AC6;color:#fff}
+.dock{position:absolute;left:50%;transform:translateX(-50%);bottom:22px;display:flex;gap:4px;padding:8px;border-radius:999px;z-index:5}
+.dock a{display:inline-flex;align-items:center;gap:8px;font:600 13px Inter,sans-serif;padding:9px 16px;border-radius:999px;color:#171A1F}
+.dock a:hover{background:rgba(23,26,31,.06)}
+.dock i{width:8px;height:8px;border-radius:50%;flex:0 0 auto}
+</style>
+</helmet>
+
+<div class="stage">
+<header class="bar">
+  <a href="Main.dc.html" aria-label="GroundIQ overview"><img class="logo" src="groundiq-logo.svg" alt="GroundIQ"></a>
+  <nav class="pills" aria-label="Main">
+    <a class="pill" href="Main.dc.html">Overview</a>
+    <a class="pill cur" href="SiteOverview.dc.html" aria-current="page">Site plan</a>
+    <a class="pill" href="FlagInbox.dc.html">Flags</a>
+    <a class="pill" href="EvidenceReview.dc.html">Evidence</a>
+  </nav>
+  <div class="right">
+    <span class="clock">Day 2 · 18:10</span>
+    <button type="button" class="rolebtn" aria-haspopup="listbox" title="Demo role switcher (MVP) — not authentication">Superintendent ▾</button>
+  </div>
+</header>
+
+<div class="glass" style="position:absolute;left:24px;top:50%;transform:translateY(-50%);padding:10px 6px;display:flex;flex-direction:column;gap:4px;align-items:center;z-index:4" role="group" aria-label="Floor isolation and view">
+  <button type="button" class="floor">F4</button>
+  <button type="button" class="floor cur" aria-pressed="true">F3</button>
+  <button type="button" class="floor">F2</button>
+  <button type="button" class="floor">F1</button>
+  <span style="width:28px;height:1px;background:rgba(23,26,31,.12);margin:6px 0"></span>
+  <span class="vbtn cur" aria-current="true">2D</span>
+  <a href="Site3D.dc.html" class="vbtn">3D</a>
+</div>
+
+<div style="position:absolute;left:110px;right:110px;top:96px;bottom:90px;display:flex;align-items:center;justify-content:center">
+  <svg viewBox="0 0 960 420" style="width:100%;max-height:100%;filter:drop-shadow(0 20px 32px rgba(23,26,31,.16))" role="img" aria-label="Top-down plan of floor F3 at full width, no zone selected.">
+    <rect x="48" y="28" width="864" height="364" fill="#FBFCFD"/>
+    <g stroke="#171A1F" stroke-width="3" fill="none">
+      <rect x="50" y="30" width="860" height="360" />
+      <line x1="50" y1="210" x2="910" y2="210" />
+      <line x1="480" y1="30" x2="480" y2="180" />
+      <line x1="480" y1="240" x2="480" y2="390" />
+    </g>
+    <g stroke="#C3CCD5" stroke-width="1.5" fill="none">
+      <line x1="50" y1="180" x2="910" y2="180"/>
+      <line x1="50" y1="240" x2="910" y2="240"/>
+    </g>
+    <g stroke="#9AA4AF" stroke-width="1.5" fill="none">
+      <rect x="380" y="64" width="72" height="88" />
+      <rect x="508" y="64" width="72" height="88" />
+      <rect x="380" y="272" width="72" height="88" />
+      <rect x="508" y="272" width="72" height="88" />
+    </g>
+    <g font-family="'JetBrains Mono',monospace" font-size="21" fill="#5A6470">
+      <text x="200" y="115">3A</text>
+      <text x="710" y="115">3B</text>
+      <text x="200" y="330">3C</text>
+      <text x="710" y="330">3D</text>
+    </g>
+    <line x1="508" y1="64" x2="508" y2="152" stroke="#E2492F" stroke-width="6" />
+    <line x1="526" y1="64" x2="526" y2="152" stroke="#8A93A1" stroke-width="3" stroke-dasharray="7 5" />
+    <a href="FlagDetail.dc.html" aria-label="Zone 3B — 2 open flags">
+      <rect x="790" y="52" width="110" height="32" rx="16" fill="#fff" stroke="#E3E8ED"/>
+      <circle cx="809" cy="68" r="5" fill="#E2492F"/>
+      <text x="822" y="73" font-family="'JetBrains Mono',monospace" font-size="13" fill="#A3271A">2 flags</text>
+    </a>
+  </svg>
+</div>
+
+<a href="SiteOverview.dc.html" class="glass" aria-label="Expand site information widget — no zone selected, 2 flags" style="position:absolute;right:24px;top:96px;width:54px;padding:12px 0;display:flex;flex-direction:column;align-items:center;gap:10px;z-index:4;border-radius:999px">
+  <span style="font:600 16px 'Space Grotesk',sans-serif" aria-hidden="true">⟪</span>
+  <span style="width:26px;height:26px;border-radius:50%;background:#E2492F;color:#fff;font:600 12.5px Inter,sans-serif;display:flex;align-items:center;justify-content:center">2</span>
+  <span class="mono muted" style="writing-mode:vertical-rl">Site</span>
+</a>
+
+<nav class="dock glass" aria-label="Quick actions">
+  <a href="FlagInbox.dc.html"><i style="background:#E2492F"></i>Open flags (2)</a>
+  <a href="EvidenceReview.dc.html"><i style="background:#5A6470"></i>Review evidence</a>
+  <a href="#chat" title="Chat agent (issue #19): read-only Q&amp;A"><i style="background:#176AC6"></i>Ask GroundIQ</a>
+</nav>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1360,"height":860}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>
