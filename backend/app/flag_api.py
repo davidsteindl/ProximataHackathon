@@ -69,7 +69,7 @@ def flag_view(session, flag):
 
 @router.get("/flags", response_model=list[FlagView])
 def get_flags(session: Database, status: Literal["open", "closed", "all"] = "open"):
-    """All open Flags, highest severity first; unrelated schedule filters do not hide them."""
+    """Open by default, or closed/all; schedule filters never hide Flags."""
     statement = select(models.Flag)
     if status == "open":
         statement = statement.where(models.Flag.state.not_in(["resolved", "false_alarm"]))

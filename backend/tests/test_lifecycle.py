@@ -229,3 +229,17 @@ def test_source_mismatch_and_unresolved_counterclaim(initialized, engine):
     assert decision(initialized, "counterclaim", "confirmed").status_code == 422
     assert decision(initialized, "counterclaim", "rejected").status_code == 200
     assert initialized.get("/flags").json()[0]["awaiting_human_closure"]
+
+
+def test_closed_flag_does_not_claim_it_is_waiting_for_closure(initialized, engine):
+    evidence_id = inspection_claim(initialized)
+    ingest(initialized)
+    flag = initialized.get("/flags").json()[0]
+    signal(engine, flag["id"], "notified")
+    assert decision(initialized, evidence_id, "confirmed").status_code == 200
+    satisfied = initialized.get("/flags").json()[0]
+    assert satisfied["awaiting_human_closure"]
+    closed = action(initialized, satisfied, "false_alarm").json()
+    assert closed["state"] == "false_alarm"
+    assert not closed["awaiting_human_closure"]
+    assert "awaiting" not in closed["explanation"]
