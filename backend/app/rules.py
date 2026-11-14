@@ -1,6 +1,6 @@
 """Deterministic Preconditions; advisory Events can trigger checks, never grant approval."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from uuid import uuid4
 
@@ -8,6 +8,7 @@ from sqlalchemy import and_, event, or_, select
 from sqlalchemy.orm import Session
 
 from app import models
+from app.revision_rules import RevisionAcknowledged, revision_work
 
 
 def utc(value):
@@ -19,6 +20,9 @@ class Evaluation:
     status: str
     explanation: str
     inspection_id: str | None = None
+    context: dict = field(default_factory=dict)
+    conflict_key: str | None = None
+    source_event_ids: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -27,6 +31,7 @@ class Work:
     zone_id: str
     task: models.Task | None
     crew: models.Crew | None
+    revision: models.Revision | None = None
 
 
 def ancestors(zone_id, zones):
@@ -69,7 +74,7 @@ class InspectionPassed:
     kind = "rough_in"
 
     def applies(self, work):
-        return work.event.intent == "planned_work" and work.event.activity in {
+        return work.revision is None and work.event.intent == "planned_work" and work.event.activity in {
             "closing_work", "drywall", "insulation",
         }
 
@@ -139,7 +144,7 @@ class InspectionPassed:
 
 
 # New types implement applies/evaluate; persistence, dedup and audit are shared.
-PRECONDITIONS = (InspectionPassed(),)
+PRECONDITIONS = (InspectionPassed(), RevisionAcknowledged())
 
 
 def affected_work(session, statement, zones):
@@ -179,24 +184,29 @@ def evaluate_site(session, *, source_ref="rules:scan", actor="rule_engine", chan
     existing_flags = session.scalars(select(models.Flag)).all()
     flags = {flag.open_key: flag for flag in existing_flags if flag.open_key}
     closed_sources = {
-        (source.event_id, flag.type, flag.zone_id, flag.precondition)
+        (source.event_id, flag.type, flag.zone_id, flag.precondition,
+         (flag.context or {}).get("revision_id"),
+         (flag.context or {}).get("crew_id"))
         for flag in existing_flags if flag.state in {"resolved", "false_alarm"}
         for source in flag.sources
     }
     statements = session.scalars(select(models.Event).order_by(models.Event.created_at, models.Event.id)).all()
     now = datetime.now(UTC)
     for statement in statements:
-        for work in affected_work(session, statement, zones):
+        candidates = [*affected_work(session, statement, zones), *revision_work(session, statement, zones)]
+        for work in candidates:
             for rule in PRECONDITIONS:
                 if not rule.applies(work):
                     continue
                 # A human closure settles these work sources for this conflict.
                 # Rechecks must not replay them into a new Flag. New work Events
                 # remain eligible, including another announcement in this Zone.
-                if (statement.id, rule.type, work.zone_id, rule.name) in closed_sources:
+                if (statement.id, rule.type, work.zone_id, rule.name,
+                    work.revision.id if work.revision else None,
+                    work.crew.id if work.revision and work.crew else None) in closed_sources:
                     continue
                 result = rule.evaluate(session, work, zones)
-                key = ":".join((rule.type, work.zone_id,
+                key = result.conflict_key or ":".join((rule.type, work.zone_id,
                     work.task.id if work.task else work.crew.id if work.crew else "unassigned",
                     rule.name))
                 flag = flags.get(key)
@@ -205,26 +215,28 @@ def evaluate_site(session, *, source_ref="rules:scan", actor="rule_engine", chan
                 if flag is None:
                     flag = models.Flag(
                         id=uuid4().hex, type=rule.type, zone_id=work.zone_id,
-                        task_id=work.task.id if work.task else None, activity=statement.activity,
+                        task_id=work.task.id if work.task else None, activity=statement.activity or rule.name,
                         precondition=rule.name, inspection_id=result.inspection_id,
                         severity="high", responsible_id=work.crew.lead_id if work.crew else None,
                         state="detected", evaluation=result.status, explanation=result.explanation,
-                        open_key=key, created_at=now, updated_at=now, sources=[],
+                        context=result.context, open_key=key, created_at=now, updated_at=now, sources=[],
                         audit=[models.FlagAudit(action="detected", actor="rule_engine",
                             channel=statement.source.channel, source_ref=f"source:{statement.source_message_id}", recorded_at=now)],
                     )
                     session.add(flag)
                     flags[key] = flag
                 elif (flag.evaluation != result.status or flag.explanation != result.explanation
-                      or flag.inspection_id != result.inspection_id):
+                      or flag.inspection_id != result.inspection_id or flag.context != result.context):
                     flag.evaluation, flag.explanation = result.status, result.explanation
                     flag.updated_at = now
                     flag.audit.append(models.FlagAudit(action="precondition_evaluated", actor=actor,
                         channel=channel, source_ref=source_ref, recorded_at=now))
                 flag.inspection_id = result.inspection_id
-                if statement.id not in {item.event_id for item in flag.sources}:
-                    flag.sources.append(models.FlagSource(event_id=statement.id, attached_at=now))
-                    flag.updated_at = now
+                flag.context = result.context
+                for event_id in dict.fromkeys((statement.id, *result.source_event_ids)):
+                    if event_id not in {item.event_id for item in flag.sources}:
+                        flag.sources.append(models.FlagSource(event_id=event_id, attached_at=now))
+                        flag.updated_at = now
 
 
 @event.listens_for(Session, "before_flush")
