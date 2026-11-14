@@ -133,6 +133,9 @@ unknown details stay null. Actor describes a role or crew, not a personal identi
 Separate questions from work announcements and 'warning seen' from acknowledgment
 of a specific revision. Use inspection_kind rough_in for Rohinstallation, insulation
 for Dämmung; trade drywall for Trockenbau, plumbing for installation.
+Use activity closing_work when planned work explicitly covers or closes a zone,
+wall or ceiling (e.g. '3B zu', boarding or drywall closure); not for deliveries,
+questions or inspection claims. This label triggers checks, never authorizes work.
 Do not guess today's date. Encode tomorrow as day_offset=1, today as 0, and explicit
 'Tag 4' as scenario_day=4; the API resolves dates internally. Keep 'morgen früh' as
 part_of_day=morning, not an invented exact time. Use time=null when unclear.
