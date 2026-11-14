@@ -135,7 +135,7 @@ class InspectionPassed:
         if "passed" in claims and claims & {"failed", "pending"}:
             return Evaluation("contradictory", "Inspection statements conflict; review unresolved counterclaims. Unconfirmed claims are not proof.", inspection.id)
         if positives:
-            return Evaluation("satisfied", "Valid confirmed proof that the rough-in inspection passed; awaiting human Flag closure.", inspection.id)
+            return Evaluation("satisfied", "Valid confirmed proof that the rough-in inspection passed.", inspection.id)
         if any(item.claim == "failed" for item in confirmed):
             return Evaluation("not_satisfied", "Confirmed evidence reports that the rough-in inspection failed.", inspection.id)
         if any(item.claim == "pending" for item in confirmed):
@@ -220,7 +220,7 @@ def evaluate_site(session, *, source_ref="rules:scan", actor="rule_engine", chan
                         severity="high", responsible_id=work.crew.lead_id if work.crew else None,
                         state="detected", evaluation=result.status, explanation=result.explanation,
                         context=result.context, open_key=key, created_at=now, updated_at=now, sources=[],
-                        audit=[models.FlagAudit(action="detected", actor="rule_engine",
+                        audit=[models.FlagAudit(action="detected", actor="rule_engine", to_state="detected",
                             channel=statement.source.channel, source_ref=f"source:{statement.source_message_id}", recorded_at=now)],
                     )
                     session.add(flag)

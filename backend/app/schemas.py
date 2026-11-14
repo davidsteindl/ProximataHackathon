@@ -154,6 +154,7 @@ class EvidenceScope(Record):
 
 
 class EvidenceReview(Record):
+    reason: str | None
     sequence: int
     status: ReviewStatus
     actor_type: Literal["seed_import", "statement_ingestion", "human"]

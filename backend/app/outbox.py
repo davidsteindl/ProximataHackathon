@@ -10,6 +10,7 @@ from pydantic import Field
 from sqlalchemy import select
 
 from app import models
+from app.lifecycle import transition_flag
 from app.schemas import Identifier, Record, Timestamp
 from app.site_api import Database
 
@@ -101,6 +102,7 @@ def claim_outbox(session: Database):
 def delivery_result(message_id: str, result: DeliveryResult, session: Database):
     now = datetime.now(UTC)
     with session.begin():
+        session.scalar(select(models.Site).with_for_update())
         message = session.scalar(select(models.OutboxMessage).where(
             models.OutboxMessage.id == message_id).with_for_update())
         if message is None:
@@ -122,8 +124,9 @@ def delivery_result(message_id: str, result: DeliveryResult, session: Database):
             message.sent_at = now
             flag = session.scalar(select(models.Flag).where(models.Flag.id == message.flag_id).with_for_update())
             if flag.state == "detected":
-                flag.state, flag.updated_at = "notified", now
-                audit(session, message, "notified", now)
+                transition_flag(session, flag, action="notified", actor="worker",
+                                actor_type="system", channel="gmail",
+                                source_ref=f"outbox:{message.id}")
         else:
             message.available_at = now + timedelta(seconds=min(60 * 2 ** min(message.attempts - 1, 6), 3600))
         audit(session, message, "delivery_" + result.status, now)

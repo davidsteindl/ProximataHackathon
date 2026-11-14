@@ -18,6 +18,7 @@ test("schedule and timeline filtering reach REST while other overview data remai
   assert.ok(urls.some((url) => url.pathname === "/evidence"));
   assert.ok(urls.some((url) => url.pathname === "/flags" && url.search === ""));
   assert.deepEqual(result.data.flags, []);
+  assert.ok(urls.some((url) => url.pathname === "/flags" && url.searchParams.get("status") === "closed"));
   const tasks = urls.find((url) => url.pathname === "/tasks");
   assert.equal(tasks.searchParams.get("zone_id"), "F3");
   assert.equal(tasks.searchParams.get("from_time"), "2026-11-15T00:00:00Z");
@@ -25,7 +26,7 @@ test("schedule and timeline filtering reach REST while other overview data remai
   const events = urls.find((url) => url.pathname === "/events");
   assert.equal(events.search, tasks.search);
   assert.deepEqual(result.data.events, []);
-  assert.ok(urls.filter((url) => !["/tasks", "/events"].includes(url.pathname)).every((url) => url.search === ""));
+  assert.ok(urls.filter((url) => !["/tasks", "/events", "/flags"].includes(url.pathname)).every((url) => url.search === ""));
 });
 
 test("unavailable or invalid REST responses are shown as errors, not an empty site", async () => {

@@ -16,7 +16,7 @@ from test_rules import initialized, ingest
 
 def test_outbox_migration_extends_revision_notes_and_round_trips(engine):
     config = Config(str(BACKEND / "alembic.ini"))
-    assert ScriptDirectory.from_config(config).get_heads() == ["0007"]
+    assert ScriptDirectory.from_config(config).get_heads() == ["0008"]
     with engine.begin() as connection:
         config.attributes["connection"] = connection
         command.downgrade(config, "0006")
@@ -84,6 +84,8 @@ def test_recipient_comes_from_site_record_and_success_notifies_once(initialized,
     assert report(initialized, item).status_code == 200
     flag = initialized.get('/flags').json()[0]
     assert flag['state'] == 'notified'
+    transition = next(row for row in flag['audit'] if row['action'] == 'notified')
+    assert (transition['from_state'], transition['to_state']) == ('detected', 'notified')
     assert {x['action'] for x in flag['audit']} >= {'delivery_attempted', 'delivery_sent', 'notified'}
     assert report(initialized, item).status_code == 200
     assert initialized.get('/flags').json()[0] == flag

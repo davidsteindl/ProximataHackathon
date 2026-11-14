@@ -2,6 +2,7 @@ import Link from "next/link";
 import { flattenZones, formatTime } from "../lib/site.mjs";
 import EventTimeline from "./event-timeline";
 import FlagInbox from "./flag-inbox";
+import { HumanReview, EvidenceActions } from "./human-review";
 
 function ZoneTree({ zones }) {
   return (
@@ -20,13 +21,17 @@ function ZoneTree({ zones }) {
 }
 
 export default function SiteOverview({ data, filters }) {
-  const { site, zones, tasks, crews, plans, inspections, evidence, events, flags } = data;
+  const { site, zones, tasks, crews, plans, inspections, evidence, events, flags, closedFlags } = data;
   if (!site) return <p>No site data has been loaded yet.</p>;
 
   const crewNames = Object.fromEntries(crews.map((crew) => [crew.id, crew.name]));
   return (
-    <>
+    <HumanReview crews={crews}>
       <FlagInbox flags={flags} timezone={site.timezone} />
+      <details>
+        <summary>Closed Flags and audit history ({closedFlags.length})</summary>
+        <FlagInbox flags={closedFlags} timezone={site.timezone} closed />
+      </details>
       <section aria-labelledby="site-title">
         <h2 id="site-title">{site.name}</h2>
         <p>Scenario day 1: {site.start_date}. Schedule times: {site.timezone}.</p>
@@ -152,9 +157,11 @@ export default function SiteOverview({ data, filters }) {
                         <li key={review.sequence}>
                           {review.status} · {review.actor_type === "human" ? `${review.reviewer_id} (${review.reviewer_role})` : review.actor_type.replaceAll("_", " ")}
                           <p>{formatTime(review.decided_at || review.recorded_at, site.timezone)}</p>
+                          {review.reason && <p>{review.reason}</p>}
                         </li>
                       ))}</ol>
                     </details>
+                    <EvidenceActions evidence={record} crews={crews} tasks={tasks} />
                   </td>
                 </tr>
               ))}</tbody>
@@ -162,6 +169,6 @@ export default function SiteOverview({ data, filters }) {
           </div>
         )}
       </section>
-    </>
+    </HumanReview>
   );
 }
