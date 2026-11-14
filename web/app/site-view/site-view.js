@@ -397,7 +397,6 @@ export default function SiteView({ model, initialState, error }) {
           <nav className="quick-dock panel" data-reserve aria-label="Quick actions">
             <Link href="/flags"><i style={{ background: "var(--crit-solid)" }} aria-hidden="true" />Open flags ({openFlags})</Link>
             <Link href="/evidence"><i style={{ background: "var(--muted)" }} aria-hidden="true" />Review evidence{unconfirmed ? ` (${unconfirmed})` : ""}</Link>
-            <Link href="/chat"><i style={{ background: "var(--blue)" }} aria-hidden="true" />Ask GroundIQ</Link>
           </nav>
         </div>
 

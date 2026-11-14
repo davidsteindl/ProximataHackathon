@@ -9,7 +9,6 @@ export const ICONS = {
   evidence: <svg {...svg}><rect x="3" y="2.2" width="10" height="11.6" rx="1.5" /><path d="m5.6 8.4 1.8 1.8 3.2-3.6" /></svg>,
   proposals: <svg {...svg}><path d="M8 2.2a4 4 0 0 1 2.4 7.2c-.5.4-.8.9-.8 1.5v.6H6.4v-.6c0-.6-.3-1.1-.8-1.5A4 4 0 0 1 8 2.2zM6.4 13.8h3.2" /></svg>,
   activity: <svg {...svg}><path d="M1.8 8.5h2.7l1.8-4.6 3.2 8.2 1.8-3.6h2.9" /></svg>,
-  chat: <svg {...svg}><path d="M2.8 3.4h10.4v6.8H7.4l-2.8 2.6v-2.6H2.8z" /></svg>,
 };
 
 export const NAV = [
@@ -19,7 +18,6 @@ export const NAV = [
   { key: "evidence", href: "/evidence", text: "Evidence" },
   { key: "proposals", href: "/proposals", text: "Proposals" },
   { key: "activity", href: "/activity", text: "Activity" },
-  { key: "chat", href: "/chat", text: "Chat" },
 ];
 
 /** Dark work-view chrome: sidebar navigation, scenario clock and demo role switcher. */
