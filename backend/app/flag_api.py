@@ -6,6 +6,7 @@ from fastapi import APIRouter, HTTPException
 from sqlalchemy import case, select
 
 from app import models
+from app.outbox import OutboxView
 from app.ingestion_schemas import EventView
 from app.ingestion import event_views
 from app.schemas import EvidenceView, Identifier, Record, Timestamp
@@ -46,13 +47,15 @@ class FlagView(Record):
     sources: list[EventView]
     evidence: list[EvidenceView]
     audit: list[AuditView]
+    notifications: list[OutboxView]
 
 
 def flag_view(session, flag):
     inspection = session.get(models.Inspection, flag.inspection_id) if flag.inspection_id else None
     zones = {zone.id: zone for zone in session.scalars(select(models.Zone))} if inspection else {}
     return FlagView.model_validate({
-        **{key: getattr(flag, key) for key in FlagView.model_fields if key not in {"sources", "evidence"}},
+        **{key: getattr(flag, key) for key in FlagView.model_fields if key not in {"sources", "evidence", "notifications"}},
+        "notifications": session.scalars(select(models.OutboxMessage).where(models.OutboxMessage.flag_id == flag.id)).all(),
         "sources": event_views(session, [link.event for link in flag.sources]),
         "evidence": inspection_evidence(session, inspection, inspection_evidence_scope(flag.zone_id, zones)) if inspection else [],
     })

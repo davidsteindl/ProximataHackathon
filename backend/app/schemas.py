@@ -56,7 +56,7 @@ class ZoneNode(Zone):
 class CrewLead(Record):
     id: Identifier
     name: Name
-    email: Annotated[str, Field(max_length=254, pattern=r"^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$")] | None = None
+    email: Annotated[str, Field(max_length=254, pattern=r"^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$")] | None = None
 
 
 class Crew(Record):

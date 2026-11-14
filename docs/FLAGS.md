@@ -4,7 +4,8 @@
 creation time and ID. `GET /flags/{id}` returns one Flag, or 404. Both include
 affected Zone/Task/activity, required Inspection, responsible Crew Lead, current
 Precondition evaluation, timestamps, triggering Events with original Source
-Messages/quotes, Evidence with review history, and the Flag audit trail.
+Messages/quotes, Evidence with review history, the Flag audit trail, and
+`notifications` with Gmail outbox status/attempts (see [GMAIL.md](GMAIL.md#factual-flag-warnings-outbox)).
 These endpoints are read-only. Lifecycle actions and dashboard Evidence review
 belong to #9; ingestion, MCP and chat cannot approve Evidence here.
 
@@ -79,9 +80,11 @@ Flag type, Zone and Precondition: later scans, questions or Evidence reviews do
 not replay them into a new Flag. This does not suppress a new work announcement
 or a different Zone/Precondition from the same Event. Work that never had a
 closed Flag and all open Flags still participate in Evidence-triggered rechecks.
-No automatic closure, outgoing notification, Proposal or lifecycle transition is
-implemented in #7. Seed reset clears Flags, source
-links and audit before their referenced Site Record tables.
+No automatic closure or Proposal is implemented. #10 queues one factual warning
+in the Flag-creation transaction; only successful Gmail delivery changes a still
+`detected` Flag to `notified`. It never regresses human lifecycle states or confirms
+Evidence. Seed reset clears the outbox, Flags, source links and audit before their
+referenced Site Record tables.
 
 ## Verify offline
 

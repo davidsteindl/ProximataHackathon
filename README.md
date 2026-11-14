@@ -56,8 +56,8 @@ Stoppen: `docker compose down`. Die Daten bleiben im Volume `db-data` erhalten.
 Enthalten sind Infrastruktur, Health-Prüfungen, der statische Site Record aus
 Issue #5, Nachrichten-Ingestion, Event-Extraktion und Timeline aus #6 sowie
 DXF-Extraktion und Geometrie-API aus #15, Conflict A und Flag-Inbox aus #7
-sowie Gmail-Eingang aus #11. 3D-Ansicht, Plan-Diff,
-Telegram-Adapter, Gmail-Versand, MCP-Tools, Authentifizierung
+sowie Gmail-Eingang aus #11 und Outbox-/Gmail-Versand aus #10. 3D-Ansicht, Plan-Diff,
+Telegram-Adapter, MCP-Tools, Authentifizierung
 und Hosting folgen in ihren eigenen Issues.
 
 ### Nachricht → Event → Timeline (Issue #6)
@@ -118,6 +118,12 @@ und eine transaktionale Outbox: genau eine faktische Gmail-Warnung pro neuem Fla
 (60 Sekunden bis eine Stunde) erneut versucht. Nur bestätigter Versand setzt
 einen noch `detected` Flag auf `notified`; menschliche Zustände bleiben erhalten.
 Versandversuche und Ergebnisse stehen im Flag-Audit. Der Demo-Reset leert die Outbox.
+
+Versand aktivieren: Crew-Lead-Testadresse im Seed hinterlegen, OAuth mit
+`python -m app.gmail_auth --send` erneut autorisieren und `GMAIL_SEND_ENABLED=true`
+setzen. Fehlende Adressen werden als Versandfehler sichtbar. Einrichtung, Hero-Test
+und Grenzen (Gmail-Annahme, mögliche Duplikate bei unklarem Versandresultat):
+[docs/GMAIL.md](docs/GMAIL.md#factual-flag-warnings-outbox).
 
 ### Gmail-Eingang (Issue #11)
 

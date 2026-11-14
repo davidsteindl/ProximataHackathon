@@ -1,4 +1,4 @@
-"""Read-only Gmail adapter. Credentials and mailbox content stay in the worker."""
+"""Gmail adapter. Credentials and mailbox content stay in the worker."""
 
 import base64
 import json
@@ -18,6 +18,7 @@ from pydantic import TypeAdapter
 
 from app.ingestion_schemas import SenderRole, SourceMessageInput
 
+SEND_SCOPE = "https://www.googleapis.com/auth/gmail.send"
 READ_SCOPE = "https://www.googleapis.com/auth/gmail.readonly"
 GMAIL_URL = "https://gmail.googleapis.com/gmail/v1/users/me"
 
@@ -33,6 +34,7 @@ class GmailSettings:
     token_file: str = "/gmail/token.json"
     poll_seconds: float = 15
     sender_roles: dict[str, SenderRole] | None = None
+    send_enabled: bool = False
 
     @classmethod
     def from_env(cls):
@@ -48,7 +50,11 @@ class GmailSettings:
             )
         except (ValueError, TypeError):
             raise GmailError("invalid_polling_configuration") from None
+        sending = os.environ.get("GMAIL_SEND_ENABLED", "false").lower()
+        if sending not in {"true", "false"}:
+            raise GmailError("invalid_sending_configuration")
         return cls(
+            send_enabled=sending == "true",
             mailbox=mailbox, label=os.environ.get("GMAIL_LABEL", "INBOX").strip(),
             token_file=os.environ.get("GMAIL_TOKEN_FILE", "/gmail/token.json"),
             poll_seconds=interval, sender_roles={key.lower(): value for key, value in roles.items()},
@@ -69,8 +75,9 @@ class GmailClient:
     def __init__(self, settings, http, credentials=None):
         self.settings, self.http = settings, http
         self.credentials = credentials or Credentials.from_authorized_user_file(settings.token_file)
-        if set(self.credentials.scopes or ()) != {READ_SCOPE}:
-            raise GmailError("expected_readonly_scope")
+        expected = {READ_SCOPE, SEND_SCOPE} if settings.send_enabled else {READ_SCOPE}
+        if set(self.credentials.scopes or ()) != expected:
+            raise GmailError("expected_sending_scopes" if settings.send_enabled else "expected_readonly_scope")
 
     def get(self, resource, **params):
         if not self.credentials.valid:
@@ -82,6 +89,35 @@ class GmailClient:
         )
         response.raise_for_status()
         return response.json()
+
+    def send_warning(self, message):
+        from email.message import EmailMessage
+
+        if not self.settings.send_enabled:
+            raise GmailError("sending_disabled")
+        # Verify the dedicated authenticated account before any outbound request.
+        if self.get("profile").get("emailAddress", "").lower() != self.settings.mailbox:
+            raise GmailError("mailbox_mismatch")
+        if not message["recipient"]:
+            raise GmailError("missing_recipient")
+        mail = EmailMessage()
+        mail["From"] = self.settings.mailbox
+        mail["To"] = message["recipient"]
+        mail["Subject"] = message["subject"]
+        # Stable across retries; Gmail itself does not guarantee deduplication.
+        mail["Message-ID"] = f"<outbox-{message['id']}@sitemind.invalid>"
+        mail.set_content(message["content"])
+        response = self.http.post(
+            f"{GMAIL_URL}/messages/send",
+            headers={"Authorization": f"Bearer {self.credentials.token}"},
+            json={"raw": base64.urlsafe_b64encode(mail.as_bytes(policy=policy.SMTP)).decode("ascii")},
+            timeout=30,
+        )
+        response.raise_for_status()
+        result = response.json()
+        if not isinstance(result.get("id"), str) or not 1 <= len(result["id"]) <= 200:
+            raise GmailError("invalid_send_response")
+        return result["id"]
 
     def message_ids(self):
         # Validate the authenticated account before reading any message content.

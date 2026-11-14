@@ -54,6 +54,7 @@ services:
     environment:
       API_BASE_URL: ${API_BASE_URL:-http://api:8000}
       GMAIL_ENABLED: ${GMAIL_ENABLED:-false}
+      GMAIL_SEND_ENABLED: ${GMAIL_SEND_ENABLED:-false}
       GMAIL_MAILBOX: ${GMAIL_MAILBOX:-}
       GMAIL_LABEL: ${GMAIL_LABEL-INBOX}
       GMAIL_TOKEN_FILE: ${GMAIL_TOKEN_FILE:-/gmail/token.json}
