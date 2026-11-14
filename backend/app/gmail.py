@@ -3,6 +3,7 @@
 import base64
 import json
 import os
+import re
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from email import policy
@@ -158,12 +159,41 @@ def _body_text(part):
     return ""
 
 
-def _attachments(part):
+def _raw_parts(part, raw):
+    """Yield original child entities without the MIME boundary's own line ending."""
+    body = BytesParser(policy=policy.default).parsebytes(raw, headersonly=True).get_payload(decode=True)
+    if part.get_content_type() == "message/rfc822":
+        yield body
+        return
+    if part.get_content_type() == "message/delivery-status":
+        yield from re.split(rb"\r?\n\r?\n", body.rstrip(b"\r\n"))
+        return
+    boundary = part.get_boundary()
+    if boundary is None:
+        raise GmailError("unsupported_multipart")
+    delimiter = rb"(?m)^--" + re.escape(boundary.encode("ascii")) + rb"(--)?[ \t]*(?:\r?\n|$)"
+    start = None
+    for match in re.finditer(delimiter, body):
+        if start is not None:
+            content = body[start:match.start()]
+            if content.endswith(b"\r\n"):
+                content = content[:-2]
+            elif content.endswith(b"\n"):
+                content = content[:-1]
+            yield content
+        if match.group(1):
+            return
+        start = match.end()
+    if start is not None:
+        yield body[start:]
+
+
+def _attachments(part, raw):
     if part.get_filename() or part.get_content_disposition() == "attachment":
         # RFC822 attachments are preserved as complete messages, not traversed as input.
         content = part.get_payload(decode=True)
         if content is None and part.get_content_type() == "message/rfc822":
-            content = b"\n".join(child.as_bytes() for child in part.get_payload())
+            content = BytesParser(policy=policy.default).parsebytes(raw, headersonly=True).get_payload(decode=True)
         if content is None:
             raise GmailError("unsupported_attachment")
         yield {
@@ -172,8 +202,8 @@ def _attachments(part):
             "content_base64": base64.b64encode(content).decode("ascii"),
         }
     elif part.is_multipart():
-        for child in part.iter_parts():
-            yield from _attachments(child)
+        for child, child_raw in zip(part.iter_parts(), _raw_parts(part, raw), strict=True):
+            yield from _attachments(child, child_raw)
 
 
 def decode_message(message, settings):
@@ -190,5 +220,5 @@ def decode_message(message, settings):
         sender_id=sender, sender_role=(settings.sender_roles or {}).get(sender.lower(), "unknown"),
         # Gmail internalDate is stable, UTC and independent of missing/forged Date headers.
         sent_at=datetime.fromtimestamp(int(message["internalDate"]) / 1000, UTC),
-        text=text, attachments=list(_attachments(mail)),
+        text=text, attachments=list(_attachments(mail, raw)),
     )

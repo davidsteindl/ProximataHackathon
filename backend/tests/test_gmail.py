@@ -1,4 +1,5 @@
 import base64
+import quopri
 from datetime import UTC, datetime
 from email.message import EmailMessage
 from unittest.mock import Mock
@@ -33,6 +34,31 @@ def gmail_message(subject="Plan revision", body="Badwand 3B verschoben.", attach
 
 def credentials():
     return Mock(valid=True, scopes=[READ_SCOPE], token="test-access-token")
+
+
+def forwarded_message(content, newline=b"\r\n", transfer_encoding="7bit", nested=False):
+    encoded = content
+    if transfer_encoding == "base64":
+        encoded = base64.encodebytes(content)
+    elif transfer_encoding == "quoted-printable":
+        encoded = quopri.encodestring(content)
+    attachment = newline.join([
+        b"Content-Type: message/rfc822", b'Content-Disposition: attachment; filename="forwarded.eml"',
+        f"Content-Transfer-Encoding: {transfer_encoding}".encode(), b"", encoded,
+    ])
+    if nested:
+        attachment = newline.join([
+            b'Content-Type: multipart/mixed; boundary="nested"', b"", b"--nested",
+            attachment, b"--nested--", b"Nested epilogue",
+        ])
+    data = gmail_message()
+    raw = newline.join([
+        b"From: architect@example.test", b'Content-Type: multipart/mixed; boundary="outer"',
+        b"", b"Preamble", b"--outer", b"Content-Type: text/plain; charset=utf-8", b"", b"Actual body",
+        b"--outer", attachment, b"--outer--", b"Epilogue",
+    ])
+    data["raw"] = base64.urlsafe_b64encode(raw).decode()
+    return data
 
 
 def test_mime_metadata_alternatives_and_original_dxf():
@@ -89,6 +115,46 @@ def test_attached_email_is_not_ingested_as_body():
     assert source.text == "Actual body"
     assert source.attachments[0].file_name == "forwarded.eml"
     assert b"Do not extract" in base64.b64decode(source.attachments[0].content_base64)
+
+
+@pytest.mark.parametrize("newline", [b"\r\n", b"\n"])
+@pytest.mark.parametrize("transfer_encoding", ["7bit", "base64", "quoted-printable"])
+@pytest.mark.parametrize("nested", [False, True])
+@pytest.mark.parametrize("trailing_newlines", [0, 1, 2])
+def test_attached_email_preserves_original_bytes(newline, transfer_encoding, nested, trailing_newlines):
+    original = newline.join([
+        b"From: inspector@example.test", b"Subject: Inspection", b"\tfolded subject",
+        b"Content-Type: text/plain", b"", b"Original body with trailing whitespace.  ",
+    ]) + newline * trailing_newlines
+    source = decode_message(forwarded_message(original, newline, transfer_encoding, nested), SETTINGS)
+    assert source.text == "Actual body"
+    assert len(source.attachments) == 1
+    assert source.attachments[0].file_name == "forwarded.eml"
+    assert source.attachments[0].media_type == "message/rfc822"
+    assert base64.b64decode(source.attachments[0].content_base64) == original
+
+
+def test_attached_email_preserves_mixed_line_endings_and_non_ascii_bytes():
+    original = b"Subject: Original\r\nContent-Type: application/octet-stream\r\n\r\n\xff\x00\n--outer-prefix\r\n"
+    source = decode_message(forwarded_message(original, transfer_encoding="8bit"), SETTINGS)
+    assert base64.b64decode(source.attachments[0].content_base64) == original
+
+
+def test_delivery_report_does_not_block_original_email_attachment():
+    original = b"Subject: Original\r\n\r\nOriginal message.\r\n"
+    message = forwarded_message(original)
+    raw = base64.urlsafe_b64decode(message["raw"])
+    report = (
+        b"Content-Type: message/delivery-status\r\n\r\nReporting-MTA: dns; example.test\r\n\r\n"
+        b"Final-Recipient: rfc822; project@example.test\r\nAction: failed\r\nStatus: 5.1.1\r\n"
+    )
+    message["raw"] = base64.urlsafe_b64encode(raw.replace(
+        b"--outer\r\nContent-Type: message/rfc822",
+        b"--outer\r\n" + report + b"\r\n--outer\r\nContent-Type: message/rfc822",
+    )).decode()
+    source = decode_message(message, SETTINGS)
+    assert len(source.attachments) == 1
+    assert base64.b64decode(source.attachments[0].content_base64) == original
 
 
 def test_mailbox_guard_prevents_reading_content():

@@ -1,3 +1,4 @@
+import base64
 from pathlib import Path
 from unittest.mock import Mock
 
@@ -8,7 +9,7 @@ from app import ingestion
 from app.extraction import ExtractionError
 from app.gmail import GmailClient, GmailSettings
 from app.gmail_polling import poll_gmail
-from test_gmail import MAILBOX, credentials, gmail_message
+from test_gmail import MAILBOX, credentials, forwarded_message, gmail_message
 
 ROOT = Path(__file__).resolve().parents[2]
 HEROES = [
@@ -81,6 +82,27 @@ def test_hero_mail_to_timeline_and_byte_exact_dxf(initialized, subject, body, se
         assert identity(initialized, channel="telegram").json() is None
         assert identity(initialized, source_key="another@example.test").json() is None
         assert initialized.get("/source-messages").status_code == 422
+
+
+def test_forwarded_email_download_preserves_original_bytes(initialized):
+    original = b"From: inspector@example.test\r\nSubject: Inspection\r\n\tfolded header\r\n\r\nSource body.  \r\n"
+    message = forwarded_message(original, nested=True)
+    subject, body, _, _ = HEROES[0]
+    raw = base64.urlsafe_b64decode(message["raw"])
+    message["raw"] = base64.urlsafe_b64encode(
+        raw.replace(b"Actual body", f"Subject: {subject}\n\n{body}".encode()),
+    ).decode()
+    gmail, http, _ = make_gmail(message)
+    with http:
+        assert poll_gmail(gmail, initialized) == 1
+        source = identity(initialized).json()
+        attachment = source["attachments"][0]
+        assert attachment["file_name"] == "forwarded.eml"
+        assert attachment["media_type"] == "message/rfc822"
+        url = f"/source-messages/{source['id']}/attachments/{attachment['id']}"
+        assert initialized.get(url).content == original
+        assert poll_gmail(gmail, initialized) == 0
+        assert len(initialized.get("/events").json()) == 1
 
 
 def test_extraction_failure_is_retried_and_seed_reset_allows_replay(initialized, seed, monkeypatch):
